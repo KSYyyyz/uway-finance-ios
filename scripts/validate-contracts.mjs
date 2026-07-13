@@ -80,15 +80,13 @@ const project = fs.readFileSync(path.join(root, 'project.yml'), 'utf8')
 if (!project.includes(`MARKETING_VERSION: ${expectedMarketingVersion}`)) {
   throw new Error(`project MARKETING_VERSION must be ${expectedMarketingVersion}`)
 }
-for (const marker of ['UWAY_API_SCHEME: https', 'UWAY_API_HOST:']) {
-  if (!project.includes(marker)) throw new Error(`project API configuration marker missing: ${marker}`)
-}
-
 for (const configFile of ['Debug.xcconfig', 'Release.xcconfig']) {
   const config = fs.readFileSync(path.join(root, 'Config', configFile), 'utf8')
-  if (!config.includes('UWAY_API_SCHEME = https') || !config.includes('UWAY_API_HOST = ')) {
-    throw new Error(`${configFile} must provide separate HTTPS scheme and API host settings`)
-  }
+  if (!config.trim()) throw new Error(`${configFile} must not be empty`)
+}
+
+for (const marker of ['<string>https</string>', '<string>115.29.239.217</string>']) {
+  if (!plist.includes(marker)) throw new Error(`Info.plist API configuration marker missing: ${marker}`)
 }
 
 const profile = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'ProfileView.swift'), 'utf8')

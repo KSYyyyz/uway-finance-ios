@@ -40,8 +40,6 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: false
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        UWAY_API_SCHEME: https
-        UWAY_API_HOST: 115.29.239.217
     dependencies:
       - sdk: Charts.framework
 

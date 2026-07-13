@@ -26,7 +26,7 @@ chmod +x scripts/bootstrap.sh
 ./scripts/bootstrap.sh
 ```
 
-Then select the `UwayFinance` scheme and run. The API base URL comes from `Config/Debug.xcconfig` and `Config/Release.xcconfig`; no API key or password belongs in the project.
+Then select the `UwayFinance` scheme and run. The public Alibaba Cloud API endpoint is assembled from `UWAY_API_SCHEME` and `UWAY_API_HOST` in `UwayFinance/Resources/Info.plist`; no API key or password belongs in the project. A future staging build can replace those two values before compilation without changing the networking layer.
 
 ## Validate without Xcode
 
