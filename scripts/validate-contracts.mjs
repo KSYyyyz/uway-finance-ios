@@ -63,7 +63,8 @@ for (const marker of [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<plist version="1.0">',
   '</plist>',
-  '<key>UWAY_API_BASE_URL</key>',
+  '<key>UWAY_API_SCHEME</key>',
+  '<key>UWAY_API_HOST</key>',
   '<key>NSCameraUsageDescription</key>',
 ]) {
   if (!plist.includes(marker)) throw new Error(`Info.plist marker missing: ${marker}`)
@@ -82,9 +83,8 @@ if (!project.includes(`MARKETING_VERSION: ${expectedMarketingVersion}`)) {
 
 for (const configFile of ['Debug.xcconfig', 'Release.xcconfig']) {
   const config = fs.readFileSync(path.join(root, 'Config', configFile), 'utf8')
-  if (!config.includes('UWAY_URL_SLASH = /')
-    || !config.includes('https:$(UWAY_URL_SLASH)$(UWAY_URL_SLASH)')) {
-    throw new Error(`${configFile} must construct a valid HTTPS URL without xcconfig comment parsing`)
+  if (!config.includes('UWAY_API_SCHEME = https') || !config.includes('UWAY_API_HOST = ')) {
+    throw new Error(`${configFile} must provide separate HTTPS scheme and API host settings`)
   }
 }
 

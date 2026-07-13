@@ -31,12 +31,13 @@
   <array>
     <string>UIInterfaceOrientationPortrait</string>
   </array>
-  <key>UWAY_API_BASE_URL</key>
-  <string>$(UWAY_API_BASE_URL)</string>
+  <key>UWAY_API_SCHEME</key>
+  <string>$(UWAY_API_SCHEME)</string>
+  <key>UWAY_API_HOST</key>
+  <string>$(UWAY_API_HOST)</string>
   <key>NSCameraUsageDescription</key>
   <string>用于拍摄发票、合同和付款凭证，上传前会先让你确认。</string>
   <key>NSFaceIDUsageDescription</key>
   <string>用于再次解锁本机中的公司财务信息。</string>
 </dict>
 </plist>
-

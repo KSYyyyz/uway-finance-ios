@@ -32,13 +32,18 @@ struct AppConfiguration {
     let apiBaseURL: URL
 
     init(bundle: Bundle) {
-        let rawValue = bundle.object(forInfoDictionaryKey: "UWAY_API_BASE_URL") as? String
-        self.init(rawValue: rawValue)
+        let scheme = bundle.object(forInfoDictionaryKey: "UWAY_API_SCHEME") as? String
+        let host = bundle.object(forInfoDictionaryKey: "UWAY_API_HOST") as? String
+        self.init(scheme: scheme, host: host)
     }
 
-    init(rawValue: String?) {
-        guard let rawValue, let url = URL(string: rawValue), url.scheme == "https", url.host != nil else {
-            preconditionFailure("UWAY_API_BASE_URL must be a valid HTTPS URL")
+    init(scheme: String?, host: String?) {
+        var components = URLComponents()
+        components.scheme = scheme
+        components.host = host
+
+        guard scheme == "https", let host, !host.isEmpty, let url = components.url else {
+            preconditionFailure("UWAY_API_SCHEME and UWAY_API_HOST must form a valid HTTPS URL")
         }
         self.apiBaseURL = url
     }
