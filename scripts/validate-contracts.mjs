@@ -86,6 +86,12 @@ if (!project.includes('INFOPLIST_FILE: UwayFinance/Resources/Info.plist')) {
 if (/\n\s+info:\s*\n\s+path: UwayFinance\/Resources\/Info\.plist/.test(project)) {
   throw new Error('XcodeGen info generation would overwrite custom runtime configuration')
 }
+for (const marker of [
+  'path: UwayFinance/Resources/Assets.xcassets\n        buildPhase: resources',
+  'path: UwayFinanceTests/Fixtures\n        buildPhase: resources',
+]) {
+  if (!project.includes(marker)) throw new Error(`project resource build phase missing: ${marker}`)
+}
 for (const configFile of ['Debug.xcconfig', 'Release.xcconfig']) {
   const config = fs.readFileSync(path.join(root, 'Config', configFile), 'utf8')
   if (!config.trim()) throw new Error(`${configFile} must not be empty`)

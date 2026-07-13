@@ -26,8 +26,8 @@ targets:
       - path: UwayFinance
         excludes:
           - Resources
-    resources:
       - path: UwayFinance/Resources/Assets.xcassets
+        buildPhase: resources
     configFiles:
       Debug: Config/Debug.xcconfig
       Release: Config/Release.xcconfig
@@ -49,8 +49,8 @@ targets:
       - path: UwayFinanceTests
         excludes:
           - Fixtures
-    resources:
       - path: UwayFinanceTests/Fixtures
+        buildPhase: resources
     dependencies:
       - target: UwayFinance
     settings:
