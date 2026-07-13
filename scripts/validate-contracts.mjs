@@ -23,6 +23,7 @@ const requiredFiles = [
   'UwayFinance/Resources/Assets.xcassets/BrandGreen.colorset/Contents.json',
   'UwayFinanceTests/Fixtures/state-envelope.json',
   'UwayFinanceTests/AppConfigurationTests.swift',
+  'UwayFinanceTests/AppSessionTests.swift',
   'UwayFinanceTests/Fixtures/harness-result.json',
   'UwayFinanceTests/Fixtures/import-analysis-request.json',
   'UwayFinanceTests/Fixtures/import-decision-response.json',

@@ -28,9 +28,17 @@ struct ProfileView: View {
             }
 
             Section("服务连接") {
+                LabeledContent("阿里云服务") { ServerStatusLabel(state: session.serverState) }
                 LabeledContent("账本同步") { SyncStatusLabel(state: session.syncState) }
                 LabeledContent("导入分析", value: "主线接口已连接")
                 LabeledContent("OCR与附件", value: "等待后端")
+                Button("检查服务与同步", systemImage: "arrow.clockwise") {
+                    Task {
+                        await session.checkServer()
+                        guard case .available = session.serverState else { return }
+                        await session.recoverSync()
+                    }
+                }
             }
 
             Section("关于") {

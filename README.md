@@ -9,6 +9,7 @@ Current marketing version: `0.8.0`. The Profile screen reads `CFBundleShortVersi
 - Native `TabView` with 工作台、账目、待处理、月结、我的.
 - Native login and HttpOnly-cookie session restoration.
 - Current `/api/state` read/write compatibility, debounced sync status and pull-to-refresh.
+- Live `/api/health` status and backend version display; failed saves keep their local snapshot and expose a one-tap retry instead of overwriting it with a refresh.
 - “记一笔” `Form`, workbench cash summary, recent activity and a Swift Charts cash forecast.
 - Ledger fixed region: page brief, date filter, status filter and period totals stay fixed; only year/month/day ledger content scrolls. Month headings are not sticky.
 - Pending summary stays fixed while the task list scrolls; resolving a task changes the underlying record and updates every count.

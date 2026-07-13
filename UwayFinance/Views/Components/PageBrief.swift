@@ -14,7 +14,7 @@ struct PageBrief: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -43,9 +43,62 @@ struct SyncStatusLabel: View {
     }
 }
 
+struct ServerStatusLabel: View {
+    let state: AppSession.ServerState
+
+    var body: some View {
+        HStack(spacing: 5) {
+            switch state {
+            case .checking:
+                ProgressView().controlSize(.mini)
+                Text("检查中")
+            case .available(let version):
+                Image(systemName: "checkmark.circle.fill")
+                Text("服务正常 · v\(version)")
+            case .unavailable:
+                Image(systemName: "exclamationmark.triangle.fill")
+                Text("暂时无法连接")
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(state.isUnavailable ? AppTheme.danger : .secondary)
+    }
+}
+
+struct SyncRecoveryBanner: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "icloud.slash.fill")
+                .foregroundStyle(AppTheme.danger)
+            Text(message)
+                .font(.caption)
+                .lineLimit(2)
+            Spacer(minLength: 8)
+            Button("重试", action: retry)
+                .font(.caption.weight(.semibold))
+                .buttonStyle(.bordered)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(.regularMaterial)
+        .overlay(alignment: .bottom) { Divider() }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private extension AppSession.SyncState {
     var isFailure: Bool {
         if case .failed = self { return true }
+        return false
+    }
+}
+
+private extension AppSession.ServerState {
+    var isUnavailable: Bool {
+        if case .unavailable = self { return true }
         return false
     }
 }

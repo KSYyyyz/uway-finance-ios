@@ -29,6 +29,14 @@ struct MainTabView: View {
                 .tabItem { Label("我的", systemImage: "person") }
                 .tag(AppTab.profile)
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if case .failed(let message) = session.syncState {
+                SyncRecoveryBanner(message: message) {
+                    Task { await session.recoverSync() }
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(MotionToken.normal, value: session.syncState)
     }
 }
-

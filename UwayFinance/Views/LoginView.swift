@@ -37,6 +37,12 @@ struct LoginView: View {
                             .foregroundStyle(.red)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    if let alertMessage = session.alertMessage, errorMessage == nil {
+                        Text(alertMessage)
+                            .font(.footnote)
+                            .foregroundStyle(AppTheme.danger)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     Button {
                         Task { await submit() }
                     } label: {
@@ -50,6 +56,16 @@ struct LoginView: View {
                     .disabled(username.trimmingCharacters(in: .whitespaces).isEmpty || password.isEmpty || isSubmitting)
                 }
                 .appCard()
+                HStack {
+                    ServerStatusLabel(state: session.serverState)
+                    Spacer()
+                    Button("重新检查") {
+                        Task { await session.retryConnection() }
+                    }
+                    .font(.caption.weight(.semibold))
+                    .disabled(session.serverState == .checking)
+                }
+                .padding(.horizontal, 4)
                 Spacer()
                 Text("会话使用服务器 HttpOnly Cookie；App 不读取或记录密码。")
                     .font(.caption)
