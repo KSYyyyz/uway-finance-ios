@@ -80,6 +80,9 @@ const project = fs.readFileSync(path.join(root, 'project.yml'), 'utf8')
 if (!project.includes(`MARKETING_VERSION: ${expectedMarketingVersion}`)) {
   throw new Error(`project MARKETING_VERSION must be ${expectedMarketingVersion}`)
 }
+for (const marker of ['UWAY_API_SCHEME: https', 'UWAY_API_HOST:']) {
+  if (!project.includes(marker)) throw new Error(`project API configuration marker missing: ${marker}`)
+}
 
 for (const configFile of ['Debug.xcconfig', 'Release.xcconfig']) {
   const config = fs.readFileSync(path.join(root, 'Config', configFile), 'utf8')
@@ -143,6 +146,9 @@ for (const marker of [
   'runs-on: macos-26',
   'uses: actions/checkout@v7',
   'xcodegen generate --spec project.yml',
+  'build-for-testing',
+  'Verify built API configuration',
+  'test-without-building',
   'CODE_SIGNING_ALLOWED=NO',
   'uses: actions/upload-artifact@v7',
 ]) {

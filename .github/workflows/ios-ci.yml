@@ -79,7 +79,7 @@ jobs:
           echo "id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
           echo "Selected simulator: $DEVICE_ID"
 
-      - name: Build and run XCTest
+      - name: Build for testing
         env:
           NSUnbufferedIO: "YES"
         run: |
@@ -90,10 +90,37 @@ jobs:
             -scheme UwayFinance \
             -configuration Debug \
             -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -derivedDataPath DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build-for-testing 2>&1 | tee TestResults/build.log
+
+      - name: Verify built API configuration
+        run: |
+          set -euo pipefail
+          PLIST_PATH="$(find DerivedData/Build/Products/Debug-iphonesimulator -path '*/UwayFinance.app/Info.plist' -print -quit)"
+          test -n "$PLIST_PATH"
+          SCHEME="$(/usr/libexec/PlistBuddy -c 'Print :UWAY_API_SCHEME' "$PLIST_PATH")"
+          HOST="$(/usr/libexec/PlistBuddy -c 'Print :UWAY_API_HOST' "$PLIST_PATH")"
+          test "$SCHEME" = "https"
+          test -n "$HOST"
+          echo "Verified API configuration: $SCHEME://$HOST"
+
+      - name: Run XCTest
+        env:
+          NSUnbufferedIO: "YES"
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project UwayFinance.xcodeproj \
+            -scheme UwayFinance \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -derivedDataPath DerivedData \
             -resultBundlePath TestResults/UwayFinance.xcresult \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            test 2>&1 | tee TestResults/xcodebuild.log
+            test-without-building 2>&1 | tee TestResults/test.log
 
       - name: Upload Xcode results
         if: always()
