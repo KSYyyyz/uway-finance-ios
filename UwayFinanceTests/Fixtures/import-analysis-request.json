@@ -1,0 +1,27 @@
+{
+  "analysisId": "analysis-001",
+  "batchId": "batch-001",
+  "rowId": "row-1",
+  "sourceFingerprint": "fixture-fingerprint-001",
+  "existingFingerprints": [],
+  "source": {
+    "sourceId": "bank.xlsx",
+    "rowPath": "rows[1]"
+  },
+  "record": {
+    "date": "2026-07-13",
+    "direction": "expense",
+    "amount": 2480,
+    "category": "软件服务",
+    "counterparty": "示例云服务商",
+    "project": "Uway",
+    "account": "基本户",
+    "description": "云服务器费用"
+  },
+  "companyOwnership": {
+    "verified": true,
+    "evidenceText": "付款账户户名为公司名称",
+    "fieldPath": "rows[1].accountName",
+    "fingerprint": "fixture-ownership-001"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "analysisId": "analysis-001",
+  "status": "review",
+  "classification": {
+    "decision": "classify",
+    "accountCode": "6602.01",
+    "businessType": "cloud_service",
+    "evidenceRefs": ["row-1-description"],
+    "reasonCode": "CLOUD_SERVICE_PURCHASE",
+    "needsReview": true
+  },
+  "confidence": 0.82,
+  "validatedEvidenceRefs": ["row-1-description"],
+  "issues": [
+    {
+      "code": "LOW_HARNESS_CONFIDENCE",
+      "severity": "review",
+      "message": "需要人工复核",
+      "evidenceRefs": ["row-1-description"]
+    }
+  ],
+  "sourceFingerprint": "fixture-fingerprint-001"
+}
+

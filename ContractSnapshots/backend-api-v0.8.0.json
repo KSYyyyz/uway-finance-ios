@@ -1,0 +1,17 @@
+{
+  "version": "0.8.0",
+  "endpoints": [
+    { "method": "get", "path": "/api/health", "swift": "method: .get, path: \"/api/health\"" },
+    { "method": "post", "path": "/api/auth/login", "swift": "method: .post, path: \"/api/auth/login\"" },
+    { "method": "get", "path": "/api/auth/me", "swift": "method: .get, path: \"/api/auth/me\"" },
+    { "method": "post", "path": "/api/auth/logout", "swift": "method: .post, path: \"/api/auth/logout\"" },
+    { "method": "get", "path": "/api/state", "swift": "method: .get, path: \"/api/state\"" },
+    { "method": "put", "path": "/api/state", "swift": "method: .put, path: \"/api/state\"" },
+    { "method": "post", "path": "/api/audit-events", "swift": "method: .post, path: \"/api/audit-events\"" },
+    { "method": "post", "path": "/api/import-analysis", "swift": "method: .post, path: \"/api/import-analysis\"" },
+    { "method": "post", "path": "/api/import-analysis/:analysisId/decision", "swift": "method: .post, path: \"/api/import-analysis/\\(encoded)/decision\"" }
+  ],
+  "importRequestFields": ["source:", "record:", "companyOwnership:", "evidenceText:", "rowPath:"],
+  "ledgerProvenanceFields": ["importAnalysisId", "sourceFingerprint", "analysisDecision"],
+  "decisionStatuses": ["accepted", "review", "rejected"]
+}

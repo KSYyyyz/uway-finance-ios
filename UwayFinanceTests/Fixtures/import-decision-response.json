@@ -1,0 +1,9 @@
+{
+  "analysisId": "analysis-001",
+  "status": "accepted",
+  "sourceFingerprint": "fixture-fingerprint-001",
+  "resolution": {
+    "decision": "accept",
+    "reviewer": "finance-admin"
+  }
+}

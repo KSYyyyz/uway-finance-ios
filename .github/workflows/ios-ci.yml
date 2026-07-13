@@ -1,0 +1,105 @@
+name: iOS CI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/ios-ci.yml"
+      - "Config/**"
+      - "ContractSnapshots/**"
+      - "UwayFinance/**"
+      - "UwayFinanceTests/**"
+      - "project.yml"
+      - "scripts/**"
+  pull_request:
+    paths:
+      - ".github/workflows/ios-ci.yml"
+      - "Config/**"
+      - "ContractSnapshots/**"
+      - "UwayFinance/**"
+      - "UwayFinanceTests/**"
+      - "project.yml"
+      - "scripts/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test UwayFinance
+    runs-on: macos-26
+    timeout-minutes: 35
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Inspect Apple toolchain
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          xcrun simctl list runtimes
+
+      - name: Install XcodeGen
+        run: |
+          set -euo pipefail
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Validate API contracts and fixtures
+        run: node scripts/validate-contracts.mjs
+
+      - name: Generate Xcode project
+        run: xcodegen generate --spec project.yml
+
+      - name: Select newest available iPhone simulator
+        id: simulator
+        run: |
+          set -euo pipefail
+          DEVICE_ID="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices_by_runtime = json.load(sys.stdin)["devices"]
+          for runtime in sorted(devices_by_runtime, reverse=True):
+              if ".iOS-" not in runtime:
+                  continue
+              for device in devices_by_runtime[runtime]:
+                  if device.get("isAvailable") and device["name"].startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit(0)
+          raise SystemExit("No available iPhone simulator")
+          ')"
+          echo "id=$DEVICE_ID" >> "$GITHUB_OUTPUT"
+          echo "Selected simulator: $DEVICE_ID"
+
+      - name: Build and run XCTest
+        env:
+          NSUnbufferedIO: "YES"
+        run: |
+          set -euo pipefail
+          mkdir -p TestResults
+          xcodebuild \
+            -project UwayFinance.xcodeproj \
+            -scheme UwayFinance \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
+            -resultBundlePath TestResults/UwayFinance.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            test 2>&1 | tee TestResults/xcodebuild.log
+
+      - name: Upload Xcode results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-test-results-${{ github.run_number }}
+          path: TestResults
+          if-no-files-found: warn
+          retention-days: 14

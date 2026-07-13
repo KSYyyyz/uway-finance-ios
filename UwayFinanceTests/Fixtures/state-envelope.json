@@ -1,0 +1,46 @@
+{
+  "data": {
+    "records": [
+      {
+        "id": "R-001",
+        "date": "2026-07-13",
+        "direction": "expense",
+        "amount": 2480,
+        "category": "云服务",
+        "counterparty": "阿里云计算有限公司",
+        "project": "Uway",
+        "account": "招商银行6214",
+        "settlementStatus": "settled",
+        "invoiceStatus": "pending",
+        "financeStatus": "draft",
+        "contractStatus": "not_required",
+        "description": "云服务器年度费用",
+        "source": "csv",
+        "scenario": "formal_expense",
+        "supportingDocumentStatus": "pending",
+        "importAnalysisId": "analysis-001",
+        "sourceFingerprint": "fixture-fingerprint-001",
+        "analysisDecision": "harness_accepted"
+      }
+    ],
+    "bankTransactions": [
+      {
+        "id": "B-001",
+        "date": "2026-07-13",
+        "direction": "expense",
+        "amount": 2480,
+        "counterparty": "阿里云计算有限公司",
+        "description": "云服务器年度费用",
+        "account": "招商银行6214",
+        "reference": "BANK-001",
+        "sourceFile": "bank.xlsx",
+        "importedAt": "2026-07-13T09:30:00Z",
+        "matchStatus": "suggested",
+        "suggestedRecordId": "R-001"
+      }
+    ],
+    "completedLessons": [],
+    "completedClose": ["C-1"]
+  },
+  "updatedAt": "2026-07-13T09:42:00Z"
+}

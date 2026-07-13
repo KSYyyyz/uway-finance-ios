@@ -1,0 +1,11 @@
+.DS_Store
+DerivedData/
+TestResults/
+UwayFinance.xcodeproj/
+xcuserdata/
+*.xcuserstate
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision
