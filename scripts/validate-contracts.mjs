@@ -83,6 +83,9 @@ if (!project.includes(`MARKETING_VERSION: ${expectedMarketingVersion}`)) {
 if (!project.includes('INFOPLIST_FILE: UwayFinance/Resources/Info.plist')) {
   throw new Error('project must reference the complete checked-in Info.plist without regenerating it')
 }
+if (!project.includes('ASSETCATALOG_COMPILER_APPICON_NAME: ""')) {
+  throw new Error('project must not require an AppIcon set until production icon assets are added')
+}
 if (/\n\s+info:\s*\n\s+path: UwayFinance\/Resources\/Info\.plist/.test(project)) {
   throw new Error('XcodeGen info generation would overwrite custom runtime configuration')
 }
