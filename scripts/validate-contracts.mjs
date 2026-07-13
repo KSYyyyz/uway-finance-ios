@@ -80,6 +80,12 @@ const project = fs.readFileSync(path.join(root, 'project.yml'), 'utf8')
 if (!project.includes(`MARKETING_VERSION: ${expectedMarketingVersion}`)) {
   throw new Error(`project MARKETING_VERSION must be ${expectedMarketingVersion}`)
 }
+if (!project.includes('INFOPLIST_FILE: UwayFinance/Resources/Info.plist')) {
+  throw new Error('project must reference the complete checked-in Info.plist without regenerating it')
+}
+if (/\n\s+info:\s*\n\s+path: UwayFinance\/Resources\/Info\.plist/.test(project)) {
+  throw new Error('XcodeGen info generation would overwrite custom runtime configuration')
+}
 for (const configFile of ['Debug.xcconfig', 'Release.xcconfig']) {
   const config = fs.readFileSync(path.join(root, 'Config', configFile), 'utf8')
   if (!config.trim()) throw new Error(`${configFile} must not be empty`)
