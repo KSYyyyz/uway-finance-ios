@@ -22,6 +22,7 @@ const requiredFiles = [
   'UwayFinance/Resources/Assets.xcassets/AccentColor.colorset/Contents.json',
   'UwayFinance/Resources/Assets.xcassets/BrandGreen.colorset/Contents.json',
   'UwayFinanceTests/Fixtures/state-envelope.json',
+  'UwayFinanceTests/AppConfigurationTests.swift',
   'UwayFinanceTests/Fixtures/harness-result.json',
   'UwayFinanceTests/Fixtures/import-analysis-request.json',
   'UwayFinanceTests/Fixtures/import-decision-response.json',
@@ -77,6 +78,14 @@ if (!plist.includes('<key>CFBundleShortVersionString</key>') || !plist.includes(
 const project = fs.readFileSync(path.join(root, 'project.yml'), 'utf8')
 if (!project.includes(`MARKETING_VERSION: ${expectedMarketingVersion}`)) {
   throw new Error(`project MARKETING_VERSION must be ${expectedMarketingVersion}`)
+}
+
+for (const configFile of ['Debug.xcconfig', 'Release.xcconfig']) {
+  const config = fs.readFileSync(path.join(root, 'Config', configFile), 'utf8')
+  if (!config.includes('UWAY_URL_SLASH = /')
+    || !config.includes('https:$(UWAY_URL_SLASH)$(UWAY_URL_SLASH)')) {
+    throw new Error(`${configFile} must construct a valid HTTPS URL without xcconfig comment parsing`)
+  }
 }
 
 const profile = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'ProfileView.swift'), 'utf8')
