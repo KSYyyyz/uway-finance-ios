@@ -67,9 +67,15 @@ extension Array where Element == BusinessRecord {
         let months = Dictionary(grouping: self) { String($0.date.prefix(7)) }
         return months.keys.sorted(by: >).map { month in
             let records = months[month, default: []]
-            let days = Dictionary(grouping: records, by: \.date)
-                .keys.sorted(by: >)
-                .map { LedgerDayGroup(date: $0, records: days[$0, default: []].sorted { $0.id < $1.id }) }
+            let recordsByDay = Dictionary(grouping: records, by: \.date)
+            let days = recordsByDay.keys
+                .sorted(by: >)
+                .map { date in
+                    LedgerDayGroup(
+                        date: date,
+                        records: recordsByDay[date, default: []].sorted { $0.id < $1.id }
+                    )
+                }
             return LedgerMonthGroup(month: month, days: days)
         }
     }
