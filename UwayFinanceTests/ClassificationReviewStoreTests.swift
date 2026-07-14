@@ -26,7 +26,7 @@ final class ClassificationReviewStoreTests: XCTestCase {
 
     func testOfflineDecisionRetryKeepsDraftAndReusesIdenticalCommand() async throws {
         let page = try decodeList("classification-reviews-pending-v0.11.0")
-        let completedPage = try decodeList("classification-reviews-accepted-v0.11.0")
+        let completedPage = try decodeList("classification-reviews-rejected-v0.11.0")
         let response = try decodeDecision("classification-decision-correct-v0.11.0")
         let api = ClassificationReviewAPISpy(
             listResponses: [page, completedPage],

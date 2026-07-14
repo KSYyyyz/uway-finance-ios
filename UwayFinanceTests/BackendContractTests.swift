@@ -89,7 +89,7 @@ final class BackendContractTests: XCTestCase {
         )
         let contract = BackendContract(health: health, negotiated: response)
 
-        XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260714_004")
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])
         XCTAssertTrue(contract.capabilities.unifiedDashboardMetrics)

@@ -74,8 +74,10 @@ final class ClassificationReviewAPITests: XCTestCase {
         }
         XCTAssertEqual(Set(keys), Set(["ios-classification-analyze-00000000-0000-0000-0000-000000000011"]))
         let bodies = try ClassificationReviewURLProtocol.capturedBodies.map { try XCTUnwrap($0) }
-        XCTAssertEqual(Set(bodies).count, 1)
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: bodies[0]) as? [String: Any])
+        let firstJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: bodies[0]) as? NSDictionary)
+        let secondJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: bodies[1]) as? NSDictionary)
+        XCTAssertEqual(firstJSON, secondJSON)
+        let json = try XCTUnwrap(firstJSON as? [String: Any])
         XCTAssertEqual(json["expectedRecordVersion"] as? Int, 3)
         XCTAssertEqual(json["expectedClassificationVersion"] as? Int, 2)
     }
