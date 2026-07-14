@@ -187,7 +187,7 @@ enum RecordCSVParser {
             } else if character == ",", !quoted {
                 row.append(field.trimmingCharacters(in: .whitespacesAndNewlines))
                 field = ""
-            } else if (character == "\n" || character == "\r"), !quoted {
+            } else if (character == "\n" || character == "\r" || character == "\r\n"), !quoted {
                 if character == "\r", next < source.endIndex, source[next] == "\n" {
                     index = source.index(after: next)
                 } else {
