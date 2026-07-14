@@ -2,14 +2,15 @@
 
 SwiftUI client for the internal Uway finance workflow. This repository contains only the native iOS frontend; the Fastify/PostgreSQL backend is deployed separately on Alibaba Cloud and is accessed over HTTPS.
 
-Current marketing version: `0.8.0`. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
+Current marketing version: `0.9.0`, compatible with backend 0.9.0 and its `20260714_001_finance_domain_v2` database schema. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
 
 ## Implemented stage
 
 - Native `TabView` with 工作台、账目、待处理、月结、我的.
 - Native login and HttpOnly-cookie session restoration.
-- Current `/api/state` read/write compatibility, debounced sync status and pull-to-refresh.
-- Live `/api/health` status and backend version display; failed saves keep their local snapshot and expose a one-tap retry instead of overwriting it with a refresh.
+- Current `/api/state` read/write compatibility, debounced sync status and pull-to-refresh. The backend may mirror those writes into Finance Domain V2, but the iOS client does not call unimplemented resource APIs.
+- Live `/api/health` status, backend version and optional finance-schema display; 0.8.x responses without `financeSchemaVersion` remain decodable. Failed saves keep their local snapshot and expose a one-tap retry instead of overwriting it with a refresh.
+- Exact-cent network/domain boundary: current JSON number amounts remain compatible, while Swift Codable converts them to integer cents before round-tripping state and import payloads.
 - “记一笔” `Form`, workbench cash summary, recent activity and a Swift Charts cash forecast.
 - Ledger fixed region: page brief, date filter, status filter and period totals stay fixed; only year/month/day ledger content scrolls. Month headings are not sticky.
 - Pending summary stays fixed while the task list scrolls; resolving a task changes the underlying record and updates every count.
@@ -56,8 +57,8 @@ The repository workflow `.github/workflows/ios-ci.yml` runs on GitHub's `macos-2
 4. builds the app and runs XCTest without signing;
 5. uploads the `.xcresult` bundle and build log for 14 days.
 
-It runs for iOS or checked-in contract-snapshot changes and can also be started manually with `workflow_dispatch`. `ContractSnapshots/backend-api-v0.8.0.json` is the standalone frontend contract baseline; when the repository is located inside the full Uway workspace, the validator additionally cross-checks the local backend source. No Apple signing secret is required for this simulator job.
+It runs for iOS or checked-in contract-snapshot changes and can also be started manually with `workflow_dispatch`. `ContractSnapshots/backend-api-v0.9.0.json` is the standalone frontend contract baseline; when the repository is located inside the full Uway workspace, the validator additionally cross-checks the local backend source and Finance Domain schema constant. No Apple signing secret is required for this simulator job.
 
 ## Current backend boundary
 
-The main backend implements both import-analysis endpoints. Analysis requires the server-side classifier configuration and can return `503 IMPORT_AI_NOT_CONFIGURED` when that service is unavailable. The native screen surfaces that failure and never falls back to a model key on the phone. Attachment/OCR endpoints are not exposed yet; the native client keeps them behind `DocumentAPI` so backend activation does not require a screen rewrite.
+Backend 0.9.0 implements both import-analysis endpoints and still exposes finance data through the legacy `/api/state` compatibility path. Its V2 organization, account-book, period, business-record, bank-transaction, voucher, reconciliation, workflow and AI evidence domains do not yet have resource APIs, so the native app does not invent or probe those paths. Analysis requires the server-side classifier configuration and can return `503 IMPORT_AI_NOT_CONFIGURED` when that service is unavailable. The native screen surfaces that failure and never falls back to a model key on the phone. Attachment/OCR endpoints are not exposed yet; the native client keeps them behind `DocumentAPI` so backend activation does not require a screen rewrite.

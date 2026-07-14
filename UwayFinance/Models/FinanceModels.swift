@@ -36,7 +36,7 @@ struct BusinessRecord: Codable, Identifiable, Hashable {
     var id: String
     var date: String
     var direction: Direction
-    var amount: Double
+    @LegacyMoney var amount: Double
     var category: String
     var counterparty: String
     var project: String
@@ -64,7 +64,7 @@ struct BankTransaction: Codable, Identifiable, Hashable {
     var id: String
     var date: String
     var direction: Direction
-    var amount: Double
+    @LegacyMoney var amount: Double
     var counterparty: String
     var description: String
     var account: String
@@ -101,6 +101,24 @@ struct SessionUser: Codable, Identifiable, Equatable {
 }
 
 struct SessionEnvelope: Codable { let user: SessionUser }
-struct HealthResponse: Codable { let status: String; let version: String }
+struct HealthResponse: Codable, Equatable {
+    let status: String
+    let version: String
+    let financeSchemaVersion: String?
+
+    init(status: String, version: String, financeSchemaVersion: String? = nil) {
+        self.status = status
+        self.version = version
+        self.financeSchemaVersion = financeSchemaVersion
+    }
+}
 struct MutationResponse: Codable { let ok: Bool; let updatedAt: String? }
 struct OKResponse: Codable { let ok: Bool }
+
+extension BusinessRecord {
+    var preciseAmount: MoneyAmount { $amount }
+}
+
+extension BankTransaction {
+    var preciseAmount: MoneyAmount { $amount }
+}

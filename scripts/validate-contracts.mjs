@@ -4,18 +4,21 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
-const expectedMarketingVersion = '0.8.0'
+const expectedMarketingVersion = '0.9.0'
+const expectedFinanceSchemaVersion = '20260714_001_finance_domain_v2'
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
-const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.8.0.json')
+const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.9.0.json')
 
 const requiredFiles = [
   'project.yml',
-  'ContractSnapshots/backend-api-v0.8.0.json',
+  'ContractSnapshots/backend-api-v0.9.0.json',
   'UwayFinance/App/UwayFinanceApp.swift',
   'UwayFinance/Networking/APIEndpoint.swift',
   'UwayFinance/Networking/FinanceAPI.swift',
   'UwayFinance/Networking/ImportAnalysisAPI.swift',
   'UwayFinance/Networking/DocumentAPI.swift',
+  'UwayFinance/Models/BackendContract.swift',
+  'UwayFinance/Models/MoneyAmount.swift',
   'UwayFinance/Models/RecordImportPipeline.swift',
   'UwayFinance/State/RecordImportSession.swift',
   'UwayFinance/Views/RecordImportView.swift',
@@ -27,10 +30,15 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/state-envelope.json',
   'UwayFinanceTests/AppConfigurationTests.swift',
   'UwayFinanceTests/AppSessionTests.swift',
+  'UwayFinanceTests/BackendContractTests.swift',
+  'UwayFinanceTests/MoneyAmountTests.swift',
   'UwayFinanceTests/RecordImportPipelineTests.swift',
   'UwayFinanceTests/Fixtures/harness-result.json',
   'UwayFinanceTests/Fixtures/import-analysis-request.json',
   'UwayFinanceTests/Fixtures/import-decision-response.json',
+  'UwayFinanceTests/Fixtures/health-v0.8.1.json',
+  'UwayFinanceTests/Fixtures/health-v0.9.0.json',
+  'CHANGELOG.md',
 ]
 
 for (const file of requiredFiles) {
@@ -38,7 +46,14 @@ for (const file of requiredFiles) {
 }
 if (!fs.existsSync(workflowPath)) throw new Error('missing .github/workflows/ios-ci.yml')
 
-const fixtures = ['state-envelope.json', 'harness-result.json', 'import-analysis-request.json', 'import-decision-response.json']
+const fixtures = [
+  'state-envelope.json',
+  'harness-result.json',
+  'import-analysis-request.json',
+  'import-decision-response.json',
+  'health-v0.8.1.json',
+  'health-v0.9.0.json',
+]
 for (const fixture of fixtures) {
   JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', fixture), 'utf8'))
 }
@@ -51,6 +66,16 @@ if (decisionResponse.resolution?.decision !== 'accept' || !decisionResponse.reso
 
 const contractSnapshot = JSON.parse(fs.readFileSync(contractSnapshotPath, 'utf8'))
 if (contractSnapshot.version !== expectedMarketingVersion) throw new Error('backend contract snapshot version mismatch')
+if (contractSnapshot.financeSchemaVersion !== expectedFinanceSchemaVersion) {
+  throw new Error('backend contract snapshot finance schema mismatch')
+}
+if (contractSnapshot.dataMode !== 'legacy_state_compatibility') {
+  throw new Error('iOS must remain on the legacy-state compatibility path')
+}
+if (contractSnapshot.capabilities?.financeDomainV2Mirror !== true
+    || contractSnapshot.capabilities?.financeResourceAPI !== false) {
+  throw new Error('V2 mirror/resource capabilities do not match the 0.9.0 backend boundary')
+}
 if (!['accepted', 'review', 'rejected'].every((status) => contractSnapshot.decisionStatuses.includes(status))) {
   throw new Error('backend contract snapshot must preserve Harness three-state status')
 }
@@ -120,6 +145,10 @@ if (profile.includes(`value: "${expectedMarketingVersion}"`)) {
 const swiftEndpoints = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'APIEndpoint.swift'), 'utf8')
 const currentContracts = contractSnapshot.endpoints
 
+if (swiftEndpoints.includes('/api/v2') || swiftEndpoints.includes('/api/business-records')) {
+  throw new Error('client must not call unimplemented Finance Domain V2 resource endpoints')
+}
+
 for (const { method, path: endpoint, swift: swiftNeedle } of currentContracts) {
   if (!swiftEndpoints.includes(swiftNeedle)) throw new Error(`Swift endpoint missing: ${method.toUpperCase()} ${endpoint}`)
 }
@@ -131,6 +160,9 @@ for (const field of contractSnapshot.importRequestFields) {
 if (importModels.includes('reviewerId')) throw new Error('reviewer identity must come from the authenticated server session')
 if (!importModels.includes('let resolution: ImportReviewResolution?')) {
   throw new Error('Harness result must preserve authenticated human-resolution provenance')
+}
+if (!importModels.includes('@LegacyMoney var amount: Double')) {
+  throw new Error('legacy import amount must cross Codable through the exact-cent adapter')
 }
 
 const importPipeline = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'RecordImportPipeline.swift'), 'utf8')
@@ -150,12 +182,26 @@ const financeModels = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', '
 for (const field of contractSnapshot.ledgerProvenanceFields) {
   if (!financeModels.includes(field)) throw new Error(`ledger provenance field mismatch: ${field}`)
 }
+for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amount: Double']) {
+  if (!financeModels.includes(marker)) throw new Error(`0.9 compatibility model marker missing: ${marker}`)
+}
+
+const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
+for (const marker of [expectedFinanceSchemaVersion, 'legacy_state_compatibility', 'financeResourceAPI: false', '"accepted", "review", "rejected"']) {
+  if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
+}
+
+const moneyAmount = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'MoneyAmount.swift'), 'utf8')
+for (const marker of ['let cents: Int64', 'struct LegacyMoney: Codable', 'container.encode(decimalValue)']) {
+  if (!moneyAmount.includes(marker)) throw new Error(`lossless money marker missing: ${marker}`)
+}
 
 const serverPath = path.join(workspace, 'server', 'index.ts')
 const importSchemaPath = path.join(workspace, 'server', 'import-analysis.ts')
 const stateSchemaPath = path.join(workspace, 'server', 'schema.ts')
+const financeDomainPath = path.join(workspace, 'server', 'finance-domain.ts')
 const hasLocalBackend = process.env.UWAY_SKIP_LOCAL_BACKEND !== '1'
-  && [serverPath, importSchemaPath, stateSchemaPath].every(fs.existsSync)
+  && [serverPath, importSchemaPath, stateSchemaPath, financeDomainPath].every(fs.existsSync)
 if (hasLocalBackend) {
   const server = fs.readFileSync(serverPath, 'utf8')
   for (const { method, path: endpoint } of currentContracts) {
@@ -168,6 +214,13 @@ if (hasLocalBackend) {
   const stateSchema = fs.readFileSync(stateSchemaPath, 'utf8')
   for (const field of contractSnapshot.ledgerProvenanceFields) {
     if (!stateSchema.includes(field)) throw new Error(`local state schema mismatch: ${field}`)
+  }
+  const financeDomain = fs.readFileSync(financeDomainPath, 'utf8')
+  if (!financeDomain.includes(`FINANCE_SCHEMA_VERSION = '${expectedFinanceSchemaVersion}'`)) {
+    throw new Error('local finance domain schema version mismatch')
+  }
+  if (!server.includes('financeSchemaVersion: FINANCE_SCHEMA_VERSION')) {
+    throw new Error('local health response must expose financeSchemaVersion')
   }
 }
 

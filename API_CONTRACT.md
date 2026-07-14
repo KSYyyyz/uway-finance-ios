@@ -1,6 +1,12 @@
 # UwayFinance iOS API contract
 
-The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.8.0.json` is the checked-in v0.8.0 compatibility baseline used by Windows and macOS CI; the full workspace validator also cross-checks it against local backend sources when they are present.
+The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.9.0.json` is the checked-in 0.9.0 compatibility baseline used by Windows and macOS CI; the full workspace validator also cross-checks it against local backend sources when they are present.
+
+## Backend 0.9.0 capability handshake
+
+`GET /api/health` returns `status`, `version` and, on backend 0.9.0, `financeSchemaVersion: "20260714_001_finance_domain_v2"`. The schema field is optional in Swift so an installed client can still connect to a 0.8.x backend that omits it.
+
+The detected schema enables only a capability description, not a new URL. The active mode is `legacy_state_compatibility`: iOS continues to use `/api/state`, the server owns any Finance Domain V2 mirror, and `financeResourceAPI` remains false. No organization, account-book, period, business-record, voucher, reconciliation, workflow or AI-evidence resource endpoint is called until mainline publishes and implements that contract.
 
 ## Connected in the first native build
 
@@ -17,6 +23,8 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 | POST | `/api/audit-events` | `FinanceAPI.audit(...)` |
 
 `PUT /api/state` remains a compatibility bridge. It is suitable for the current single-user pilot but does not provide record-level conflict protection.
+
+Legacy state and import JSON keep their existing numeric `amount` keys. Swift decodes them through `MoneyAmount` into signed 64-bit integer cents and encodes a decimal JSON number on write. The existing UI may temporarily consume a compatibility `Double`, but network/domain state has an exact-cent projection and no new financial model should introduce a raw `Double` boundary. A future resource API may send either decimal JSON numbers or decimal strings; both decode losslessly to cents.
 
 ## Connected mainline import-analysis boundary
 
@@ -58,6 +66,6 @@ Proposed paths are centralized in `FutureAPIEndpoint`:
 
 Until Fastify implements them, `ReservedDocumentAPI` returns a visible “waiting for backend” error and does not drop user data.
 
-## Next backend migration
+## Contracts required for the next backend migration
 
-Before multi-device release, replace whole-state writes with cursor-based record resources, idempotency keys and `expectedVersion` conflict checks. UI code depends on `FinanceAPI`, not concrete URLs, so the migration stays inside the repository/network layer.
+Before multi-device release, mainline must publish implemented resource paths and DTOs for organization/account-book context, periods, business records, bank transactions, vouchers, reconciliation/workflow actions, documents and AI evidence/feedback. The contract also needs pagination/cursors, decimal amount representation, stable IDs, idempotency keys, `expectedVersion` conflict checks, deletion semantics and authorization/role errors. UI code depends on `FinanceAPI`, not concrete URLs, so the eventual migration stays inside the repository/network layer.

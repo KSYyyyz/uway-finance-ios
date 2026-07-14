@@ -7,7 +7,7 @@ final class AppSession: ObservableObject {
     enum SyncState: Equatable { case idle, syncing, synced(Date), failed(String) }
     enum ServerState: Equatable {
         case checking
-        case available(version: String)
+        case available(BackendContract)
         case unavailable(String)
     }
 
@@ -50,7 +50,7 @@ final class AppSession: ObservableObject {
         serverState = .checking
         do {
             let health = try await api.health()
-            serverState = .available(version: health.version)
+            serverState = .available(BackendContract(health: health))
             alertMessage = nil
         } catch {
             serverState = .unavailable(error.localizedDescription)

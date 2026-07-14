@@ -52,9 +52,9 @@ struct ServerStatusLabel: View {
             case .checking:
                 ProgressView().controlSize(.mini)
                 Text("检查中")
-            case .available(let version):
+            case .available(let contract):
                 Image(systemName: "checkmark.circle.fill")
-                Text("服务正常 · v\(version)")
+                Text("服务正常 · v\(contract.serverVersion)")
             case .unavailable:
                 Image(systemName: "exclamationmark.triangle.fill")
                 Text("暂时无法连接")

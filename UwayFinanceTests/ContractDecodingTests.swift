@@ -9,7 +9,9 @@ final class ContractDecodingTests: XCTestCase {
         XCTAssertEqual(envelope.data.records[0].scenario, .formalExpense)
         XCTAssertEqual(envelope.data.records[0].analysisDecision, .harnessAccepted)
         XCTAssertEqual(envelope.data.records[0].importAnalysisId, "analysis-001")
+        XCTAssertEqual(envelope.data.records[0].preciseAmount.cents, 248_000)
         XCTAssertEqual(envelope.data.bankTransactions[0].matchStatus, .suggested)
+        XCTAssertEqual(envelope.data.bankTransactions[0].preciseAmount.cents, 248_000)
     }
 
     func testHarnessResultDecodesWithoutCreatingFacts() throws {

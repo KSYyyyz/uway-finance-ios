@@ -10,7 +10,7 @@ struct ImportSource: Codable, Hashable {
 struct ImportRecordInput: Codable, Hashable {
     let date: String
     let direction: Direction
-    let amount: Double
+    @LegacyMoney var amount: Double
     var category: String? = nil
     var counterparty: String? = nil
     var project: String? = nil

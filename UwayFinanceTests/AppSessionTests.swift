@@ -11,7 +11,14 @@ final class AppSessionTests: XCTestCase {
 
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
-        XCTAssertEqual(session.serverState, .available(version: "0.8.1"))
+        XCTAssertEqual(
+            session.serverState,
+            .available(BackendContract(health: HealthResponse(
+                status: "ok",
+                version: "0.9.0",
+                financeSchemaVersion: BackendContract.financeDomainV2Schema
+            )))
+        )
         XCTAssertEqual(session.state.records.count, 1)
     }
 
@@ -31,6 +38,17 @@ final class AppSessionTests: XCTestCase {
         } catch {
             XCTFail("unexpected error: \(error)")
         }
+    }
+
+    func testLoginLoadsCurrentLegacyState() async throws {
+        let api = FinanceAPISpy()
+        let session = AppSession(api: api, saveDelay: .zero)
+
+        try await session.login(username: "finance-admin", password: "secret")
+
+        XCTAssertEqual(session.phase, .signedIn)
+        XCTAssertEqual(session.user?.username, "finance-admin")
+        XCTAssertEqual(session.state.records.first?.id, "local-001")
     }
 
     func testFailedSaveRetriesLocalSnapshot() async throws {
@@ -106,7 +124,11 @@ private actor FinanceAPISpy: FinanceAPI {
     func lastAuditEvent() -> AuditEventRequest? { auditEvents.last }
 
     func health() async throws -> HealthResponse {
-        HealthResponse(status: "ok", version: "0.8.1")
+        HealthResponse(
+            status: "ok",
+            version: "0.9.0",
+            financeSchemaVersion: BackendContract.financeDomainV2Schema
+        )
     }
 
     func login(username: String, password: String) async throws -> SessionUser {

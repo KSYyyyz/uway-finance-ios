@@ -30,6 +30,14 @@ struct ProfileView: View {
             Section("服务连接") {
                 LabeledContent("阿里云服务") { ServerStatusLabel(state: session.serverState) }
                 LabeledContent("账本同步") { SyncStatusLabel(state: session.syncState) }
+                if case .available(let contract) = session.serverState {
+                    LabeledContent("财务数据模式", value: contract.capabilities.financeDataMode.displayName)
+                    LabeledContent("财务数据库版本", value: contract.financeSchemaDisplay)
+                    LabeledContent(
+                        "V2 资源接口",
+                        value: contract.capabilities.financeResourceAPI ? "已开放" : "尚未开放"
+                    )
+                }
                 LabeledContent("导入分析", value: "主线接口已连接")
                 LabeledContent("OCR与附件", value: "等待后端")
                 Button("检查服务与同步", systemImage: "arrow.clockwise") {
