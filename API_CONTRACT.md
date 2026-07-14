@@ -1,10 +1,10 @@
 # UwayFinance iOS API contract
 
-The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.10.1.json` is the checked-in 0.10.1 baseline used by Windows and macOS CI; the full workspace validator also cross-checks it against local backend sources when they are present.
+The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.10.2.json` is the checked-in 0.10.2 baseline used by Windows and macOS CI; the full workspace validator also cross-checks it against local backend sources when they are present.
 
-## Backend 0.10.1 capability handshake
+## Backend 0.10.2 capability handshake
 
-`GET /api/health` returns `status`, `version` and `financeSchemaVersion: "20260714_002_finance_resource_api"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose `apiContractVersion` is `20260714_003`.
+`GET /api/health` returns `status`, `version` and `financeSchemaVersion: "20260714_002_finance_resource_api"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose `apiContractVersion` is `20260714_004`.
 
 The capabilities response is the machine-readable source of truth. `financeResources.available=true` with `cutoverState=shadow` means the context and business-record slice can be compiled and contract-tested, not that the active app should cut over. Because `preferredMode` and `availableModes` still contain only `legacy_state_v1`, `AppSession` continues exclusively through `/api/state`. If capabilities are missing or invalid, old 0.8/0.9 fallback remains available.
 
@@ -26,6 +26,7 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 | POST | `/api/v2/business-records` | `FinanceResourceAPI.createBusinessRecord(...)` — shadow only |
 | PATCH | `/api/v2/business-records/:recordId` | `FinanceResourceAPI.updateBusinessRecord(...)` — shadow only |
 | GET | `/api/v2/cutover-readiness` | `CutoverReadinessAPI.readiness(...)` — read-only diagnostics |
+| GET | `/api/v2/dashboard-metrics` | `DashboardMetricsAPI.metrics(...)` — governed shadow read model |
 | POST | `/api/audit-events` | `FinanceAPI.audit(...)` |
 
 `PUT /api/state` remains a compatibility bridge. It is suitable for the current single-user pilot but does not provide record-level conflict protection.
@@ -35,6 +36,8 @@ Legacy state and import JSON keep their existing numeric `amount` keys. Swift de
 The V2 client encodes every amount as a decimal string and decodes it into the same integer-cent model. List requests preserve the opaque cursor and optional account-book/direction/finance-status filters. Create/update commands retain a stable `Idempotency-Key` across retries; update bodies require `expectedVersion`. A `409 VERSION_CONFLICT` response is mapped to a dedicated `APIError.versionConflict(expectedVersion:currentVersion:)` so future UI can refresh instead of silently overwriting.
 
 `financeResources.cutoverReadiness` is optional so 0.8/0.9/0.10.0 responses remain decodable. In 0.10.1 it advertises cursor pagination, zero-difference and zero-shadow-only requirements, and `clientWritesEnabled=false`. The corresponding client is GET-only. It decodes snapshot digests, exact-cent summaries, blockers and paginated difference metadata; `403 CUTOVER_READINESS_FORBIDDEN` and `400 INVALID_CUTOVER_CURSOR` remain recognizable server errors. It does not update `AppSession`, replace `/api/state`, or overwrite locally unsynchronized changes.
+
+`features.unifiedDashboardMetrics` remains decodable when older servers send only `{ available: false }`. In 0.10.2 it advertises `/api/v2/dashboard-metrics`, decimal-string money and `finance_v2_shadow_read_model`; `rawRecordsMerged=false`. The GET-only client decodes overview, five-period trend, category/same-type groups, trace provenance, classification coverage and safety flags. Negative `netCashFlow` uses the same signed integer-cent model. `features.aiClassification.available` remains false; `deterministicGroupingAvailable=true` does not grant a model permission to classify or write records. Metrics errors never refresh or replace `AppSession` state.
 
 ## Connected mainline import-analysis boundary
 

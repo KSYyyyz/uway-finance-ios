@@ -1,6 +1,6 @@
 {
-  "version": "0.10.1",
-  "apiContractVersion": "20260714_003",
+  "version": "0.10.2",
+  "apiContractVersion": "20260714_004",
   "financeSchemaVersion": "20260714_002_finance_resource_api",
   "syncMode": "legacy_state_v1",
   "money": {
@@ -34,6 +34,18 @@
         "concurrencyControl": "expectedVersion"
       }
     },
+    "unifiedDashboardMetrics": {
+      "available": true,
+      "endpoint": "/api/v2/dashboard-metrics",
+      "moneyEncoding": "decimal_string",
+      "source": "finance_v2_shadow_read_model",
+      "rawRecordsMerged": false,
+      "classificationStates": ["accepted", "review", "unclassified"]
+    },
+    "aiClassification": {
+      "available": false,
+      "deterministicGroupingAvailable": true
+    },
     "importAnalysis": {
       "availability": "runtime",
       "reasonWhenUnavailable": "provider_not_configured"
@@ -52,6 +64,7 @@
     { "method": "post", "path": "/api/v2/business-records", "swift": "method: .post, path: \"/api/v2/business-records\"" },
     { "method": "patch", "path": "/api/v2/business-records/:recordId", "swift": "method: .patch, path: \"/api/v2/business-records/\\(encoded)\"" },
     { "method": "get", "path": "/api/v2/cutover-readiness", "swift": "path(\"/api/v2/cutover-readiness\"" },
+    { "method": "get", "path": "/api/v2/dashboard-metrics", "swift": "path(\"/api/v2/dashboard-metrics\"" },
     { "method": "post", "path": "/api/audit-events", "swift": "method: .post, path: \"/api/audit-events\"" },
     { "method": "post", "path": "/api/import-analysis", "swift": "method: .post, path: \"/api/import-analysis\"" },
     { "method": "post", "path": "/api/import-analysis/:analysisId/decision", "swift": "method: .post, path: \"/api/import-analysis/\\(encoded)/decision\"" }

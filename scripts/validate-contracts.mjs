@@ -4,15 +4,15 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
-const expectedMarketingVersion = '0.10.1'
-const expectedAPIContractVersion = '20260714_003'
+const expectedMarketingVersion = '0.10.2'
+const expectedAPIContractVersion = '20260714_004'
 const expectedFinanceSchemaVersion = '20260714_002_finance_resource_api'
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
-const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.10.1.json')
+const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.10.2.json')
 
 const requiredFiles = [
   'project.yml',
-  'ContractSnapshots/backend-api-v0.10.1.json',
+  'ContractSnapshots/backend-api-v0.10.2.json',
   'UwayFinance/App/UwayFinanceApp.swift',
   'UwayFinance/Networking/APIEndpoint.swift',
   'UwayFinance/Networking/FinanceAPI.swift',
@@ -20,9 +20,11 @@ const requiredFiles = [
   'UwayFinance/Networking/DocumentAPI.swift',
   'UwayFinance/Networking/FinanceResourceAPI.swift',
   'UwayFinance/Networking/CutoverReadinessAPI.swift',
+  'UwayFinance/Networking/DashboardMetricsAPI.swift',
   'UwayFinance/Models/BackendContract.swift',
   'UwayFinance/Models/FinanceResourceModels.swift',
   'UwayFinance/Models/CutoverReadinessModels.swift',
+  'UwayFinance/Models/DashboardMetricsModels.swift',
   'UwayFinance/Models/MoneyAmount.swift',
   'UwayFinance/Models/RecordImportPipeline.swift',
   'UwayFinance/State/RecordImportSession.swift',
@@ -39,6 +41,7 @@ const requiredFiles = [
   'UwayFinanceTests/MoneyAmountTests.swift',
   'UwayFinanceTests/FinanceResourceAPITests.swift',
   'UwayFinanceTests/CutoverReadinessAPITests.swift',
+  'UwayFinanceTests/DashboardMetricsAPITests.swift',
   'UwayFinanceTests/RecordImportPipelineTests.swift',
   'UwayFinanceTests/Fixtures/harness-result.json',
   'UwayFinanceTests/Fixtures/import-analysis-request.json',
@@ -55,6 +58,12 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/cutover-readiness-differences-v0.10.1.json',
   'UwayFinanceTests/Fixtures/cutover-readiness-forbidden-v0.10.1.json',
   'UwayFinanceTests/Fixtures/cutover-readiness-invalid-cursor-v0.10.1.json',
+  'UwayFinanceTests/Fixtures/health-v0.10.2.json',
+  'UwayFinanceTests/Fixtures/capabilities-v0.10.2.json',
+  'UwayFinanceTests/Fixtures/dashboard-metrics-v0.10.2.json',
+  'UwayFinanceTests/Fixtures/dashboard-metrics-negative-v0.10.2.json',
+  'UwayFinanceTests/Fixtures/dashboard-metrics-forbidden-v0.10.2.json',
+  'UwayFinanceTests/Fixtures/dashboard-metrics-invalid-period-v0.10.2.json',
   'UwayFinanceTests/Fixtures/finance-context-v0.10.0.json',
   'UwayFinanceTests/Fixtures/business-records-page-v0.10.0.json',
   'UwayFinanceTests/Fixtures/business-record-response-v0.10.0.json',
@@ -84,6 +93,12 @@ const fixtures = [
   'cutover-readiness-differences-v0.10.1.json',
   'cutover-readiness-forbidden-v0.10.1.json',
   'cutover-readiness-invalid-cursor-v0.10.1.json',
+  'health-v0.10.2.json',
+  'capabilities-v0.10.2.json',
+  'dashboard-metrics-v0.10.2.json',
+  'dashboard-metrics-negative-v0.10.2.json',
+  'dashboard-metrics-forbidden-v0.10.2.json',
+  'dashboard-metrics-invalid-period-v0.10.2.json',
   'finance-context-v0.10.0.json',
   'business-records-page-v0.10.0.json',
   'business-record-response-v0.10.0.json',
@@ -124,7 +139,18 @@ if (contractSnapshot.capabilities?.financeDomainV2Mirror !== true
     || resourceSnapshot?.businessRecords?.pagination !== 'cursor'
     || resourceSnapshot?.businessRecords?.idempotencyHeader !== 'Idempotency-Key'
     || resourceSnapshot?.businessRecords?.concurrencyControl !== 'expectedVersion') {
-  throw new Error('V2 shadow resource capabilities do not match the 0.10.1 backend boundary')
+  throw new Error('V2 shadow resource capabilities do not match the 0.10.2 backend boundary')
+}
+const metricsSnapshot = contractSnapshot.capabilities?.unifiedDashboardMetrics
+if (metricsSnapshot?.available !== true
+    || metricsSnapshot?.endpoint !== '/api/v2/dashboard-metrics'
+    || metricsSnapshot?.moneyEncoding !== 'decimal_string'
+    || metricsSnapshot?.source !== 'finance_v2_shadow_read_model'
+    || metricsSnapshot?.rawRecordsMerged !== false
+    || metricsSnapshot?.classificationStates?.join(',') !== 'accepted,review,unclassified'
+    || contractSnapshot.capabilities?.aiClassification?.available !== false
+    || contractSnapshot.capabilities?.aiClassification?.deterministicGroupingAvailable !== true) {
+  throw new Error('dashboard metrics snapshot must remain governed, read-only and deterministic')
 }
 if (contractSnapshot.capabilities?.importAnalysis?.availability !== 'runtime'
     || contractSnapshot.capabilities?.importAnalysis?.reasonWhenUnavailable !== 'provider_not_configured') {
@@ -140,11 +166,11 @@ if (contractSnapshot.money?.legacyStateEncoding !== 'json_number'
   throw new Error('backend contract snapshot money boundary mismatch')
 }
 
-const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.1.json'), 'utf8'))
-const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-v0.10.1.json'), 'utf8'))
+const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.2.json'), 'utf8'))
+const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-v0.10.2.json'), 'utf8'))
 if (healthFixture.version !== expectedMarketingVersion
     || healthFixture.financeSchemaVersion !== expectedFinanceSchemaVersion) {
-  throw new Error('0.10.1 health fixture version/schema mismatch')
+  throw new Error('0.10.2 health fixture version/schema mismatch')
 }
 if (capabilitiesFixture.apiContractVersion !== expectedAPIContractVersion
     || capabilitiesFixture.sync?.preferredMode !== 'legacy_state_v1'
@@ -164,7 +190,7 @@ if (capabilitiesFixture.sync?.financeResources?.available !== true
     || capabilitiesFixture.sync?.financeResources?.cutoverState !== 'shadow'
     || capabilitiesFixture.sync?.financeResources?.cutoverReadiness?.clientWritesEnabled !== false
     || capabilitiesFixture.sync?.financeResources?.businessRecords?.moneyEncoding !== 'decimal_string') {
-  throw new Error('0.10.1 capabilities fixture must expose read-only readiness and the shadow resource slice')
+  throw new Error('0.10.2 capabilities fixture must preserve read-only readiness and the shadow resource slice')
 }
 const oldCapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.0.json'), 'utf8'))
 if ('cutoverReadiness' in (oldCapabilitiesFixture.sync?.financeResources ?? {})) {
@@ -190,7 +216,32 @@ if (forbiddenReadinessFixture.code !== 'CUTOVER_READINESS_FORBIDDEN'
     || invalidCursorFixture.code !== 'INVALID_CUTOVER_CURSOR') {
   throw new Error('cutover readiness error fixtures must keep recognizable server codes')
 }
-for (const feature of ['unifiedDashboardMetrics', 'workflowTasks', 'aiClassification', 'documentUpload', 'ocr']) {
+const oldMetricsCapability = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.1.json'), 'utf8')).features?.unifiedDashboardMetrics
+if (oldMetricsCapability?.available !== false || 'endpoint' in oldMetricsCapability) {
+  throw new Error('0.10.1 fixture must prove dashboard capability details are optional')
+}
+const metricsFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'dashboard-metrics-v0.10.2.json'), 'utf8'))
+const negativeMetricsFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'dashboard-metrics-negative-v0.10.2.json'), 'utf8'))
+if (metricsFixture.metricDefinition?.moneyEncoding !== 'decimal_string'
+    || metricsFixture.safety?.rawBusinessRecordsMerged !== false
+    || metricsFixture.safety?.modelWritesBusinessRecords !== false
+    || metricsFixture.safety?.reviewSuggestionsAffectRawFacts !== false
+    || negativeMetricsFixture.overview?.netCashFlow !== '-1830.00') {
+  throw new Error('dashboard metrics fixtures must preserve exact money and non-mutation safety')
+}
+const forbiddenMetricsFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'dashboard-metrics-forbidden-v0.10.2.json'), 'utf8'))
+const invalidPeriodMetricsFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'dashboard-metrics-invalid-period-v0.10.2.json'), 'utf8'))
+if (forbiddenMetricsFixture.code !== 'DASHBOARD_METRICS_FORBIDDEN'
+    || invalidPeriodMetricsFixture.code !== 'INVALID_DASHBOARD_METRICS_QUERY') {
+  throw new Error('dashboard metrics error fixtures must keep recognizable server codes')
+}
+if (capabilitiesFixture.features?.unifiedDashboardMetrics?.available !== true
+    || capabilitiesFixture.features?.unifiedDashboardMetrics?.rawRecordsMerged !== false
+    || capabilitiesFixture.features?.aiClassification?.available !== false
+    || capabilitiesFixture.features?.aiClassification?.deterministicGroupingAvailable !== true) {
+  throw new Error('dashboard metrics capability must not claim AI classification or raw-record merging')
+}
+for (const feature of ['workflowTasks', 'documentUpload', 'ocr']) {
   const value = capabilitiesFixture.features?.[feature]
   if (value?.available !== false) throw new Error(`future capability must remain unavailable: ${feature}`)
 }
@@ -309,7 +360,7 @@ for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amo
 }
 
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
-for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'businessRecords', '"accepted", "review", "rejected"']) {
+for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'deterministicGroupingAvailable', 'businessRecords', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
 }
 for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
@@ -343,12 +394,23 @@ for (const marker of ['protocol CutoverReadinessAPI', 'func readiness(', '.cutov
 if (/\b(post|put|patch|delete)\b/i.test(readinessAPI)) {
   throw new Error('cutover readiness client must remain read-only')
 }
+const metricsModels = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'DashboardMetricsModels.swift'), 'utf8')
+for (const marker of ['struct DashboardMetricsResponse: Codable', 'V2DecimalAmount', 'netCashFlow', 'classificationCoverage', 'rawBusinessRecordsMerged', 'modelWritesBusinessRecords', 'reviewSuggestionsAffectRawFacts']) {
+  if (!metricsModels.includes(marker)) throw new Error(`dashboard metrics model marker missing: ${marker}`)
+}
+const metricsAPI = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'DashboardMetricsAPI.swift'), 'utf8')
+for (const marker of ['protocol DashboardMetricsAPI', 'func metrics(', '.dashboardMetrics(query)']) {
+  if (!metricsAPI.includes(marker)) throw new Error(`dashboard metrics API marker missing: ${marker}`)
+}
+if (/\b(post|put|patch|delete)\b/i.test(metricsAPI)) {
+  throw new Error('dashboard metrics client must remain read-only')
+}
 const httpTransport = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'HTTPTransport.swift'), 'utf8')
 for (const marker of ['case versionConflict', 'VERSION_CONFLICT', 'headers: [String: String]']) {
   if (!httpTransport.includes(marker)) throw new Error(`V2 transport marker missing: ${marker}`)
 }
 const appSession = fs.readFileSync(path.join(root, 'UwayFinance', 'State', 'AppSession.swift'), 'utf8')
-if (appSession.includes('FinanceResourceAPI') || appSession.includes('CutoverReadinessAPI') || appSession.includes('/api/v2')) {
+if (appSession.includes('FinanceResourceAPI') || appSession.includes('CutoverReadinessAPI') || appSession.includes('DashboardMetricsAPI') || appSession.includes('/api/v2')) {
   throw new Error('shadow V2 clients must not become the AppSession data source')
 }
 
@@ -359,10 +421,11 @@ const financeDomainPath = path.join(workspace, 'server', 'finance-domain.ts')
 const capabilitiesPath = path.join(workspace, 'server', 'capabilities.ts')
 const financeResourcesPath = path.join(workspace, 'server', 'finance-resources.ts')
 const financeCutoverPath = path.join(workspace, 'server', 'finance-cutover.ts')
+const dashboardMetricsPath = path.join(workspace, 'server', 'dashboard-metrics.ts')
 const apiContractDocumentPath = path.join(workspace, 'API-V2-CONTRACT.md')
 const mainPackagePath = path.join(workspace, 'package.json')
 const hasLocalBackend = process.env.UWAY_SKIP_LOCAL_BACKEND !== '1'
-  && [serverPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, apiContractDocumentPath].every(fs.existsSync)
+  && [serverPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, apiContractDocumentPath].every(fs.existsSync)
 if (hasLocalBackend) {
   const server = fs.readFileSync(serverPath, 'utf8')
   for (const { method, path: endpoint } of currentContracts) {
@@ -398,6 +461,10 @@ if (hasLocalBackend) {
     'requiresZeroDifferences: true',
     'requiresZeroShadowOnlyRecords: true',
     'clientWritesEnabled: false',
+    "endpoint: '/api/v2/dashboard-metrics'",
+    "source: 'finance_v2_shadow_read_model'",
+    'rawRecordsMerged: false',
+    'deterministicGroupingAvailable: true',
     "pagination: 'cursor'",
     "idempotencyHeader: 'Idempotency-Key'",
     "concurrencyControl: 'expectedVersion'",
@@ -418,6 +485,10 @@ if (hasLocalBackend) {
   const financeCutover = fs.readFileSync(financeCutoverPath, 'utf8')
   for (const marker of ['INVALID_CUTOVER_CURSOR', 'CUTOVER_READINESS_FORBIDDEN', 'businessRecordReadCutoverEligible', 'businessRecordWriteCutoverEligible: false', 'fullFinanceCutoverEligible: false']) {
     if (!financeCutover.includes(marker)) throw new Error(`local cutover readiness marker missing: ${marker}`)
+  }
+  const dashboardMetrics = fs.readFileSync(dashboardMetricsPath, 'utf8')
+  for (const marker of ['DASHBOARD_METRICS_FORBIDDEN', 'INVALID_DASHBOARD_PERIOD', 'netCashFlow', 'rawBusinessRecordsMerged: false', 'modelWritesBusinessRecords: false', 'reviewSuggestionsAffectRawFacts: false']) {
+    if (!dashboardMetrics.includes(marker)) throw new Error(`local dashboard metrics marker missing: ${marker}`)
   }
   const apiContractDocument = fs.readFileSync(apiContractDocumentPath, 'utf8')
   const staleDocumentMarkers = []

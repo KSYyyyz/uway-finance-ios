@@ -1,0 +1,79 @@
+{
+  "accountBook": {
+    "id": "11",
+    "name": "默认账套",
+    "baseCurrency": "CNY",
+    "organization": { "id": "7", "name": "有为科技" },
+    "role": "owner",
+    "permissions": { "readBusinessRecords": true, "writeBusinessRecords": true }
+  },
+  "period": "2026-07",
+  "generatedAt": "2026-07-14T12:00:00.000Z",
+  "metricDefinition": {
+    "code": "cash_dashboard_v1",
+    "version": 1,
+    "moneyEncoding": "decimal_string",
+    "basis": "settled_business_records"
+  },
+  "overview": {
+    "paidIncome": "10000.00",
+    "paidExpense": "2000.00",
+    "netCashFlow": "8000.00",
+    "outstandingIncome": "5000.00",
+    "missingMaterialsCount": 2,
+    "periodRecordCount": 4
+  },
+  "trend": [
+    { "period": "2026-03", "label": "3月", "received": "0.00", "paid": "0.00" },
+    { "period": "2026-04", "label": "4月", "received": "0.00", "paid": "0.00" },
+    { "period": "2026-05", "label": "5月", "received": "0.00", "paid": "0.00" },
+    { "period": "2026-06", "label": "6月", "received": "0.00", "paid": "0.00" },
+    { "period": "2026-07", "label": "7月", "received": "10000.00", "paid": "2000.00" }
+  ],
+  "categoryGroups": [
+    {
+      "groupKey": "income:service_revenue",
+      "label": "主营及服务收入",
+      "direction": "income",
+      "categoryCode": "service_revenue",
+      "categoryLabel": "主营及服务收入",
+      "amount": "10000.00",
+      "recordCount": 1,
+      "recordIds": ["101"],
+      "classificationState": "accepted",
+      "trace": { "origins": ["rule"], "reasons": ["scenario_rule"] }
+    },
+    {
+      "groupKey": "expense:software_cloud",
+      "label": "软件、云与订阅",
+      "direction": "expense",
+      "categoryCode": "software_cloud",
+      "categoryLabel": "软件、云与订阅",
+      "amount": "2000.00",
+      "recordCount": 2,
+      "recordIds": ["102", "103"],
+      "classificationState": "accepted",
+      "trace": { "origins": ["rule"], "reasons": ["category_rule"] }
+    }
+  ],
+  "sameTypeGroups": [
+    {
+      "groupKey": "expense:software_cloud:codex_openai",
+      "label": "Codex / OpenAI",
+      "direction": "expense",
+      "categoryCode": "software_cloud",
+      "categoryLabel": "软件、云与订阅",
+      "amount": "2000.00",
+      "recordCount": 2,
+      "recordIds": ["102", "103"],
+      "classificationState": "accepted",
+      "trace": { "origins": ["rule"], "reasons": ["category_rule"] }
+    }
+  ],
+  "classificationCoverage": { "accepted": 3, "review": 1, "unclassified": 0 },
+  "safety": {
+    "rawBusinessRecordsMerged": false,
+    "modelWritesBusinessRecords": false,
+    "reviewSuggestionsAffectRawFacts": false
+  }
+}

@@ -12,9 +12,9 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
         guard case .available(let contract) = session.serverState else {
-            return XCTFail("0.10.1 server should be available")
+            return XCTFail("0.10.2 server should be available")
         }
-        XCTAssertEqual(contract.serverVersion, "0.10.1")
+        XCTAssertEqual(contract.serverVersion, "0.10.2")
         XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
         XCTAssertEqual(contract.capabilities.source, .server)
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
@@ -123,6 +123,31 @@ final class AppSessionTests: XCTestCase {
         }
     }
 
+    func testDashboardMetricsFailureCannotOverwriteUnsavedLegacyState() async throws {
+        let api = FinanceAPISpy()
+        let session = AppSession(api: api, saveDelay: .zero)
+        await session.start()
+        await api.setSaveError(.transport("offline"))
+        let localRecord = makeSessionTestRecord()
+        session.addRecord(localRecord)
+        try await Task.sleep(for: .milliseconds(50))
+
+        do {
+            _ = try await DashboardMetricsAPISpy().metrics(DashboardMetricsQuery(period: "2026-07"))
+            XCTFail("diagnostic failure should be surfaced")
+        } catch APIError.server(let status, let code, _) {
+            XCTAssertEqual(status, 403)
+            XCTAssertEqual(code, "DASHBOARD_METRICS_FORBIDDEN")
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+
+        XCTAssertEqual(session.state.records.first?.id, localRecord.id)
+        guard case .failed = session.syncState else {
+            return XCTFail("unsaved /api/state snapshot must remain recoverable")
+        }
+    }
+
     func testImportRecordsSavesOneBatchAndAuditsProvenance() async throws {
         let api = FinanceAPISpy()
         let session = AppSession(api: api, saveDelay: .zero)
@@ -173,9 +198,9 @@ private actor FinanceAPISpy: FinanceAPI {
 
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
-        version: "0.10.1",
+        version: "0.10.2",
         financeSchemaVersion: BackendContract.financeDomainV2Schema
-    ), capabilitiesFixtureName: String = "capabilities-v0.10.1") {
+    ), capabilitiesFixtureName: String = "capabilities-v0.10.2") {
         self.healthResponse = healthResponse
         self.capabilitiesFixtureName = capabilitiesFixtureName
     }
@@ -243,5 +268,15 @@ private actor ImportAnalysisAPISpy: ImportAnalysisAPI {
 
     func decide(analysisId: String, decision: ImportReviewDecision) async throws -> ImportReviewDecisionResponse {
         throw APIError.unavailable("test should not reach transport")
+    }
+}
+
+private actor DashboardMetricsAPISpy: DashboardMetricsAPI {
+    func metrics(_ query: DashboardMetricsQuery) async throws -> DashboardMetricsResponse {
+        throw APIError.server(
+            status: 403,
+            code: "DASHBOARD_METRICS_FORBIDDEN",
+            message: "当前角色无权查看全账套经营指标"
+        )
     }
 }

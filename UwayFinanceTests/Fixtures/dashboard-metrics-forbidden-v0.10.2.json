@@ -1,0 +1,4 @@
+{
+  "error": "当前角色无权查看全账套经营指标",
+  "code": "DASHBOARD_METRICS_FORBIDDEN"
+}

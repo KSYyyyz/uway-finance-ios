@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.2 - 2026-07-14
+
+- Decode governed dashboard-metrics and deterministic-grouping capabilities while keeping 0.10.1 and older capability responses compatible.
+- Add a GET-only `/api/v2/dashboard-metrics` client with exact signed decimal money, traceable grouping and explicit safety DTOs.
+- Preserve `/api/state` as the only `AppSession` data source; metrics failures cannot replace an unsaved legacy snapshot and no V2 write path is enabled.
+
 ## 0.10.1 - 2026-07-14
 
 - Decode the optional `financeResources.cutoverReadiness` capability while preserving 0.8, 0.9 and 0.10.0 capability fixtures.

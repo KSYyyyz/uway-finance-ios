@@ -1,0 +1,4 @@
+{
+  "error": "经营指标查询参数不正确",
+  "code": "INVALID_DASHBOARD_METRICS_QUERY"
+}

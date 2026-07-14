@@ -59,7 +59,7 @@ final class BackendContractTests: XCTestCase {
         )
         let contract = BackendContract(health: health, negotiated: response)
 
-        XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260714_003")
         XCTAssertEqual(contract.financeSchemaVersion, BackendContract.financeDomainV2Schema)
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])
@@ -76,6 +76,31 @@ final class BackendContractTests: XCTestCase {
         XCTAssertTrue(readiness.requiresZeroDifferences)
         XCTAssertTrue(readiness.requiresZeroShadowOnlyRecords)
         XCTAssertFalse(readiness.clientWritesEnabled)
+        XCTAssertFalse(contract.capabilities.unifiedDashboardMetrics)
+        XCTAssertNil(contract.capabilities.dashboardMetrics.endpoint)
+        XCTAssertFalse(contract.capabilities.deterministicGroupingAvailable)
+    }
+
+    func testCapabilitiesV0102ExposeReadOnlyDashboardMetricsWithoutClaimingAIClassification() throws {
+        let health = try JSONDecoder().decode(HealthResponse.self, from: fixture(named: "health-v0.10.2"))
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-v0.10.2")
+        )
+        let contract = BackendContract(health: health, negotiated: response)
+
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])
+        XCTAssertTrue(contract.capabilities.unifiedDashboardMetrics)
+        XCTAssertEqual(contract.capabilities.dashboardMetrics.endpoint, "/api/v2/dashboard-metrics")
+        XCTAssertEqual(contract.capabilities.dashboardMetrics.moneyEncoding, "decimal_string")
+        XCTAssertEqual(contract.capabilities.dashboardMetrics.source, "finance_v2_shadow_read_model")
+        XCTAssertEqual(contract.capabilities.dashboardMetrics.rawRecordsMerged, false)
+        XCTAssertEqual(contract.capabilities.dashboardMetrics.classificationStates, ["accepted", "review", "unclassified"])
+        XCTAssertFalse(contract.capabilities.aiClassification)
+        XCTAssertTrue(contract.capabilities.deterministicGroupingAvailable)
+        XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
     }
 
     func testCapabilitiesV090ReportsUnconfiguredImportProvider() throws {

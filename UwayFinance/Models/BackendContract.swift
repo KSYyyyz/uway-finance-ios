@@ -16,6 +16,20 @@ struct CapabilityAvailability: Codable, Equatable, Sendable {
     }
 }
 
+struct UnifiedDashboardMetricsCapability: Codable, Equatable, Sendable {
+    let available: Bool
+    let endpoint: String?
+    let moneyEncoding: String?
+    let source: String?
+    let rawRecordsMerged: Bool?
+    let classificationStates: [String]?
+}
+
+struct AIClassificationCapability: Codable, Equatable, Sendable {
+    let available: Bool
+    let deterministicGroupingAvailable: Bool?
+}
+
 struct LegacyStateCapability: Codable, Equatable, Sendable {
     let readable: Bool
     let writable: Bool
@@ -121,9 +135,9 @@ struct ImportAnalysisCapability: Codable, Equatable, Sendable {
 
 struct FeatureCapabilitiesResponse: Codable, Equatable, Sendable {
     let importAnalysis: ImportAnalysisCapability
-    let unifiedDashboardMetrics: CapabilityAvailability
+    let unifiedDashboardMetrics: UnifiedDashboardMetricsCapability
     let workflowTasks: CapabilityAvailability
-    let aiClassification: CapabilityAvailability
+    let aiClassification: AIClassificationCapability
     let documentUpload: CapabilityAvailability
     let ocr: CapabilityAvailability
 }
@@ -156,8 +170,10 @@ struct ServerCapabilities: Equatable, Sendable {
     let importHarnessStatuses: Set<String>
     let importAnalysis: ImportAnalysisCapability
     let unifiedDashboardMetrics: Bool
+    let dashboardMetrics: UnifiedDashboardMetricsCapability
     let workflowTasks: Bool
     let aiClassification: Bool
+    let deterministicGroupingAvailable: Bool
     let documentUpload: Bool
     let ocr: Bool
     let money: MoneyCapabilitiesResponse
@@ -181,8 +197,10 @@ struct ServerCapabilities: Equatable, Sendable {
             importHarnessStatuses: Set(response.features.importAnalysis.decisions),
             importAnalysis: response.features.importAnalysis,
             unifiedDashboardMetrics: response.features.unifiedDashboardMetrics.available,
+            dashboardMetrics: response.features.unifiedDashboardMetrics,
             workflowTasks: response.features.workflowTasks.available,
             aiClassification: response.features.aiClassification.available,
+            deterministicGroupingAvailable: response.features.aiClassification.deterministicGroupingAvailable ?? false,
             documentUpload: response.features.documentUpload.available,
             ocr: response.features.ocr.available,
             money: response.money,
@@ -199,8 +217,17 @@ struct ServerCapabilities: Equatable, Sendable {
             importHarnessStatuses: ["accepted", "review", "rejected"],
             importAnalysis: .unavailableFallback,
             unifiedDashboardMetrics: false,
+            dashboardMetrics: UnifiedDashboardMetricsCapability(
+                available: false,
+                endpoint: nil,
+                moneyEncoding: nil,
+                source: nil,
+                rawRecordsMerged: nil,
+                classificationStates: nil
+            ),
             workflowTasks: false,
             aiClassification: false,
+            deterministicGroupingAvailable: false,
             documentUpload: false,
             ocr: false,
             money: MoneyCapabilitiesResponse(
@@ -222,7 +249,7 @@ struct ServerCapabilities: Equatable, Sendable {
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260714_003"
+    static let apiContractVersion = "20260714_004"
     static let financeDomainV2Schema = "20260714_002_finance_resource_api"
 
     let serverVersion: String

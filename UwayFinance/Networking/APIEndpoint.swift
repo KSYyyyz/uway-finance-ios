@@ -47,6 +47,13 @@ struct APIEndpoint: Hashable {
         return APIEndpoint(method: .get, path: path("/api/v2/cutover-readiness", queryItems: items))
     }
 
+    static func dashboardMetrics(_ query: DashboardMetricsQuery) -> APIEndpoint {
+        var items: [URLQueryItem] = []
+        if let value = query.period { items.append(URLQueryItem(name: "period", value: value)) }
+        if let value = query.accountBookId { items.append(URLQueryItem(name: "accountBookId", value: value)) }
+        return APIEndpoint(method: .get, path: path("/api/v2/dashboard-metrics", queryItems: items))
+    }
+
     static func updateBusinessRecord(recordId: String) -> APIEndpoint {
         let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
         let encoded = recordId.addingPercentEncoding(withAllowedCharacters: allowed) ?? recordId
