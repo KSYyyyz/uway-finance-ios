@@ -57,7 +57,8 @@ struct RecordImportView: View {
                 allowsMultipleSelection: false
             ) { result in
                 switch result {
-                case .success(let url):
+                case .success(let urls):
+                    guard let url = urls.first else { return }
                     Task { await importSession.load(url: url, existing: session.state.records) }
                 case .failure(let error):
                     importSession.message = error.localizedDescription
