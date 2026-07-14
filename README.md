@@ -13,8 +13,10 @@ Current marketing version: `0.8.0`. The Profile screen reads `CFBundleShortVersi
 - “记一笔” `Form`, workbench cash summary, recent activity and a Swift Charts cash forecast.
 - Ledger fixed region: page brief, date filter, status filter and period totals stay fixed; only year/month/day ledger content scrolls. Month headings are not sticky.
 - Pending summary stays fixed while the task list scrolls; resolving a task changes the underlying record and updates every count.
-- Mainline import-analysis request/result/decision models and live client for both active endpoints; reviewer identity comes from the authenticated session.
+- Native CSV import flow with UTF-8/GB18030 parsing, duplicate and company-ownership gates, live AI Harness analysis, authenticated human review, provenance fields and one-batch state sync. Reviewer identity always comes from the authenticated server session.
 - Explicit `DocumentAPI` boundary for attachment upload and OCR jobs.
+
+The iOS import flow currently accepts CSV files up to 5MB and 30 rows per batch. The 30-row boundary deliberately matches the backend import-analysis rate limit; failed, pending-review and rejected rows never enter `/api/state`. XLSX and receipt OCR are still outside the active backend boundary and are not presented as working features.
 
 ## Generate and open on macOS
 
@@ -58,4 +60,4 @@ It runs for iOS or checked-in contract-snapshot changes and can also be started 
 
 ## Current backend boundary
 
-The main backend implements both import-analysis endpoints. Analysis requires the server-side classifier configuration and can return `503 IMPORT_AI_NOT_CONFIGURED` when that service is unavailable. Attachment/OCR endpoints are not exposed yet; the native client keeps them behind `DocumentAPI` so backend activation does not require a screen rewrite.
+The main backend implements both import-analysis endpoints. Analysis requires the server-side classifier configuration and can return `503 IMPORT_AI_NOT_CONFIGURED` when that service is unavailable. The native screen surfaces that failure and never falls back to a model key on the phone. Attachment/OCR endpoints are not exposed yet; the native client keeps them behind `DocumentAPI` so backend activation does not require a screen rewrite.

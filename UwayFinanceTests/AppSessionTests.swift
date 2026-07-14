@@ -55,6 +55,25 @@ final class AppSessionTests: XCTestCase {
             return XCTFail("retry should finish in synced state")
         }
     }
+
+    func testImportRecordsSavesOneBatchAndAuditsProvenance() async throws {
+        let api = FinanceAPISpy()
+        let session = AppSession(api: api, saveDelay: .zero)
+        await session.start()
+        let record = makeSessionTestRecord()
+
+        session.importRecords([record], fileName: "records.csv", duplicateCount: 2, errorCount: 1)
+        try await Task.sleep(for: .milliseconds(50))
+
+        let saved = await api.lastSavedState()
+        XCTAssertEqual(saved?.records.first?.id, record.id)
+        let event = await api.lastAuditEvent()
+        XCTAssertEqual(event?.action, .recordCSVImport)
+        XCTAssertEqual(event?.count, 1)
+        XCTAssertEqual(event?.duplicateCount, 2)
+        XCTAssertEqual(event?.errorCount, 1)
+        XCTAssertEqual(event?.fileName, "records.csv")
+    }
 }
 
 private func makeSessionTestRecord() -> BusinessRecord {
@@ -79,10 +98,12 @@ private actor FinanceAPISpy: FinanceAPI {
     private var fetchError: APIError?
     private var saveError: APIError?
     private var savedStates: [AppStatePayload] = []
+    private var auditEvents: [AuditEventRequest] = []
 
     func setFetchError(_ error: APIError?) { fetchError = error }
     func setSaveError(_ error: APIError?) { saveError = error }
     func lastSavedState() -> AppStatePayload? { savedStates.last }
+    func lastAuditEvent() -> AuditEventRequest? { auditEvents.last }
 
     func health() async throws -> HealthResponse {
         HealthResponse(status: "ok", version: "0.8.1")
@@ -117,5 +138,5 @@ private actor FinanceAPISpy: FinanceAPI {
         return "2026-07-14T00:00:00.000Z"
     }
 
-    func audit(_ event: AuditEventRequest) async throws {}
+    func audit(_ event: AuditEventRequest) async throws { auditEvents.append(event) }
 }

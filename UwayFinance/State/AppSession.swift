@@ -100,6 +100,19 @@ final class AppSession: ObservableObject {
         queueSave()
     }
 
+    func importRecords(_ records: [BusinessRecord], fileName: String, duplicateCount: Int, errorCount: Int) {
+        guard !records.isEmpty else { return }
+        state.records.insert(contentsOf: records, at: 0)
+        queueSave()
+        audit(AuditEventRequest(
+            action: .recordCSVImport,
+            count: records.count,
+            duplicateCount: duplicateCount,
+            errorCount: errorCount,
+            fileName: fileName
+        ))
+    }
+
     func updateRecord(_ record: BusinessRecord) {
         guard let index = state.records.firstIndex(where: { $0.id == record.id }) else { return }
         state.records[index] = record
@@ -146,6 +159,10 @@ final class AppSession: ObservableObject {
         } else {
             try? await refresh()
         }
+    }
+
+    func invalidateExternalSession() {
+        handleUnauthorized()
     }
 
     private func queueSave() {

@@ -62,6 +62,7 @@ struct HarnessResult: Codable, Hashable {
     let validatedEvidenceRefs: [String]
     let issues: [HarnessIssue]
     let sourceFingerprint: String
+    let resolution: ImportReviewResolution?
 }
 
 struct ImportReviewDecision: Codable, Hashable {

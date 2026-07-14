@@ -15,12 +15,7 @@ struct QuickSheetView: View {
                 endpoints: ["POST /api/documents", "POST /api/documents/:id/upload", "POST /api/documents/:id/ocr"]
             )
         case .importFile:
-            ReservedIntegrationView(
-                title: "导入流水",
-                symbol: "square.and.arrow.down",
-                description: "主线分析接口已经连接；文件选择、逐行标准化和公司归属证据确认界面将在下一阶段接入，分析结果不会直接写正式账目。",
-                endpoints: ["POST /api/import-analysis", "POST /api/import-analysis/:analysisId/decision"]
-            )
+            RecordImportView()
         }
     }
 }

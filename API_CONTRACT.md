@@ -33,6 +33,14 @@ The decision response keeps the Harness status vocabulary: an accepted human dec
 
 If the server-side classifier is not configured, analysis returns `503` with `IMPORT_AI_NOT_CONFIGURED`; the client surfaces the server message and does not fall back to an on-device or direct-provider call.
 
+### Native import safety boundary
+
+- The file picker accepts CSV only; parsing supports UTF-8 and GB18030, a 5MB file limit and a 30-row batch limit aligned with the server rate limit.
+- Rows explicitly marked as personal are excluded. Rows without company evidence stay outside analysis until the user explicitly confirms company ownership or excludes them.
+- Each analyzed row receives SHA-256 source and ownership fingerprints. Existing ledger fingerprints are sent only for server-side duplicate/evidence checks.
+- `accepted` rows are the only rows appended to `/api/state`. `review` requires an authenticated decision and reason; `rejected` and failed rows remain outside the ledger.
+- Imported records persist `importAnalysisId`, `sourceFingerprint` and either `harness_accepted` or `human_accepted`. The client sends one `record_csv_import` audit event for the committed batch.
+
 ## Reserved document and OCR boundary
 
 `DocumentAPI` reserves a three-step workflow:

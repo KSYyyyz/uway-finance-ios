@@ -16,6 +16,9 @@ const requiredFiles = [
   'UwayFinance/Networking/FinanceAPI.swift',
   'UwayFinance/Networking/ImportAnalysisAPI.swift',
   'UwayFinance/Networking/DocumentAPI.swift',
+  'UwayFinance/Models/RecordImportPipeline.swift',
+  'UwayFinance/State/RecordImportSession.swift',
+  'UwayFinance/Views/RecordImportView.swift',
   'UwayFinance/Views/LedgerView.swift',
   'UwayFinance/Resources/Info.plist',
   'UwayFinance/Resources/Assets.xcassets/Contents.json',
@@ -24,6 +27,7 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/state-envelope.json',
   'UwayFinanceTests/AppConfigurationTests.swift',
   'UwayFinanceTests/AppSessionTests.swift',
+  'UwayFinanceTests/RecordImportPipelineTests.swift',
   'UwayFinanceTests/Fixtures/harness-result.json',
   'UwayFinanceTests/Fixtures/import-analysis-request.json',
   'UwayFinanceTests/Fixtures/import-decision-response.json',
@@ -125,6 +129,22 @@ for (const field of contractSnapshot.importRequestFields) {
   if (!importModels.includes(field)) throw new Error(`mainline import field mismatch: ${field}`)
 }
 if (importModels.includes('reviewerId')) throw new Error('reviewer identity must come from the authenticated server session')
+if (!importModels.includes('let resolution: ImportReviewResolution?')) {
+  throw new Error('Harness result must preserve authenticated human-resolution provenance')
+}
+
+const importPipeline = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'RecordImportPipeline.swift'), 'utf8')
+for (const marker of ['maximumBatchRows = 30', 'maximumFileSize = 5 * 1024 * 1024', 'SHA256.hash', 'companyOwnership']) {
+  if (!importPipeline.includes(marker)) throw new Error(`native import safety marker missing: ${marker}`)
+}
+const importView = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'RecordImportView.swift'), 'utf8')
+for (const marker of ['.fileImporter(', 'confirmPendingOwnership()', 'importSession.analyze', 'importSession.commit']) {
+  if (!importView.includes(marker)) throw new Error(`native import flow marker missing: ${marker}`)
+}
+const quickSheet = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'QuickSheetView.swift'), 'utf8')
+if (!quickSheet.includes('case .importFile:\n            RecordImportView()')) {
+  throw new Error('quick import entry must open the live native import flow')
+}
 
 const financeModels = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'FinanceModels.swift'), 'utf8')
 for (const field of contractSnapshot.ledgerProvenanceFields) {
