@@ -1,0 +1,56 @@
+{
+  "accountBook": {
+    "id": "11",
+    "name": "默认账套",
+    "baseCurrency": "CNY",
+    "organization": { "id": "7", "name": "有为科技" },
+    "role": "owner",
+    "permissions": { "readBusinessRecords": true, "writeBusinessRecords": true }
+  },
+  "generatedAt": "2026-07-14T10:05:00.000Z",
+  "snapshot": {
+    "legacyStateUpdatedAt": "2026-07-14T09:59:00.000Z",
+    "legacyDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "v2MirrorDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "digestsMatch": false
+  },
+  "summary": {
+    "legacy": {
+      "businessRecords": { "count": 2, "income": "10.01", "expense": "0.30" },
+      "bankTransactions": { "count": 1, "income": "10.01", "expense": "0.00" }
+    },
+    "v2Mirror": {
+      "businessRecords": { "count": 2, "income": "10.02", "expense": "0.30" },
+      "bankTransactions": { "count": 1, "income": "10.01", "expense": "0.00" }
+    },
+    "v2ShadowOnly": {
+      "businessRecords": { "count": 1, "income": "0.00", "expense": "1.00" }
+    }
+  },
+  "readiness": {
+    "stage": "shadow",
+    "legacyMirrorConsistent": false,
+    "businessRecordReadCutoverEligible": false,
+    "businessRecordWriteCutoverEligible": false,
+    "fullFinanceCutoverEligible": false,
+    "blockers": [
+      { "code": "LEGACY_V2_DIFFERENCES", "count": 1, "message": "旧账本与 V2 镜像存在逐笔差异" },
+      { "code": "V2_SHADOW_ONLY_RECORDS", "count": 1, "message": "V2 中存在旧账本不可见的独有经营事项" },
+      { "code": "BUSINESS_RECORD_DELETE_UNAVAILABLE", "count": 1, "message": "经营事项删除接口尚未开放" },
+      { "code": "BANK_TRANSACTION_RESOURCE_UNAVAILABLE", "count": 1, "message": "银行流水资源接口尚未开放" }
+    ]
+  },
+  "differences": {
+    "total": 2,
+    "items": [
+      {
+        "key": "business_record:R-1:field_mismatch",
+        "entity": "business_record",
+        "externalId": "R-1",
+        "kind": "field_mismatch",
+        "fields": ["amountCents"]
+      }
+    ],
+    "page": { "limit": 1, "nextCursor": "eyJrZXkiOiJidXNpbmVzc19yZWNvcmQ6Ui0xOmZpZWxkX21pc21hdGNoIn0" }
+  }
+}

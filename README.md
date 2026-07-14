@@ -2,7 +2,7 @@
 
 SwiftUI client for the internal Uway finance workflow. This repository contains only the native iOS frontend; the Fastify/PostgreSQL backend is deployed separately on Alibaba Cloud and is accessed over HTTPS.
 
-Current marketing version: `0.10.0`, compatible with the `20260714_002` candidate API contract and `20260714_002_finance_resource_api` schema. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
+Current marketing version: `0.10.1`, compatible with the `20260714_003` API contract and `20260714_002_finance_resource_api` schema. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
 
 ## Implemented stage
 
@@ -11,6 +11,7 @@ Current marketing version: `0.10.0`, compatible with the `20260714_002` candidat
 - Startup capability negotiation through `GET /api/capabilities`. Only the published and client-supported `legacy_state_v1` mode is used; 404, missing endpoints and old servers safely fall back to that same mode.
 - Import analysis availability is negotiated at runtime. `provider_not_configured` produces a visible disabled state and the client does not send `/api/import-analysis` requests; old servers without capabilities are treated as unknown rather than assumed available.
 - A separate, compiled `FinanceResourceAPI` supports V2 context and cursor-based business-record list/create/update contracts. It is intentionally not injected into `AppSession` while capabilities still prefer only `legacy_state_v1`, so existing screens cannot write through the shadow API.
+- A separate `CutoverReadinessAPI` can read the server's shadow reconciliation report, exact-cent summaries, blockers and opaque difference pages. It has no write method and is not injected into `AppSession` or any business screen.
 - V2 writes use commands that retain one stable `Idempotency-Key` across retries. Updates always carry `expectedVersion`; `409 VERSION_CONFLICT` remains distinguishable from generic server failures.
 - Current `/api/state` read/write compatibility, debounced sync status and pull-to-refresh. The backend may mirror those writes into Finance Domain V2, but the iOS client does not call unavailable resource, metric, workflow, classification, document or OCR APIs.
 - Live `/api/health` status plus service app version, optional finance schema, API contract version and active sync-mode display; 0.8.x responses without `financeSchemaVersion` remain decodable. Failed saves keep their local snapshot and expose a one-tap retry instead of overwriting it with a refresh.
@@ -61,8 +62,8 @@ The repository workflow `.github/workflows/ios-ci.yml` runs on GitHub's `macos-2
 4. builds the app and runs XCTest without signing;
 5. uploads the `.xcresult` bundle and build log for 14 days.
 
-It runs for iOS or checked-in contract-snapshot changes and can also be started manually with `workflow_dispatch`. `ContractSnapshots/backend-api-v0.10.0.json` is the standalone frontend contract baseline; when the repository is located inside the full Uway workspace, the validator additionally cross-checks the local backend resource routes, capability factory and Finance Domain schema constant. No Apple signing secret is required for this simulator job.
+It runs for iOS or checked-in contract-snapshot changes and can also be started manually with `workflow_dispatch`. `ContractSnapshots/backend-api-v0.10.1.json` is the standalone frontend contract baseline; when the repository is located inside the full Uway workspace, the validator additionally cross-checks the local backend resource routes, capability factory, cutover-readiness implementation and Finance Domain schema constant. No Apple signing secret is required for this simulator job.
 
 ## Current backend boundary
 
-The 0.10 candidate backend exposes context plus list/create/update business-record resources as a `shadow` slice. Capabilities still publish only `legacy_state_v1` in `preferredMode` and `availableModes`; production UI continues through `/api/state`. Delete, unified metrics, workflow, AI classification, attachment and OCR remain unavailable. Import analysis is operational only when `features.importAnalysis.available` is true.
+The 0.10.1 backend exposes context, list/create/update business-record resources and a read-only cutover-readiness report as a `shadow` slice. Capabilities still publish only `legacy_state_v1` in `preferredMode` and `availableModes`; production UI and `AppSession` continue through `/api/state`. A zero-difference report does not enable client writes. Delete, unified metrics, workflow, AI classification, attachment and OCR remain unavailable. Import analysis is operational only when `features.importAnalysis.available` is true.

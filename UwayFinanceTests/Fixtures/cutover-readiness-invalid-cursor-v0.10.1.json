@@ -1,0 +1,4 @@
+{
+  "error": "切换核对游标无效或已损坏",
+  "code": "INVALID_CUTOVER_CURSOR"
+}

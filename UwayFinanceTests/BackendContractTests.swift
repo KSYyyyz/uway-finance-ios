@@ -40,11 +40,22 @@ final class BackendContractTests: XCTestCase {
         XCTAssertNil(contract.capabilities.importAnalysis.reason)
     }
 
-    func testCapabilitiesV010ExposeShadowResourcesWithoutSwitchingSyncMode() throws {
-        let health = try JSONDecoder().decode(HealthResponse.self, from: fixture(named: "health-v0.10.0"))
+    func testCapabilitiesV010RemainDecodableWithoutCutoverReadiness() throws {
         let response = try JSONDecoder().decode(
             ServerCapabilitiesResponse.self,
             from: fixture(named: "capabilities-v0.10.0")
+        )
+
+        XCTAssertNil(response.sync.financeResources.cutoverReadiness)
+        XCTAssertEqual(response.sync.financeResources.cutoverState, "shadow")
+        XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])
+    }
+
+    func testCapabilitiesV0101ExposeReadOnlyCutoverReadinessWithoutSwitchingSyncMode() throws {
+        let health = try JSONDecoder().decode(HealthResponse.self, from: fixture(named: "health-v0.10.1"))
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-v0.10.1")
         )
         let contract = BackendContract(health: health, negotiated: response)
 
@@ -58,6 +69,13 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.financeResources.businessRecords?.idempotencyHeader, "Idempotency-Key")
         XCTAssertEqual(contract.capabilities.financeResources.businessRecords?.concurrencyControl, "expectedVersion")
         XCTAssertFalse(contract.capabilities.financeResources.businessRecords?.delete ?? true)
+        let readiness = try XCTUnwrap(contract.capabilities.financeResources.cutoverReadiness)
+        XCTAssertTrue(readiness.available)
+        XCTAssertEqual(readiness.endpoint, "/api/v2/cutover-readiness")
+        XCTAssertEqual(readiness.pagination, "cursor")
+        XCTAssertTrue(readiness.requiresZeroDifferences)
+        XCTAssertTrue(readiness.requiresZeroShadowOnlyRecords)
+        XCTAssertFalse(readiness.clientWritesEnabled)
     }
 
     func testCapabilitiesV090ReportsUnconfiguredImportProvider() throws {

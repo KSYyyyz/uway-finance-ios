@@ -12,12 +12,13 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
         guard case .available(let contract) = session.serverState else {
-            return XCTFail("0.10.0 server should be available")
+            return XCTFail("0.10.1 server should be available")
         }
-        XCTAssertEqual(contract.serverVersion, "0.10.0")
+        XCTAssertEqual(contract.serverVersion, "0.10.1")
         XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
         XCTAssertEqual(contract.capabilities.source, .server)
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
+        XCTAssertEqual(contract.capabilities.financeResources.cutoverReadiness?.available, true)
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(session.state.records.count, 1)
         let fetchStateCallCount = await api.fetchStateCallCount()
@@ -172,9 +173,9 @@ private actor FinanceAPISpy: FinanceAPI {
 
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
-        version: "0.10.0",
+        version: "0.10.1",
         financeSchemaVersion: BackendContract.financeDomainV2Schema
-    ), capabilitiesFixtureName: String = "capabilities-v0.10.0") {
+    ), capabilitiesFixtureName: String = "capabilities-v0.10.1") {
         self.healthResponse = healthResponse
         self.capabilitiesFixtureName = capabilitiesFixtureName
     }

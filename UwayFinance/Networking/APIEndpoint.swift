@@ -40,6 +40,13 @@ struct APIEndpoint: Hashable {
 
     static let createBusinessRecord = APIEndpoint(method: .post, path: "/api/v2/business-records")
 
+    static func cutoverReadiness(_ query: CutoverReadinessQuery) -> APIEndpoint {
+        var items = [URLQueryItem(name: "limit", value: String(query.limit))]
+        if let value = query.accountBookId { items.append(URLQueryItem(name: "accountBookId", value: value)) }
+        if let value = query.cursor { items.append(URLQueryItem(name: "cursor", value: value)) }
+        return APIEndpoint(method: .get, path: path("/api/v2/cutover-readiness", queryItems: items))
+    }
+
     static func updateBusinessRecord(recordId: String) -> APIEndpoint {
         let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
         let encoded = recordId.addingPercentEncoding(withAllowedCharacters: allowed) ?? recordId

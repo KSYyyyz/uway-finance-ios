@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.1 - 2026-07-14
+
+- Decode the optional `financeResources.cutoverReadiness` capability while preserving 0.8, 0.9 and 0.10.0 capability fixtures.
+- Add an isolated read-only `/api/v2/cutover-readiness` client with exact-cent summaries, opaque cursor pagination and recognizable permission/cursor failures.
+- Keep `AppSession` exclusively on `/api/state`; readiness reports cannot enable V2 writes or replace local unsynchronized state.
+
 ## 0.10.0 - 2026-07-14
 
 - Add a compiled and tested shadow client for `/api/v2/context` and the list/create/update business-record resource slice without changing the active `AppSession` data source.

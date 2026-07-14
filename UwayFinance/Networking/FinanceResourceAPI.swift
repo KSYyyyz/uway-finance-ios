@@ -1,6 +1,6 @@
 import Foundation
 
-/// Compiled shadow client for the 0.10.0 Finance Resource slice.
+/// Compiled shadow client for the 0.10 Finance Resource slice.
 /// AppSession intentionally does not depend on this protocol while the server
 /// continues to prefer only `legacy_state_v1`.
 protocol FinanceResourceAPI: Sendable {

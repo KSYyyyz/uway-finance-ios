@@ -33,11 +33,21 @@ struct BusinessRecordResourceCapability: Codable, Equatable, Sendable {
     let concurrencyControl: String
 }
 
+struct CutoverReadinessCapability: Codable, Equatable, Sendable {
+    let available: Bool
+    let endpoint: String
+    let pagination: String
+    let requiresZeroDifferences: Bool
+    let requiresZeroShadowOnlyRecords: Bool
+    let clientWritesEnabled: Bool
+}
+
 struct FinanceResourceCapability: Codable, Equatable, Sendable {
     let available: Bool
     let reason: String?
     let cutoverState: String?
     let contextEndpoint: String?
+    let cutoverReadiness: CutoverReadinessCapability?
     let businessRecords: BusinessRecordResourceCapability?
 
     static let unavailable = FinanceResourceCapability(
@@ -45,6 +55,7 @@ struct FinanceResourceCapability: Codable, Equatable, Sendable {
         reason: "capabilities_unavailable",
         cutoverState: nil,
         contextEndpoint: nil,
+        cutoverReadiness: nil,
         businessRecords: nil
     )
 
@@ -211,7 +222,7 @@ struct ServerCapabilities: Equatable, Sendable {
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260714_002"
+    static let apiContractVersion = "20260714_003"
     static let financeDomainV2Schema = "20260714_002_finance_resource_api"
 
     let serverVersion: String

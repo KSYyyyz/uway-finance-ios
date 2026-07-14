@@ -1,0 +1,4 @@
+{
+  "error": "当前角色无权查看全账套切换核对结果",
+  "code": "CUTOVER_READINESS_FORBIDDEN"
+}

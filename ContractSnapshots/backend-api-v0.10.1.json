@@ -1,6 +1,6 @@
 {
-  "version": "0.10.0",
-  "apiContractVersion": "20260714_002",
+  "version": "0.10.1",
+  "apiContractVersion": "20260714_003",
   "financeSchemaVersion": "20260714_002_finance_resource_api",
   "syncMode": "legacy_state_v1",
   "money": {
@@ -15,6 +15,14 @@
       "available": true,
       "cutoverState": "shadow",
       "contextEndpoint": "/api/v2/context",
+      "cutoverReadiness": {
+        "available": true,
+        "endpoint": "/api/v2/cutover-readiness",
+        "pagination": "cursor",
+        "requiresZeroDifferences": true,
+        "requiresZeroShadowOnlyRecords": true,
+        "clientWritesEnabled": false
+      },
       "businessRecords": {
         "list": true,
         "create": true,
@@ -43,6 +51,7 @@
     { "method": "get", "path": "/api/v2/business-records", "swift": "path(\"/api/v2/business-records\"" },
     { "method": "post", "path": "/api/v2/business-records", "swift": "method: .post, path: \"/api/v2/business-records\"" },
     { "method": "patch", "path": "/api/v2/business-records/:recordId", "swift": "method: .patch, path: \"/api/v2/business-records/\\(encoded)\"" },
+    { "method": "get", "path": "/api/v2/cutover-readiness", "swift": "path(\"/api/v2/cutover-readiness\"" },
     { "method": "post", "path": "/api/audit-events", "swift": "method: .post, path: \"/api/audit-events\"" },
     { "method": "post", "path": "/api/import-analysis", "swift": "method: .post, path: \"/api/import-analysis\"" },
     { "method": "post", "path": "/api/import-analysis/:analysisId/decision", "swift": "method: .post, path: \"/api/import-analysis/\\(encoded)/decision\"" }

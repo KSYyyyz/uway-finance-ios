@@ -1,10 +1,10 @@
 # UwayFinance iOS API contract
 
-The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.10.0.json` is the checked-in 0.10.0 candidate baseline used by Windows and macOS CI; the full workspace validator also cross-checks it against local backend sources when they are present.
+The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.10.1.json` is the checked-in 0.10.1 baseline used by Windows and macOS CI; the full workspace validator also cross-checks it against local backend sources when they are present.
 
-## Backend 0.10.0 capability handshake
+## Backend 0.10.1 capability handshake
 
-`GET /api/health` returns `status`, `version` and `financeSchemaVersion: "20260714_002_finance_resource_api"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose candidate `apiContractVersion` is `20260714_002`.
+`GET /api/health` returns `status`, `version` and `financeSchemaVersion: "20260714_002_finance_resource_api"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose `apiContractVersion` is `20260714_003`.
 
 The capabilities response is the machine-readable source of truth. `financeResources.available=true` with `cutoverState=shadow` means the context and business-record slice can be compiled and contract-tested, not that the active app should cut over. Because `preferredMode` and `availableModes` still contain only `legacy_state_v1`, `AppSession` continues exclusively through `/api/state`. If capabilities are missing or invalid, old 0.8/0.9 fallback remains available.
 
@@ -25,6 +25,7 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 | GET | `/api/v2/business-records` | `FinanceResourceAPI.listBusinessRecords(...)` — shadow only |
 | POST | `/api/v2/business-records` | `FinanceResourceAPI.createBusinessRecord(...)` — shadow only |
 | PATCH | `/api/v2/business-records/:recordId` | `FinanceResourceAPI.updateBusinessRecord(...)` — shadow only |
+| GET | `/api/v2/cutover-readiness` | `CutoverReadinessAPI.readiness(...)` — read-only diagnostics |
 | POST | `/api/audit-events` | `FinanceAPI.audit(...)` |
 
 `PUT /api/state` remains a compatibility bridge. It is suitable for the current single-user pilot but does not provide record-level conflict protection.
@@ -32,6 +33,8 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 Legacy state and import JSON keep their existing numeric `amount` keys. Swift decodes them through `MoneyAmount` into signed 64-bit integer cents and encodes a decimal JSON number on write. The existing UI may temporarily consume a compatibility `Double`, but network/domain state has an exact-cent projection and no new financial model should introduce a raw `Double` boundary. The negotiated future V2 boundary is `decimal_string`; `MoneyAmount` already accepts decimal strings and converts them losslessly to cents.
 
 The V2 client encodes every amount as a decimal string and decodes it into the same integer-cent model. List requests preserve the opaque cursor and optional account-book/direction/finance-status filters. Create/update commands retain a stable `Idempotency-Key` across retries; update bodies require `expectedVersion`. A `409 VERSION_CONFLICT` response is mapped to a dedicated `APIError.versionConflict(expectedVersion:currentVersion:)` so future UI can refresh instead of silently overwriting.
+
+`financeResources.cutoverReadiness` is optional so 0.8/0.9/0.10.0 responses remain decodable. In 0.10.1 it advertises cursor pagination, zero-difference and zero-shadow-only requirements, and `clientWritesEnabled=false`. The corresponding client is GET-only. It decodes snapshot digests, exact-cent summaries, blockers and paginated difference metadata; `403 CUTOVER_READINESS_FORBIDDEN` and `400 INVALID_CUTOVER_CURSOR` remain recognizable server errors. It does not update `AppSession`, replace `/api/state`, or overwrite locally unsynchronized changes.
 
 ## Connected mainline import-analysis boundary
 
@@ -75,4 +78,4 @@ Until Fastify implements them, `ReservedDocumentAPI` returns a visible “waitin
 
 ## Contracts required for the next backend migration
 
-Before cutover, mainline still needs a verified legacy/V2 reconciliation report plus contracts for business-record deletion, periods, bank transactions, vouchers, reconciliation/workflow actions, documents and AI evidence/feedback. The current slice already defines cursor pagination, decimal-string money, stable IDs, idempotency keys and `expectedVersion`; future UI must add conflict refresh/retry and role-error states before `finance_resource_v2` can enter `availableModes`. Existing screens continue to depend on `FinanceAPI`, while the shadow client stays isolated behind `FinanceResourceAPI`.
+Before cutover, mainline still needs zero-difference readiness in real operating data plus contracts for business-record deletion, periods, bank transactions, vouchers, reconciliation/workflow actions, documents and AI evidence/feedback. The current slice defines cursor pagination, decimal-string money, stable IDs, idempotency keys and `expectedVersion`; future UI must add conflict refresh/retry and role-error states before a V2 mode can enter `availableModes`. Existing screens continue to depend on `FinanceAPI`, while the shadow clients stay isolated behind `FinanceResourceAPI` and `CutoverReadinessAPI`.
