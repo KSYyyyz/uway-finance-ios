@@ -1,13 +1,21 @@
 {
   "version": "0.9.0",
+  "apiContractVersion": "20260714_001",
   "financeSchemaVersion": "20260714_001_finance_domain_v2",
-  "dataMode": "legacy_state_compatibility",
+  "syncMode": "legacy_state_v1",
+  "money": {
+    "legacyStateEncoding": "json_number",
+    "financeV2Encoding": "decimal_string",
+    "databasePrecision": 18,
+    "databaseScale": 2
+  },
   "capabilities": {
     "financeDomainV2Mirror": true,
     "financeResourceAPI": false
   },
   "endpoints": [
     { "method": "get", "path": "/api/health", "swift": "method: .get, path: \"/api/health\"" },
+    { "method": "get", "path": "/api/capabilities", "swift": "method: .get, path: \"/api/capabilities\"" },
     { "method": "post", "path": "/api/auth/login", "swift": "method: .post, path: \"/api/auth/login\"" },
     { "method": "get", "path": "/api/auth/me", "swift": "method: .get, path: \"/api/auth/me\"" },
     { "method": "post", "path": "/api/auth/logout", "swift": "method: .post, path: \"/api/auth/logout\"" },

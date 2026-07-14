@@ -4,9 +4,9 @@ The backend is deployed independently on Alibaba Cloud and is not part of this f
 
 ## Backend 0.9.0 capability handshake
 
-`GET /api/health` returns `status`, `version` and, on backend 0.9.0, `financeSchemaVersion: "20260714_001_finance_domain_v2"`. The schema field is optional in Swift so an installed client can still connect to a 0.8.x backend that omits it.
+`GET /api/health` returns `status`, `version` and, on backend 0.9.0, `financeSchemaVersion: "20260714_001_finance_domain_v2"`. The schema field is optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260714_001`.
 
-The detected schema enables only a capability description, not a new URL. The active mode is `legacy_state_compatibility`: iOS continues to use `/api/state`, the server owns any Finance Domain V2 mirror, and `financeResourceAPI` remains false. No organization, account-book, period, business-record, voucher, reconciliation, workflow or AI-evidence resource endpoint is called until mainline publishes and implements that contract.
+The capabilities response is the machine-readable source of truth. iOS accepts a sync mode only when it is both implemented by the client and listed in `availableModes`; the current mode is `legacy_state_v1`. If the endpoint is missing, returns 404, cannot decode, or belongs to an older server, iOS safely retains `legacy_state_v1` and continues session restoration. The server owns any Finance Domain V2 mirror, and `financeResources` remains unavailable. No organization, account-book, period, business-record, voucher, reconciliation, workflow or AI-evidence resource endpoint is called until mainline publishes and implements that contract.
 
 ## Connected in the first native build
 
@@ -15,6 +15,7 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 | Method | Path | Swift boundary |
 | --- | --- | --- |
 | GET | `/api/health` | `FinanceAPI.health()` |
+| GET | `/api/capabilities` | `FinanceAPI.capabilities()` |
 | POST | `/api/auth/login` | `FinanceAPI.login(...)` |
 | GET | `/api/auth/me` | `FinanceAPI.currentUser()` |
 | POST | `/api/auth/logout` | `FinanceAPI.logout()` |
@@ -24,7 +25,7 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 
 `PUT /api/state` remains a compatibility bridge. It is suitable for the current single-user pilot but does not provide record-level conflict protection.
 
-Legacy state and import JSON keep their existing numeric `amount` keys. Swift decodes them through `MoneyAmount` into signed 64-bit integer cents and encodes a decimal JSON number on write. The existing UI may temporarily consume a compatibility `Double`, but network/domain state has an exact-cent projection and no new financial model should introduce a raw `Double` boundary. A future resource API may send either decimal JSON numbers or decimal strings; both decode losslessly to cents.
+Legacy state and import JSON keep their existing numeric `amount` keys. Swift decodes them through `MoneyAmount` into signed 64-bit integer cents and encodes a decimal JSON number on write. The existing UI may temporarily consume a compatibility `Double`, but network/domain state has an exact-cent projection and no new financial model should introduce a raw `Double` boundary. The negotiated future V2 boundary is `decimal_string`; `MoneyAmount` already accepts decimal strings and converts them losslessly to cents.
 
 ## Connected mainline import-analysis boundary
 

@@ -1,0 +1,41 @@
+{
+  "version": "0.9.0",
+  "apiContractVersion": "20260714_001",
+  "financeSchemaVersion": "20260714_001_finance_domain_v2",
+  "sync": {
+    "preferredMode": "legacy_state_v1",
+    "availableModes": ["legacy_state_v1"],
+    "legacyState": {
+      "readable": true,
+      "writable": true,
+      "conflictControl": "last_write_wins"
+    },
+    "financeResources": {
+      "available": false,
+      "reason": "not_implemented"
+    }
+  },
+  "money": {
+    "legacyStateEncoding": "json_number",
+    "financeV2Encoding": "decimal_string",
+    "databasePrecision": 18,
+    "databaseScale": 2
+  },
+  "features": {
+    "importAnalysis": {
+      "available": true,
+      "contract": "import_harness_v1",
+      "decisions": ["accepted", "review", "rejected"]
+    },
+    "unifiedDashboardMetrics": { "available": false },
+    "workflowTasks": { "available": false },
+    "aiClassification": { "available": false },
+    "documentUpload": { "available": false },
+    "ocr": { "available": false }
+  },
+  "safety": {
+    "aiMayWriteBusinessRecords": false,
+    "aiMayPostJournalVouchers": false,
+    "acceptedImportRequiresHarnessOrHumanDecision": true
+  }
+}

@@ -17,6 +17,7 @@ struct AuditEventRequest: Codable {
 
 protocol FinanceAPI: Sendable {
     func health() async throws -> HealthResponse
+    func capabilities() async throws -> ServerCapabilitiesResponse
     func login(username: String, password: String) async throws -> SessionUser
     func currentUser() async throws -> SessionUser
     func logout() async throws
@@ -32,6 +33,10 @@ actor LiveFinanceAPI: FinanceAPI {
 
     func health() async throws -> HealthResponse {
         try await transport.send(.health)
+    }
+
+    func capabilities() async throws -> ServerCapabilitiesResponse {
+        try await transport.send(.capabilities)
     }
 
     func login(username: String, password: String) async throws -> SessionUser {
@@ -65,4 +70,3 @@ actor LiveFinanceAPI: FinanceAPI {
         let _: OKResponse = try await transport.send(.auditEvent, body: event)
     }
 }
-

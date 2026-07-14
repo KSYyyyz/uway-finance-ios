@@ -11,15 +11,30 @@ final class AppSessionTests: XCTestCase {
 
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
-        XCTAssertEqual(
-            session.serverState,
-            .available(BackendContract(health: HealthResponse(
-                status: "ok",
-                version: "0.9.0",
-                financeSchemaVersion: BackendContract.financeDomainV2Schema
-            )))
-        )
+        guard case .available(let contract) = session.serverState else {
+            return XCTFail("0.9.0 server should be available")
+        }
+        XCTAssertEqual(contract.serverVersion, "0.9.0")
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
+        XCTAssertEqual(contract.capabilities.source, .server)
         XCTAssertEqual(session.state.records.count, 1)
+    }
+
+    func testCapabilities404KeepsLegacyServerUsable() async {
+        let api = FinanceAPISpy(healthResponse: HealthResponse(status: "ok", version: "0.8.1"))
+        await api.setCapabilitiesError(.server(status: 404, code: nil, message: "Not Found"))
+        let session = AppSession(api: api, saveDelay: .zero)
+
+        await session.start()
+
+        XCTAssertEqual(session.phase, .signedIn)
+        guard case .available(let contract) = session.serverState else {
+            return XCTFail("missing capabilities endpoint must not mark an old server offline")
+        }
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        XCTAssertEqual(contract.capabilities.source, .legacyFallback)
+        XCTAssertNil(contract.negotiatedAPIContractVersion)
+        XCTAssertNil(contract.financeSchemaVersion)
     }
 
     func testUnauthorizedRefreshReturnsToLogin() async {
@@ -113,22 +128,36 @@ private func makeSessionTestRecord() -> BusinessRecord {
 }
 
 private actor FinanceAPISpy: FinanceAPI {
+    private let healthResponse: HealthResponse
     private var fetchError: APIError?
     private var saveError: APIError?
+    private var capabilitiesError: APIError?
     private var savedStates: [AppStatePayload] = []
     private var auditEvents: [AuditEventRequest] = []
 
+    init(healthResponse: HealthResponse = HealthResponse(
+        status: "ok",
+        version: "0.9.0",
+        financeSchemaVersion: BackendContract.financeDomainV2Schema
+    )) {
+        self.healthResponse = healthResponse
+    }
+
     func setFetchError(_ error: APIError?) { fetchError = error }
     func setSaveError(_ error: APIError?) { saveError = error }
+    func setCapabilitiesError(_ error: APIError?) { capabilitiesError = error }
     func lastSavedState() -> AppStatePayload? { savedStates.last }
     func lastAuditEvent() -> AuditEventRequest? { auditEvents.last }
 
     func health() async throws -> HealthResponse {
-        HealthResponse(
-            status: "ok",
-            version: "0.9.0",
-            financeSchemaVersion: BackendContract.financeDomainV2Schema
-        )
+        healthResponse
+    }
+
+    func capabilities() async throws -> ServerCapabilitiesResponse {
+        if let capabilitiesError { throw capabilitiesError }
+        let bundle = Bundle(for: AppSessionTests.self)
+        let url = try XCTUnwrap(bundle.url(forResource: "capabilities-v0.9.0", withExtension: "json"))
+        return try JSONDecoder().decode(ServerCapabilitiesResponse.self, from: Data(contentsOf: url))
     }
 
     func login(username: String, password: String) async throws -> SessionUser {

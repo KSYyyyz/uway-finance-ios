@@ -50,7 +50,8 @@ final class AppSession: ObservableObject {
         serverState = .checking
         do {
             let health = try await api.health()
-            serverState = .available(BackendContract(health: health))
+            let negotiated = try? await api.capabilities()
+            serverState = .available(BackendContract(health: health, negotiated: negotiated))
             alertMessage = nil
         } catch {
             serverState = .unavailable(error.localizedDescription)

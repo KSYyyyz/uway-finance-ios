@@ -8,8 +8,9 @@ Current marketing version: `0.9.0`, compatible with backend 0.9.0 and its `20260
 
 - Native `TabView` with 工作台、账目、待处理、月结、我的.
 - Native login and HttpOnly-cookie session restoration.
-- Current `/api/state` read/write compatibility, debounced sync status and pull-to-refresh. The backend may mirror those writes into Finance Domain V2, but the iOS client does not call unimplemented resource APIs.
-- Live `/api/health` status, backend version and optional finance-schema display; 0.8.x responses without `financeSchemaVersion` remain decodable. Failed saves keep their local snapshot and expose a one-tap retry instead of overwriting it with a refresh.
+- Startup capability negotiation through `GET /api/capabilities`. Only the published and client-supported `legacy_state_v1` mode is used; 404, missing endpoints and old servers safely fall back to that same mode.
+- Current `/api/state` read/write compatibility, debounced sync status and pull-to-refresh. The backend may mirror those writes into Finance Domain V2, but the iOS client does not call unavailable resource, metric, workflow, classification, document or OCR APIs.
+- Live `/api/health` status plus service app version, optional finance schema, API contract version and active sync-mode display; 0.8.x responses without `financeSchemaVersion` remain decodable. Failed saves keep their local snapshot and expose a one-tap retry instead of overwriting it with a refresh.
 - Exact-cent network/domain boundary: current JSON number amounts remain compatible, while Swift Codable converts them to integer cents before round-tripping state and import payloads.
 - “记一笔” `Form`, workbench cash summary, recent activity and a Swift Charts cash forecast.
 - Ledger fixed region: page brief, date filter, status filter and period totals stay fixed; only year/month/day ledger content scrolls. Month headings are not sticky.
@@ -61,4 +62,4 @@ It runs for iOS or checked-in contract-snapshot changes and can also be started 
 
 ## Current backend boundary
 
-Backend 0.9.0 implements both import-analysis endpoints and still exposes finance data through the legacy `/api/state` compatibility path. Its V2 organization, account-book, period, business-record, bank-transaction, voucher, reconciliation, workflow and AI evidence domains do not yet have resource APIs, so the native app does not invent or probe those paths. Analysis requires the server-side classifier configuration and can return `503 IMPORT_AI_NOT_CONFIGURED` when that service is unavailable. The native screen surfaces that failure and never falls back to a model key on the phone. Attachment/OCR endpoints are not exposed yet; the native client keeps them behind `DocumentAPI` so backend activation does not require a screen rewrite.
+Backend 0.9.0 implements `/api/capabilities` and both import-analysis endpoints, and still exposes finance data through the negotiated `legacy_state_v1` `/api/state` path. Its V2 organization, account-book, period, business-record, bank-transaction, voucher, reconciliation, workflow and AI evidence domains do not yet have resource APIs, so the native app does not invent or probe those paths. Analysis requires the server-side classifier configuration and can return `503 IMPORT_AI_NOT_CONFIGURED` when that service is unavailable. The native screen surfaces that failure and never falls back to a model key on the phone. Attachment/OCR endpoints are advertised as unavailable; the native client keeps them behind a non-networking `DocumentAPI` reservation so backend activation does not require a screen rewrite.

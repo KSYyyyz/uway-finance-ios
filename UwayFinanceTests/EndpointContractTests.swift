@@ -3,6 +3,8 @@ import XCTest
 
 final class EndpointContractTests: XCTestCase {
     func testCurrentBackendEndpointsRemainStable() {
+        XCTAssertEqual(APIEndpoint.health.path, "/api/health")
+        XCTAssertEqual(APIEndpoint.capabilities.path, "/api/capabilities")
         XCTAssertEqual(APIEndpoint.login.path, "/api/auth/login")
         XCTAssertEqual(APIEndpoint.currentUser.path, "/api/auth/me")
         XCTAssertEqual(APIEndpoint.logout.path, "/api/auth/logout")
