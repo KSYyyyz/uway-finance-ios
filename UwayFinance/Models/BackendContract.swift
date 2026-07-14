@@ -22,11 +22,43 @@ struct LegacyStateCapability: Codable, Equatable, Sendable {
     let conflictControl: String
 }
 
+struct BusinessRecordResourceCapability: Codable, Equatable, Sendable {
+    let list: Bool
+    let create: Bool
+    let update: Bool
+    let delete: Bool
+    let pagination: String
+    let moneyEncoding: String
+    let idempotencyHeader: String
+    let concurrencyControl: String
+}
+
+struct FinanceResourceCapability: Codable, Equatable, Sendable {
+    let available: Bool
+    let reason: String?
+    let cutoverState: String?
+    let contextEndpoint: String?
+    let businessRecords: BusinessRecordResourceCapability?
+
+    static let unavailable = FinanceResourceCapability(
+        available: false,
+        reason: "capabilities_unavailable",
+        cutoverState: nil,
+        contextEndpoint: nil,
+        businessRecords: nil
+    )
+
+    var statusDisplay: String {
+        if available, cutoverState == "shadow" { return "Shadow 可用（未切换）" }
+        return available ? "可用" : "尚未开放"
+    }
+}
+
 struct SyncCapabilitiesResponse: Codable, Equatable, Sendable {
     let preferredMode: String
     let availableModes: [String]
     let legacyState: LegacyStateCapability
-    let financeResources: CapabilityAvailability
+    let financeResources: FinanceResourceCapability
 }
 
 struct MoneyCapabilitiesResponse: Codable, Equatable, Sendable {
@@ -109,7 +141,7 @@ enum CapabilityNegotiationSource: Equatable, Sendable {
 struct ServerCapabilities: Equatable, Sendable {
     let syncMode: FinanceSyncMode
     let financeDomainV2Mirror: Bool
-    let financeResourceAPI: Bool
+    let financeResources: FinanceResourceCapability
     let importHarnessStatuses: Set<String>
     let importAnalysis: ImportAnalysisCapability
     let unifiedDashboardMetrics: Bool
@@ -134,7 +166,7 @@ struct ServerCapabilities: Equatable, Sendable {
         return ServerCapabilities(
             syncMode: .legacyStateV1,
             financeDomainV2Mirror: financeSchemaVersion == BackendContract.financeDomainV2Schema,
-            financeResourceAPI: response.sync.financeResources.available,
+            financeResources: response.sync.financeResources,
             importHarnessStatuses: Set(response.features.importAnalysis.decisions),
             importAnalysis: response.features.importAnalysis,
             unifiedDashboardMetrics: response.features.unifiedDashboardMetrics.available,
@@ -152,7 +184,7 @@ struct ServerCapabilities: Equatable, Sendable {
         ServerCapabilities(
             syncMode: .legacyStateV1,
             financeDomainV2Mirror: financeSchemaVersion == BackendContract.financeDomainV2Schema,
-            financeResourceAPI: false,
+            financeResources: .unavailable,
             importHarnessStatuses: ["accepted", "review", "rejected"],
             importAnalysis: .unavailableFallback,
             unifiedDashboardMetrics: false,
@@ -174,11 +206,13 @@ struct ServerCapabilities: Equatable, Sendable {
             source: .legacyFallback
         )
     }
+
+    var financeResourceAPI: Bool { financeResources.available }
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260714_001"
-    static let financeDomainV2Schema = "20260714_001_finance_domain_v2"
+    static let apiContractVersion = "20260714_002"
+    static let financeDomainV2Schema = "20260714_002_finance_resource_api"
 
     let serverVersion: String
     let financeSchemaVersion: String?

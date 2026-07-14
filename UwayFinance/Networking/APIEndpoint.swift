@@ -22,10 +22,42 @@ struct APIEndpoint: Hashable {
     static let auditEvent = APIEndpoint(method: .post, path: "/api/audit-events")
     static let importAnalysis = APIEndpoint(method: .post, path: "/api/import-analysis")
 
+    static func financeContext(accountBookId: String? = nil) -> APIEndpoint {
+        APIEndpoint(method: .get, path: path(
+            "/api/v2/context",
+            queryItems: accountBookId.map { [URLQueryItem(name: "accountBookId", value: $0)] } ?? []
+        ))
+    }
+
+    static func businessRecords(_ query: BusinessRecordListQuery) -> APIEndpoint {
+        var items = [URLQueryItem(name: "limit", value: String(query.limit))]
+        if let value = query.accountBookId { items.append(URLQueryItem(name: "accountBookId", value: value)) }
+        if let value = query.cursor { items.append(URLQueryItem(name: "cursor", value: value)) }
+        if let value = query.direction { items.append(URLQueryItem(name: "direction", value: value.rawValue)) }
+        if let value = query.financeStatus { items.append(URLQueryItem(name: "financeStatus", value: value.rawValue)) }
+        return APIEndpoint(method: .get, path: path("/api/v2/business-records", queryItems: items))
+    }
+
+    static let createBusinessRecord = APIEndpoint(method: .post, path: "/api/v2/business-records")
+
+    static func updateBusinessRecord(recordId: String) -> APIEndpoint {
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
+        let encoded = recordId.addingPercentEncoding(withAllowedCharacters: allowed) ?? recordId
+        return APIEndpoint(method: .patch, path: "/api/v2/business-records/\(encoded)")
+    }
+
     static func importDecision(analysisId: String) -> APIEndpoint {
         let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
         let encoded = analysisId.addingPercentEncoding(withAllowedCharacters: allowed) ?? analysisId
         return APIEndpoint(method: .post, path: "/api/import-analysis/\(encoded)/decision")
+    }
+
+    private static func path(_ path: String, queryItems: [URLQueryItem]) -> String {
+        guard !queryItems.isEmpty else { return path }
+        var components = URLComponents()
+        components.path = path
+        components.queryItems = queryItems
+        return components.string ?? path
     }
 }
 

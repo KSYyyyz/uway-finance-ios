@@ -15,6 +15,10 @@ final class MoneyAmountTests: XCTestCase {
         XCTAssertEqual(amount.cents, 30)
     }
 
+    func testV2DecimalStringRejectsSubCentPrecision() {
+        XCTAssertThrowsError(try MoneyAmount(decimalString: "0.301"))
+    }
+
     func testLegacyStateRoundTripKeepsAmountKeyAndExactCents() throws {
         let original = makeMoneyTestRecord(amount: 0.1 + 0.2)
         let encoded = try JSONEncoder().encode(original)

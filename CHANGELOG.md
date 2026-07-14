@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0 - 2026-07-14
+
+- Add a compiled and tested shadow client for `/api/v2/context` and the list/create/update business-record resource slice without changing the active `AppSession` data source.
+- Decode cursor pages and V2 decimal-string money through the existing exact-cent `MoneyAmount` domain model.
+- Require stable `Idempotency-Key` commands for create/update, require `expectedVersion` for updates, and expose `409 VERSION_CONFLICT` as a recognizable client error.
+- Decode the expanded `financeResources` capability (`cutoverState: shadow`) while keeping `legacy_state_v1` as the only negotiated sync mode.
+- Preserve 0.8.x health/capability fallback and the 0.9.0 import-provider availability gate.
+
 ## 0.9.0 - 2026-07-14
 
 - Accept the optional `financeSchemaVersion` returned by backend 0.9.0 while remaining compatible with 0.8.x health responses.

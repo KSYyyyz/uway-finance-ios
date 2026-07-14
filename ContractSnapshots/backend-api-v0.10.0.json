@@ -1,7 +1,7 @@
 {
-  "version": "0.9.0",
-  "apiContractVersion": "20260714_001",
-  "financeSchemaVersion": "20260714_001_finance_domain_v2",
+  "version": "0.10.0",
+  "apiContractVersion": "20260714_002",
+  "financeSchemaVersion": "20260714_002_finance_resource_api",
   "syncMode": "legacy_state_v1",
   "money": {
     "legacyStateEncoding": "json_number",
@@ -11,7 +11,21 @@
   },
   "capabilities": {
     "financeDomainV2Mirror": true,
-    "financeResourceAPI": false,
+    "financeResources": {
+      "available": true,
+      "cutoverState": "shadow",
+      "contextEndpoint": "/api/v2/context",
+      "businessRecords": {
+        "list": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "pagination": "cursor",
+        "moneyEncoding": "decimal_string",
+        "idempotencyHeader": "Idempotency-Key",
+        "concurrencyControl": "expectedVersion"
+      }
+    },
     "importAnalysis": {
       "availability": "runtime",
       "reasonWhenUnavailable": "provider_not_configured"
@@ -25,6 +39,10 @@
     { "method": "post", "path": "/api/auth/logout", "swift": "method: .post, path: \"/api/auth/logout\"" },
     { "method": "get", "path": "/api/state", "swift": "method: .get, path: \"/api/state\"" },
     { "method": "put", "path": "/api/state", "swift": "method: .put, path: \"/api/state\"" },
+    { "method": "get", "path": "/api/v2/context", "swift": "\"/api/v2/context\"" },
+    { "method": "get", "path": "/api/v2/business-records", "swift": "path(\"/api/v2/business-records\"" },
+    { "method": "post", "path": "/api/v2/business-records", "swift": "method: .post, path: \"/api/v2/business-records\"" },
+    { "method": "patch", "path": "/api/v2/business-records/:recordId", "swift": "method: .patch, path: \"/api/v2/business-records/\\(encoded)\"" },
     { "method": "post", "path": "/api/audit-events", "swift": "method: .post, path: \"/api/audit-events\"" },
     { "method": "post", "path": "/api/import-analysis", "swift": "method: .post, path: \"/api/import-analysis\"" },
     { "method": "post", "path": "/api/import-analysis/:analysisId/decision", "swift": "method: .post, path: \"/api/import-analysis/\\(encoded)/decision\"" }

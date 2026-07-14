@@ -1,0 +1,8 @@
+{
+  "error": "经营事项已被其他设备更新，请刷新后重试",
+  "code": "VERSION_CONFLICT",
+  "details": {
+    "expectedVersion": 3,
+    "currentVersion": 4
+  }
+}

@@ -12,12 +12,16 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
         guard case .available(let contract) = session.serverState else {
-            return XCTFail("0.9.0 server should be available")
+            return XCTFail("0.10.0 server should be available")
         }
-        XCTAssertEqual(contract.serverVersion, "0.9.0")
+        XCTAssertEqual(contract.serverVersion, "0.10.0")
         XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
         XCTAssertEqual(contract.capabilities.source, .server)
+        XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(session.state.records.count, 1)
+        let fetchStateCallCount = await api.fetchStateCallCount()
+        XCTAssertEqual(fetchStateCallCount, 1)
     }
 
     func testCapabilities404KeepsLegacyServerUsable() async {
@@ -38,7 +42,14 @@ final class AppSessionTests: XCTestCase {
     }
 
     func testUnavailableImportCapabilityBlocksAnalysisRequest() async throws {
-        let api = FinanceAPISpy(capabilitiesFixtureName: "capabilities-v0.9.0-import-disabled")
+        let api = FinanceAPISpy(
+            healthResponse: HealthResponse(
+                status: "ok",
+                version: "0.9.0",
+                financeSchemaVersion: "20260714_001_finance_domain_v2"
+            ),
+            capabilitiesFixtureName: "capabilities-v0.9.0-import-disabled"
+        )
         let session = AppSession(api: api, saveDelay: .zero)
         await session.start()
 
@@ -157,12 +168,13 @@ private actor FinanceAPISpy: FinanceAPI {
     private var capabilitiesError: APIError?
     private var savedStates: [AppStatePayload] = []
     private var auditEvents: [AuditEventRequest] = []
+    private var fetchStateCalls = 0
 
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
-        version: "0.9.0",
+        version: "0.10.0",
         financeSchemaVersion: BackendContract.financeDomainV2Schema
-    ), capabilitiesFixtureName: String = "capabilities-v0.9.0") {
+    ), capabilitiesFixtureName: String = "capabilities-v0.10.0") {
         self.healthResponse = healthResponse
         self.capabilitiesFixtureName = capabilitiesFixtureName
     }
@@ -172,6 +184,7 @@ private actor FinanceAPISpy: FinanceAPI {
     func setCapabilitiesError(_ error: APIError?) { capabilitiesError = error }
     func lastSavedState() -> AppStatePayload? { savedStates.last }
     func lastAuditEvent() -> AuditEventRequest? { auditEvents.last }
+    func fetchStateCallCount() -> Int { fetchStateCalls }
 
     func health() async throws -> HealthResponse {
         healthResponse
@@ -196,6 +209,7 @@ private actor FinanceAPISpy: FinanceAPI {
 
     func fetchState() async throws -> StateEnvelope {
         if let fetchError { throw fetchError }
+        fetchStateCalls += 1
         return StateEnvelope(
             data: AppStatePayload(
                 records: [makeSessionTestRecord()],

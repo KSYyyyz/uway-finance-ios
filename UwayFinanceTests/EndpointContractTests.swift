@@ -19,6 +19,16 @@ final class EndpointContractTests: XCTestCase {
         XCTAssertEqual(APIEndpoint.importDecision(analysisId: "A-001").path, "/api/import-analysis/A-001/decision")
     }
 
+    func testShadowFinanceResourceEndpointsMatchCandidateContract() {
+        XCTAssertEqual(APIEndpoint.financeContext().path, "/api/v2/context")
+        XCTAssertEqual(APIEndpoint.businessRecords(BusinessRecordListQuery(limit: 20)).method, .get)
+        XCTAssertTrue(APIEndpoint.businessRecords(BusinessRecordListQuery(limit: 20)).path.hasPrefix("/api/v2/business-records?"))
+        XCTAssertEqual(APIEndpoint.createBusinessRecord.method, .post)
+        XCTAssertEqual(APIEndpoint.createBusinessRecord.path, "/api/v2/business-records")
+        XCTAssertEqual(APIEndpoint.updateBusinessRecord(recordId: "103").method, .patch)
+        XCTAssertEqual(APIEndpoint.updateBusinessRecord(recordId: "103").path, "/api/v2/business-records/103")
+    }
+
     func testReviewDecisionDoesNotTrustAClientReviewer() throws {
         let body = ImportReviewDecision(decision: "accept", reason: "已核对银行回单")
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any])

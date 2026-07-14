@@ -1,0 +1,20 @@
+{
+  "selectedAccountBook": {
+    "id": "11",
+    "name": "默认账套",
+    "baseCurrency": "CNY",
+    "organization": { "id": "7", "name": "有为科技" },
+    "role": "owner",
+    "permissions": { "readBusinessRecords": true, "writeBusinessRecords": true }
+  },
+  "accountBooks": [
+    {
+      "id": "11",
+      "name": "默认账套",
+      "baseCurrency": "CNY",
+      "organization": { "id": "7", "name": "有为科技" },
+      "role": "owner",
+      "permissions": { "readBusinessRecords": true, "writeBusinessRecords": true }
+    }
+  ]
+}

@@ -26,11 +26,11 @@ final class BackendContractTests: XCTestCase {
         )
         let contract = BackendContract(health: health, negotiated: response)
 
-        XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
-        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.financeDomainV2Schema)
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260714_001")
+        XCTAssertEqual(contract.financeSchemaVersion, "20260714_001_finance_domain_v2")
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(contract.capabilities.source, .server)
-        XCTAssertTrue(contract.capabilities.financeDomainV2Mirror)
+        XCTAssertFalse(contract.capabilities.financeDomainV2Mirror)
         XCTAssertFalse(contract.capabilities.financeResourceAPI)
         XCTAssertEqual(contract.capabilities.money.legacyStateEncoding, "json_number")
         XCTAssertEqual(contract.capabilities.money.financeV2Encoding, "decimal_string")
@@ -38,6 +38,26 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.money.databaseScale, 2)
         XCTAssertTrue(contract.capabilities.importAnalysis.available)
         XCTAssertNil(contract.capabilities.importAnalysis.reason)
+    }
+
+    func testCapabilitiesV010ExposeShadowResourcesWithoutSwitchingSyncMode() throws {
+        let health = try JSONDecoder().decode(HealthResponse.self, from: fixture(named: "health-v0.10.0"))
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-v0.10.0")
+        )
+        let contract = BackendContract(health: health, negotiated: response)
+
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.financeDomainV2Schema)
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])
+        XCTAssertTrue(contract.capabilities.financeResourceAPI)
+        XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
+        XCTAssertEqual(contract.capabilities.financeResources.businessRecords?.pagination, "cursor")
+        XCTAssertEqual(contract.capabilities.financeResources.businessRecords?.idempotencyHeader, "Idempotency-Key")
+        XCTAssertEqual(contract.capabilities.financeResources.businessRecords?.concurrencyControl, "expectedVersion")
+        XCTAssertFalse(contract.capabilities.financeResources.businessRecords?.delete ?? true)
     }
 
     func testCapabilitiesV090ReportsUnconfiguredImportProvider() throws {

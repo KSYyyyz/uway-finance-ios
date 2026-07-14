@@ -41,8 +41,23 @@ struct MoneyAmount: Codable, Hashable, Comparable, Sendable {
         self = try! MoneyAmount(decimal: value)
     }
 
+    init(decimalString: String) throws {
+        let pattern = #"^-?(?:0|[1-9]\d*)(?:\.\d{1,2})?$"#
+        guard decimalString.range(of: pattern, options: .regularExpression) != nil,
+              let value = Decimal(string: decimalString, locale: Locale(identifier: "en_US_POSIX")) else {
+            throw MoneyAmountError.invalidValue
+        }
+        try self.init(decimal: value)
+    }
+
     var decimalValue: Decimal { Decimal(cents) / 100 }
     var legacyDouble: Double { NSDecimalNumber(decimal: decimalValue).doubleValue }
+    var decimalString: String {
+        let sign = cents < 0 ? "-" : ""
+        let magnitude = cents.magnitude
+        let fraction = String(format: "%02llu", magnitude % 100)
+        return "\(sign)\(magnitude / 100).\(fraction)"
+    }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -50,9 +65,8 @@ struct MoneyAmount: Codable, Hashable, Comparable, Sendable {
             try self.init(decimal: decimal)
             return
         }
-        if let text = try? container.decode(String.self),
-           let decimal = Decimal(string: text, locale: Locale(identifier: "en_US_POSIX")) {
-            try self.init(decimal: decimal)
+        if let text = try? container.decode(String.self) {
+            try self.init(decimalString: text)
             return
         }
         throw DecodingError.dataCorruptedError(in: container, debugDescription: "amount must be a JSON number or decimal string")

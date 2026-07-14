@@ -37,7 +37,7 @@ struct ProfileView: View {
                     LabeledContent("当前同步模式", value: contract.capabilities.syncMode.displayName)
                     LabeledContent(
                         "V2 资源接口",
-                        value: contract.capabilities.financeResourceAPI ? "已开放" : "尚未开放"
+                        value: contract.capabilities.financeResources.statusDisplay
                     )
                     LabeledContent("导入分析", value: contract.capabilities.importAnalysis.statusDisplay)
                 }

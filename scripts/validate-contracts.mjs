@@ -4,21 +4,23 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
-const expectedMarketingVersion = '0.9.0'
-const expectedAPIContractVersion = '20260714_001'
-const expectedFinanceSchemaVersion = '20260714_001_finance_domain_v2'
+const expectedMarketingVersion = '0.10.0'
+const expectedAPIContractVersion = '20260714_002'
+const expectedFinanceSchemaVersion = '20260714_002_finance_resource_api'
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
-const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.9.0.json')
+const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.10.0.json')
 
 const requiredFiles = [
   'project.yml',
-  'ContractSnapshots/backend-api-v0.9.0.json',
+  'ContractSnapshots/backend-api-v0.10.0.json',
   'UwayFinance/App/UwayFinanceApp.swift',
   'UwayFinance/Networking/APIEndpoint.swift',
   'UwayFinance/Networking/FinanceAPI.swift',
   'UwayFinance/Networking/ImportAnalysisAPI.swift',
   'UwayFinance/Networking/DocumentAPI.swift',
+  'UwayFinance/Networking/FinanceResourceAPI.swift',
   'UwayFinance/Models/BackendContract.swift',
+  'UwayFinance/Models/FinanceResourceModels.swift',
   'UwayFinance/Models/MoneyAmount.swift',
   'UwayFinance/Models/RecordImportPipeline.swift',
   'UwayFinance/State/RecordImportSession.swift',
@@ -33,6 +35,7 @@ const requiredFiles = [
   'UwayFinanceTests/AppSessionTests.swift',
   'UwayFinanceTests/BackendContractTests.swift',
   'UwayFinanceTests/MoneyAmountTests.swift',
+  'UwayFinanceTests/FinanceResourceAPITests.swift',
   'UwayFinanceTests/RecordImportPipelineTests.swift',
   'UwayFinanceTests/Fixtures/harness-result.json',
   'UwayFinanceTests/Fixtures/import-analysis-request.json',
@@ -41,6 +44,12 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/health-v0.9.0.json',
   'UwayFinanceTests/Fixtures/capabilities-v0.9.0.json',
   'UwayFinanceTests/Fixtures/capabilities-v0.9.0-import-disabled.json',
+  'UwayFinanceTests/Fixtures/health-v0.10.0.json',
+  'UwayFinanceTests/Fixtures/capabilities-v0.10.0.json',
+  'UwayFinanceTests/Fixtures/finance-context-v0.10.0.json',
+  'UwayFinanceTests/Fixtures/business-records-page-v0.10.0.json',
+  'UwayFinanceTests/Fixtures/business-record-response-v0.10.0.json',
+  'UwayFinanceTests/Fixtures/version-conflict-v0.10.0.json',
   'CHANGELOG.md',
 ]
 
@@ -58,6 +67,12 @@ const fixtures = [
   'health-v0.9.0.json',
   'capabilities-v0.9.0.json',
   'capabilities-v0.9.0-import-disabled.json',
+  'health-v0.10.0.json',
+  'capabilities-v0.10.0.json',
+  'finance-context-v0.10.0.json',
+  'business-records-page-v0.10.0.json',
+  'business-record-response-v0.10.0.json',
+  'version-conflict-v0.10.0.json',
 ]
 for (const fixture of fixtures) {
   JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', fixture), 'utf8'))
@@ -80,9 +95,15 @@ if (contractSnapshot.financeSchemaVersion !== expectedFinanceSchemaVersion) {
 if (contractSnapshot.syncMode !== 'legacy_state_v1') {
   throw new Error('iOS must remain on the legacy-state compatibility path')
 }
+const resourceSnapshot = contractSnapshot.capabilities?.financeResources
 if (contractSnapshot.capabilities?.financeDomainV2Mirror !== true
-    || contractSnapshot.capabilities?.financeResourceAPI !== false) {
-  throw new Error('V2 mirror/resource capabilities do not match the 0.9.0 backend boundary')
+    || resourceSnapshot?.available !== true
+    || resourceSnapshot?.cutoverState !== 'shadow'
+    || resourceSnapshot?.businessRecords?.delete !== false
+    || resourceSnapshot?.businessRecords?.pagination !== 'cursor'
+    || resourceSnapshot?.businessRecords?.idempotencyHeader !== 'Idempotency-Key'
+    || resourceSnapshot?.businessRecords?.concurrencyControl !== 'expectedVersion') {
+  throw new Error('V2 shadow resource capabilities do not match the 0.10.0 backend boundary')
 }
 if (contractSnapshot.capabilities?.importAnalysis?.availability !== 'runtime'
     || contractSnapshot.capabilities?.importAnalysis?.reasonWhenUnavailable !== 'provider_not_configured') {
@@ -98,7 +119,7 @@ if (contractSnapshot.money?.legacyStateEncoding !== 'json_number'
   throw new Error('backend contract snapshot money boundary mismatch')
 }
 
-const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.9.0.json'), 'utf8'))
+const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.0.json'), 'utf8'))
 if (capabilitiesFixture.apiContractVersion !== expectedAPIContractVersion
     || capabilitiesFixture.sync?.preferredMode !== 'legacy_state_v1'
     || capabilitiesFixture.sync?.availableModes?.join(',') !== 'legacy_state_v1') {
@@ -113,10 +134,13 @@ if (disabledCapabilitiesFixture.features?.importAnalysis?.available !== false
     || disabledCapabilitiesFixture.features?.importAnalysis?.reason !== 'provider_not_configured') {
   throw new Error('unconfigured import-analysis fixture must expose provider_not_configured')
 }
-for (const feature of ['financeResources', 'unifiedDashboardMetrics', 'workflowTasks', 'aiClassification', 'documentUpload', 'ocr']) {
-  const value = feature === 'financeResources'
-    ? capabilitiesFixture.sync?.financeResources
-    : capabilitiesFixture.features?.[feature]
+if (capabilitiesFixture.sync?.financeResources?.available !== true
+    || capabilitiesFixture.sync?.financeResources?.cutoverState !== 'shadow'
+    || capabilitiesFixture.sync?.financeResources?.businessRecords?.moneyEncoding !== 'decimal_string') {
+  throw new Error('0.10 capabilities fixture must expose the shadow business-record resource slice')
+}
+for (const feature of ['unifiedDashboardMetrics', 'workflowTasks', 'aiClassification', 'documentUpload', 'ocr']) {
+  const value = capabilitiesFixture.features?.[feature]
   if (value?.available !== false) throw new Error(`future capability must remain unavailable: ${feature}`)
 }
 if (capabilitiesFixture.safety?.aiMayWriteBusinessRecords !== false
@@ -192,10 +216,6 @@ if (profile.includes('主线接口已连接')) {
 const swiftEndpoints = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'APIEndpoint.swift'), 'utf8')
 const currentContracts = contractSnapshot.endpoints
 
-if (swiftEndpoints.includes('/api/v2') || swiftEndpoints.includes('/api/business-records')) {
-  throw new Error('client must not call unimplemented Finance Domain V2 resource endpoints')
-}
-
 for (const { method, path: endpoint, swift: swiftNeedle } of currentContracts) {
   if (!swiftEndpoints.includes(swiftNeedle)) throw new Error(`Swift endpoint missing: ${method.toUpperCase()} ${endpoint}`)
 }
@@ -234,11 +254,11 @@ for (const field of contractSnapshot.ledgerProvenanceFields) {
   if (!financeModels.includes(field)) throw new Error(`ledger provenance field mismatch: ${field}`)
 }
 for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amount: Double']) {
-  if (!financeModels.includes(marker)) throw new Error(`0.9 compatibility model marker missing: ${marker}`)
+  if (!financeModels.includes(marker)) throw new Error(`legacy compatibility model marker missing: ${marker}`)
 }
 
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
-for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'financeResourceAPI: false', '"accepted", "review", "rejected"']) {
+for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'cutoverState', 'businessRecords', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
 }
 for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
@@ -249,8 +269,25 @@ if (backendContract.includes('importAnalysis: true')) {
 }
 
 const moneyAmount = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'MoneyAmount.swift'), 'utf8')
-for (const marker of ['let cents: Int64', 'struct LegacyMoney: Codable', 'container.encode(decimalValue)']) {
+for (const marker of ['let cents: Int64', 'struct LegacyMoney: Codable', 'container.encode(decimalValue)', 'init(decimalString:', 'var decimalString: String']) {
   if (!moneyAmount.includes(marker)) throw new Error(`lossless money marker missing: ${marker}`)
+}
+
+const resourceModels = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'FinanceResourceModels.swift'), 'utf8')
+for (const marker of ['struct V2DecimalAmount: Codable', 'container.encode(value.decimalString)', 'let expectedVersion: Int', 'struct IdempotencyKey', 'CreateBusinessRecordCommand', 'UpdateBusinessRecordCommand']) {
+  if (!resourceModels.includes(marker)) throw new Error(`Finance Resource V2 model marker missing: ${marker}`)
+}
+const resourceAPI = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'FinanceResourceAPI.swift'), 'utf8')
+for (const marker of ['protocol FinanceResourceAPI', 'Idempotency-Key', 'command.idempotencyKey.rawValue', '.updateBusinessRecord(recordId: command.recordId)']) {
+  if (!resourceAPI.includes(marker)) throw new Error(`Finance Resource V2 client marker missing: ${marker}`)
+}
+const httpTransport = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'HTTPTransport.swift'), 'utf8')
+for (const marker of ['case versionConflict', 'VERSION_CONFLICT', 'headers: [String: String]']) {
+  if (!httpTransport.includes(marker)) throw new Error(`V2 transport marker missing: ${marker}`)
+}
+const appSession = fs.readFileSync(path.join(root, 'UwayFinance', 'State', 'AppSession.swift'), 'utf8')
+if (appSession.includes('FinanceResourceAPI') || appSession.includes('/api/v2')) {
+  throw new Error('shadow V2 client must not become the AppSession data source')
 }
 
 const serverPath = path.join(workspace, 'server', 'index.ts')
@@ -258,9 +295,11 @@ const importSchemaPath = path.join(workspace, 'server', 'import-analysis.ts')
 const stateSchemaPath = path.join(workspace, 'server', 'schema.ts')
 const financeDomainPath = path.join(workspace, 'server', 'finance-domain.ts')
 const capabilitiesPath = path.join(workspace, 'server', 'capabilities.ts')
+const financeResourcesPath = path.join(workspace, 'server', 'finance-resources.ts')
 const apiContractDocumentPath = path.join(workspace, 'API-V2-CONTRACT.md')
+const mainPackagePath = path.join(workspace, 'package.json')
 const hasLocalBackend = process.env.UWAY_SKIP_LOCAL_BACKEND !== '1'
-  && [serverPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, apiContractDocumentPath].every(fs.existsSync)
+  && [serverPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, apiContractDocumentPath].every(fs.existsSync)
 if (hasLocalBackend) {
   const server = fs.readFileSync(serverPath, 'utf8')
   for (const { method, path: endpoint } of currentContracts) {
@@ -290,6 +329,11 @@ if (hasLocalBackend) {
     `API_CONTRACT_VERSION = '${expectedAPIContractVersion}'`,
     "preferredMode: 'legacy_state_v1'",
     "availableModes: ['legacy_state_v1']",
+    "cutoverState: 'shadow'",
+    "contextEndpoint: '/api/v2/context'",
+    "pagination: 'cursor'",
+    "idempotencyHeader: 'Idempotency-Key'",
+    "concurrencyControl: 'expectedVersion'",
     "legacyStateEncoding: 'json_number'",
     "financeV2Encoding: 'decimal_string'",
     'databasePrecision: 18',
@@ -300,9 +344,23 @@ if (hasLocalBackend) {
   ]) {
     if (!capabilities.includes(marker)) throw new Error(`local capabilities marker missing: ${marker}`)
   }
+  const financeResources = fs.readFileSync(financeResourcesPath, 'utf8')
+  for (const marker of ['amount::text', 'nextCursor', 'expectedVersion', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_REUSED']) {
+    if (!financeResources.includes(marker)) throw new Error(`local finance resource marker missing: ${marker}`)
+  }
   const apiContractDocument = fs.readFileSync(apiContractDocumentPath, 'utf8')
+  const staleDocumentMarkers = []
   for (const marker of [expectedMarketingVersion, expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1']) {
-    if (!apiContractDocument.includes(marker)) throw new Error(`local API contract document marker missing: ${marker}`)
+    if (!apiContractDocument.includes(marker)) staleDocumentMarkers.push(marker)
+  }
+  if (staleDocumentMarkers.length > 0) {
+    console.warn(`mainline API-V2-CONTRACT.md is stale for candidate markers: ${staleDocumentMarkers.join(', ')}`)
+  }
+  if (fs.existsSync(mainPackagePath)) {
+    const mainPackage = JSON.parse(fs.readFileSync(mainPackagePath, 'utf8'))
+    if (mainPackage.version !== expectedMarketingVersion) {
+      console.warn(`mainline package.json version is ${mainPackage.version}; candidate contract expects ${expectedMarketingVersion}`)
+    }
   }
 }
 

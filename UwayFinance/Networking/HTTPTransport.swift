@@ -4,6 +4,7 @@ enum APIError: LocalizedError, Equatable {
     case invalidResponse
     case unauthorized
     case server(status: Int, code: String?, message: String)
+    case versionConflict(expectedVersion: Int, currentVersion: Int?)
     case transport(String)
     case decoding(String)
     case unavailable(String)
@@ -13,6 +14,9 @@ enum APIError: LocalizedError, Equatable {
         case .invalidResponse: "服务器响应无效"
         case .unauthorized: "登录已失效，请重新登录"
         case .server(_, _, let message): message
+        case .versionConflict(_, let currentVersion):
+            if let currentVersion { return "经营事项已在其他设备更新（当前版本 \(currentVersion)），请刷新后重试" }
+            return "经营事项已在其他设备更新，请刷新后重试"
         case .transport: "暂时无法连接服务器，请检查网络后重试"
         case .decoding: "服务器数据格式与客户端不一致"
         case .unavailable(let message): message
@@ -24,6 +28,12 @@ private struct ErrorEnvelope: Decodable {
     let error: String?
     let message: String?
     let code: String?
+    let details: ErrorDetails?
+}
+
+private struct ErrorDetails: Decodable {
+    let expectedVersion: Int?
+    let currentVersion: Int?
 }
 
 actor HTTPTransport {
@@ -49,18 +59,29 @@ actor HTTPTransport {
         self.decoder = JSONDecoder()
     }
 
-    func send<Response: Decodable>(_ endpoint: APIEndpoint) async throws -> Response {
-        try await send(endpoint, encodedBody: nil)
+    func send<Response: Decodable>(
+        _ endpoint: APIEndpoint,
+        headers: [String: String] = [:]
+    ) async throws -> Response {
+        try await send(endpoint, encodedBody: nil, headers: headers)
     }
 
-    func send<Response: Decodable, Body: Encodable>(_ endpoint: APIEndpoint, body: Body) async throws -> Response {
+    func send<Response: Decodable, Body: Encodable>(
+        _ endpoint: APIEndpoint,
+        body: Body,
+        headers: [String: String] = [:]
+    ) async throws -> Response {
         let data: Data
         do { data = try encoder.encode(body) }
         catch { throw APIError.transport("请求编码失败") }
-        return try await send(endpoint, encodedBody: data)
+        return try await send(endpoint, encodedBody: data, headers: headers)
     }
 
-    private func send<Response: Decodable>(_ endpoint: APIEndpoint, encodedBody: Data?) async throws -> Response {
+    private func send<Response: Decodable>(
+        _ endpoint: APIEndpoint,
+        encodedBody: Data?,
+        headers: [String: String]
+    ) async throws -> Response {
         guard let url = URL(string: endpoint.path, relativeTo: baseURL)?.absoluteURL else {
             throw APIError.invalidResponse
         }
@@ -70,6 +91,7 @@ actor HTTPTransport {
         request.httpBody = encodedBody
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if encodedBody != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+        for (field, value) in headers { request.setValue(value, forHTTPHeaderField: field) }
 
         let data: Data
         let response: URLResponse
@@ -80,6 +102,14 @@ actor HTTPTransport {
         if http.statusCode == 401 { throw APIError.unauthorized }
         guard (200..<300).contains(http.statusCode) else {
             let envelope = try? decoder.decode(ErrorEnvelope.self, from: data)
+            if http.statusCode == 409,
+               envelope?.code == "VERSION_CONFLICT",
+               let expectedVersion = envelope?.details?.expectedVersion {
+                throw APIError.versionConflict(
+                    expectedVersion: expectedVersion,
+                    currentVersion: envelope?.details?.currentVersion
+                )
+            }
             throw APIError.server(
                 status: http.statusCode,
                 code: envelope?.code,
@@ -91,4 +121,3 @@ actor HTTPTransport {
         catch { throw APIError.decoding(error.localizedDescription) }
     }
 }
-

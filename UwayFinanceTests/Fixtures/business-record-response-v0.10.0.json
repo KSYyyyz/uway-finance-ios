@@ -1,0 +1,29 @@
+{
+  "record": {
+    "id": "104",
+    "externalId": "native:fixture",
+    "eventDate": "2026-07-04",
+    "direction": "expense",
+    "amount": "0.30",
+    "category": "软件服务",
+    "counterparty": "OpenAI",
+    "project": "Uway",
+    "account": "基本户",
+    "description": "Codex 续费",
+    "settlementStatus": "unsettled",
+    "invoiceStatus": "pending",
+    "financeStatus": "draft",
+    "contractStatus": "missing",
+    "dueDate": null,
+    "bankReference": null,
+    "scenario": null,
+    "businessPeriod": null,
+    "employeeName": null,
+    "supportingDocumentStatus": null,
+    "supportingDocumentNote": null,
+    "source": { "system": "native", "kind": "api" },
+    "version": 1,
+    "createdAt": "2026-07-14T00:00:04.000Z",
+    "updatedAt": "2026-07-14T00:00:04.000Z"
+  }
+}

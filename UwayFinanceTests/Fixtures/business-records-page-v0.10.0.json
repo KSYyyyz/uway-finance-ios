@@ -1,0 +1,43 @@
+{
+  "accountBook": {
+    "id": "11",
+    "name": "默认账套",
+    "baseCurrency": "CNY",
+    "organization": { "id": "7", "name": "有为科技" },
+    "role": "owner",
+    "permissions": { "readBusinessRecords": true, "writeBusinessRecords": true }
+  },
+  "items": [
+    {
+      "id": "103",
+      "externalId": "R-3",
+      "eventDate": "2026-07-03",
+      "direction": "expense",
+      "amount": "3.03",
+      "category": "软件",
+      "counterparty": "供应商丙",
+      "project": "",
+      "account": "基本户",
+      "description": "第三笔",
+      "settlementStatus": "settled",
+      "invoiceStatus": "pending",
+      "financeStatus": "draft",
+      "contractStatus": "not_required",
+      "dueDate": null,
+      "bankReference": null,
+      "scenario": "formal_expense",
+      "businessPeriod": "2026-07",
+      "employeeName": null,
+      "supportingDocumentStatus": "pending",
+      "supportingDocumentNote": null,
+      "source": { "system": "legacy_state", "kind": "mirror" },
+      "version": 3,
+      "createdAt": "2026-07-14T00:00:03.000Z",
+      "updatedAt": "2026-07-14T00:00:03.000Z"
+    }
+  ],
+  "page": {
+    "limit": 1,
+    "nextCursor": "eyJldmVudERhdGUiOiIyMDI2LTA3LTAzIiwiY3JlYXRlZEF0IjoiMjAyNi0wNy0xNFQwMDowMDowMy4wMDBaIiwiaWQiOiIxMDMifQ"
+  }
+}

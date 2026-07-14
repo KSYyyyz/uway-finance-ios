@@ -1,0 +1,54 @@
+{
+  "version": "0.10.0",
+  "apiContractVersion": "20260714_002",
+  "financeSchemaVersion": "20260714_002_finance_resource_api",
+  "sync": {
+    "preferredMode": "legacy_state_v1",
+    "availableModes": ["legacy_state_v1"],
+    "legacyState": {
+      "readable": true,
+      "writable": true,
+      "conflictControl": "last_write_wins"
+    },
+    "financeResources": {
+      "available": true,
+      "reason": null,
+      "cutoverState": "shadow",
+      "contextEndpoint": "/api/v2/context",
+      "businessRecords": {
+        "list": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "pagination": "cursor",
+        "moneyEncoding": "decimal_string",
+        "idempotencyHeader": "Idempotency-Key",
+        "concurrencyControl": "expectedVersion"
+      }
+    }
+  },
+  "money": {
+    "legacyStateEncoding": "json_number",
+    "financeV2Encoding": "decimal_string",
+    "databasePrecision": 18,
+    "databaseScale": 2
+  },
+  "features": {
+    "importAnalysis": {
+      "available": true,
+      "reason": null,
+      "contract": "import_harness_v1",
+      "decisions": ["accepted", "review", "rejected"]
+    },
+    "unifiedDashboardMetrics": { "available": false },
+    "workflowTasks": { "available": false },
+    "aiClassification": { "available": false },
+    "documentUpload": { "available": false },
+    "ocr": { "available": false }
+  },
+  "safety": {
+    "aiMayWriteBusinessRecords": false,
+    "aiMayPostJournalVouchers": false,
+    "acceptedImportRequiresHarnessOrHumanDecision": true
+  }
+}
