@@ -11,15 +11,15 @@ enum APIError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .invalidResponse: "服务器响应无效"
-        case .unauthorized: "登录已失效，请重新登录"
-        case .server(_, _, let message): message
+        case .invalidResponse: return "服务器响应无效"
+        case .unauthorized: return "登录已失效，请重新登录"
+        case .server(_, _, let message): return message
         case .versionConflict(_, let currentVersion):
             if let currentVersion { return "经营事项已在其他设备更新（当前版本 \(currentVersion)），请刷新后重试" }
             return "经营事项已在其他设备更新，请刷新后重试"
-        case .transport: "暂时无法连接服务器，请检查网络后重试"
-        case .decoding: "服务器数据格式与客户端不一致"
-        case .unavailable(let message): message
+        case .transport: return "暂时无法连接服务器，请检查网络后重试"
+        case .decoding: return "服务器数据格式与客户端不一致"
+        case .unavailable(let message): return message
         }
     }
 }
