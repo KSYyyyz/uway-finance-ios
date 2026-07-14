@@ -59,19 +59,19 @@ struct ImportAnalysisCapability: Codable, Equatable, Sendable {
     var statusDisplay: String {
         if available { return "可用" }
         switch reason {
-        case "provider_not_configured": "未配置模型服务"
-        case "capabilities_unavailable": "能力信息不可用"
-        case "service_unavailable": "服务不可用"
-        default: "暂不可用"
+        case "provider_not_configured": return "未配置模型服务"
+        case "capabilities_unavailable": return "能力信息不可用"
+        case "service_unavailable": return "服务不可用"
+        default: return "暂不可用"
         }
     }
 
     var unavailableMessage: String {
         switch reason {
-        case "provider_not_configured": "服务器尚未配置 DeepSeek 分析服务，暂时不能进行 AI 核验。"
-        case "capabilities_unavailable": "当前服务器未公布导入分析能力，为避免误发请求，已暂停 AI 核验。"
-        case "service_unavailable": "服务器暂时不可用，恢复连接后才能进行 AI 核验。"
-        default: "服务器暂未开放导入分析能力。"
+        case "provider_not_configured": return "服务器尚未配置 DeepSeek 分析服务，暂时不能进行 AI 核验。"
+        case "capabilities_unavailable": return "当前服务器未公布导入分析能力，为避免误发请求，已暂停 AI 核验。"
+        case "service_unavailable": return "服务器暂时不可用，恢复连接后才能进行 AI 核验。"
+        default: return "服务器暂未开放导入分析能力。"
         }
     }
 }
