@@ -37,6 +37,28 @@ final class AppSessionTests: XCTestCase {
         XCTAssertNil(contract.financeSchemaVersion)
     }
 
+    func testUnavailableImportCapabilityBlocksAnalysisRequest() async throws {
+        let api = FinanceAPISpy(capabilitiesFixtureName: "capabilities-v0.9.0-import-disabled")
+        let session = AppSession(api: api, saveDelay: .zero)
+        await session.start()
+
+        let csv = "日期,收支方向,金额,交易对方,事项说明,是否公司账目\n2026-07-14,支出,2480,示例云服务商,云服务器费用,是"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("uway-disabled-import-\(UUID().uuidString).csv")
+        try Data(csv.utf8).write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let importSession = RecordImportSession()
+        await importSession.load(url: url, existing: session.state.records)
+        XCTAssertTrue(importSession.canAnalyze)
+
+        let importAPI = ImportAnalysisAPISpy()
+        await importSession.analyze(using: importAPI, session: session)
+
+        let analyzeCallCount = await importAPI.analyzeCallCount()
+        XCTAssertEqual(analyzeCallCount, 0)
+        XCTAssertEqual(importSession.message, "服务器尚未配置 DeepSeek 分析服务，暂时不能进行 AI 核验。")
+    }
+
     func testUnauthorizedRefreshReturnsToLogin() async {
         let api = FinanceAPISpy()
         let session = AppSession(api: api, saveDelay: .zero)
@@ -129,6 +151,7 @@ private func makeSessionTestRecord() -> BusinessRecord {
 
 private actor FinanceAPISpy: FinanceAPI {
     private let healthResponse: HealthResponse
+    private let capabilitiesFixtureName: String
     private var fetchError: APIError?
     private var saveError: APIError?
     private var capabilitiesError: APIError?
@@ -139,8 +162,9 @@ private actor FinanceAPISpy: FinanceAPI {
         status: "ok",
         version: "0.9.0",
         financeSchemaVersion: BackendContract.financeDomainV2Schema
-    )) {
+    ), capabilitiesFixtureName: String = "capabilities-v0.9.0") {
         self.healthResponse = healthResponse
+        self.capabilitiesFixtureName = capabilitiesFixtureName
     }
 
     func setFetchError(_ error: APIError?) { fetchError = error }
@@ -156,7 +180,7 @@ private actor FinanceAPISpy: FinanceAPI {
     func capabilities() async throws -> ServerCapabilitiesResponse {
         if let capabilitiesError { throw capabilitiesError }
         let bundle = Bundle(for: AppSessionTests.self)
-        let url = try XCTUnwrap(bundle.url(forResource: "capabilities-v0.9.0", withExtension: "json"))
+        let url = try XCTUnwrap(bundle.url(forResource: capabilitiesFixtureName, withExtension: "json"))
         return try JSONDecoder().decode(ServerCapabilitiesResponse.self, from: Data(contentsOf: url))
     }
 
@@ -190,4 +214,19 @@ private actor FinanceAPISpy: FinanceAPI {
     }
 
     func audit(_ event: AuditEventRequest) async throws { auditEvents.append(event) }
+}
+
+private actor ImportAnalysisAPISpy: ImportAnalysisAPI {
+    private var analyzeCalls = 0
+
+    func analyzeCallCount() -> Int { analyzeCalls }
+
+    func analyze(_ request: ImportAnalysisRequest) async throws -> HarnessResult {
+        analyzeCalls += 1
+        throw APIError.unavailable("test should not reach transport")
+    }
+
+    func decide(analysisId: String, decision: ImportReviewDecision) async throws -> ImportReviewDecisionResponse {
+        throw APIError.unavailable("test should not reach transport")
+    }
 }

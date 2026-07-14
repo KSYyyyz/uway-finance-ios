@@ -23,8 +23,8 @@
   },
   "features": {
     "importAnalysis": {
-      "available": true,
-      "reason": null,
+      "available": false,
+      "reason": "provider_not_configured",
       "contract": "import_harness_v1",
       "decisions": ["accepted", "review", "rejected"]
     },

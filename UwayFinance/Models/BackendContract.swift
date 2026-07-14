@@ -38,8 +38,42 @@ struct MoneyCapabilitiesResponse: Codable, Equatable, Sendable {
 
 struct ImportAnalysisCapability: Codable, Equatable, Sendable {
     let available: Bool
+    let reason: String?
     let contract: String
     let decisions: [String]
+
+    static let unavailableFallback = ImportAnalysisCapability(
+        available: false,
+        reason: "capabilities_unavailable",
+        contract: "import_harness_v1",
+        decisions: ["accepted", "review", "rejected"]
+    )
+
+    static let serviceUnavailable = ImportAnalysisCapability(
+        available: false,
+        reason: "service_unavailable",
+        contract: "import_harness_v1",
+        decisions: ["accepted", "review", "rejected"]
+    )
+
+    var statusDisplay: String {
+        if available { return "可用" }
+        switch reason {
+        case "provider_not_configured": "未配置模型服务"
+        case "capabilities_unavailable": "能力信息不可用"
+        case "service_unavailable": "服务不可用"
+        default: "暂不可用"
+        }
+    }
+
+    var unavailableMessage: String {
+        switch reason {
+        case "provider_not_configured": "服务器尚未配置 DeepSeek 分析服务，暂时不能进行 AI 核验。"
+        case "capabilities_unavailable": "当前服务器未公布导入分析能力，为避免误发请求，已暂停 AI 核验。"
+        case "service_unavailable": "服务器暂时不可用，恢复连接后才能进行 AI 核验。"
+        default: "服务器暂未开放导入分析能力。"
+        }
+    }
 }
 
 struct FeatureCapabilitiesResponse: Codable, Equatable, Sendable {
@@ -77,7 +111,7 @@ struct ServerCapabilities: Equatable, Sendable {
     let financeDomainV2Mirror: Bool
     let financeResourceAPI: Bool
     let importHarnessStatuses: Set<String>
-    let importAnalysis: Bool
+    let importAnalysis: ImportAnalysisCapability
     let unifiedDashboardMetrics: Bool
     let workflowTasks: Bool
     let aiClassification: Bool
@@ -102,7 +136,7 @@ struct ServerCapabilities: Equatable, Sendable {
             financeDomainV2Mirror: financeSchemaVersion == BackendContract.financeDomainV2Schema,
             financeResourceAPI: response.sync.financeResources.available,
             importHarnessStatuses: Set(response.features.importAnalysis.decisions),
-            importAnalysis: response.features.importAnalysis.available,
+            importAnalysis: response.features.importAnalysis,
             unifiedDashboardMetrics: response.features.unifiedDashboardMetrics.available,
             workflowTasks: response.features.workflowTasks.available,
             aiClassification: response.features.aiClassification.available,
@@ -120,7 +154,7 @@ struct ServerCapabilities: Equatable, Sendable {
             financeDomainV2Mirror: financeSchemaVersion == BackendContract.financeDomainV2Schema,
             financeResourceAPI: false,
             importHarnessStatuses: ["accepted", "review", "rejected"],
-            importAnalysis: true,
+            importAnalysis: .unavailableFallback,
             unifiedDashboardMetrics: false,
             workflowTasks: false,
             aiClassification: false,

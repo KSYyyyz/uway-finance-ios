@@ -10,6 +10,10 @@ struct RecordImportView: View {
     @State private var ownershipDialogVisible = false
     @State private var reviewPrompt: ImportReviewPrompt?
 
+    private var importAnalysisCapability: ImportAnalysisCapability {
+        session.importAnalysisCapability
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -173,13 +177,19 @@ struct RecordImportView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "brain.head.profile")
-                    .foregroundStyle(AppTheme.brand)
+                    .foregroundStyle(importAnalysisCapability.available ? AppTheme.brand : AppTheme.warning)
                 VStack(alignment: .leading, spacing: 3) {
                     Text("AI 证据核验").font(.subheadline.weight(.semibold))
                     Text("自动准入、人工复核或拦截；模型不能绕过后端候选与证据规则。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            if !importAnalysisCapability.available {
+                Label(importAnalysisCapability.unavailableMessage, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.warning)
             }
 
             if importSession.isAnalyzing {
@@ -203,7 +213,7 @@ struct RecordImportView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!importSession.canAnalyze)
+            .disabled(!importSession.canAnalyze || !importAnalysisCapability.available)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .appCard()

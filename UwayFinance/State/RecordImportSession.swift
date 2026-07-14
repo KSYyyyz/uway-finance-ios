@@ -71,6 +71,11 @@ final class RecordImportSession: ObservableObject {
     }
 
     func analyze(using api: any ImportAnalysisAPI, session: AppSession) async {
+        let capability = session.importAnalysisCapability
+        guard capability.available else {
+            message = capability.unavailableMessage
+            return
+        }
         guard canAnalyze, let candidates = preview?.eligible else { return }
         clearAnalysis()
         isAnalyzing = true

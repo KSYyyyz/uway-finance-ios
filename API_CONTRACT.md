@@ -6,7 +6,7 @@ The backend is deployed independently on Alibaba Cloud and is not part of this f
 
 `GET /api/health` returns `status`, `version` and, on backend 0.9.0, `financeSchemaVersion: "20260714_001_finance_domain_v2"`. The schema field is optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260714_001`.
 
-The capabilities response is the machine-readable source of truth. iOS accepts a sync mode only when it is both implemented by the client and listed in `availableModes`; the current mode is `legacy_state_v1`. If the endpoint is missing, returns 404, cannot decode, or belongs to an older server, iOS safely retains `legacy_state_v1` and continues session restoration. The server owns any Finance Domain V2 mirror, and `financeResources` remains unavailable. No organization, account-book, period, business-record, voucher, reconciliation, workflow or AI-evidence resource endpoint is called until mainline publishes and implements that contract.
+The capabilities response is the machine-readable source of truth. iOS accepts a sync mode only when it is both implemented by the client and listed in `availableModes`; the current mode is `legacy_state_v1`. If the endpoint is missing, returns 404, cannot decode, or belongs to an older server, iOS safely retains `legacy_state_v1` and continues session restoration. Unknown capability state does not imply that import analysis is available. The server owns any Finance Domain V2 mirror, and `financeResources` remains unavailable. No organization, account-book, period, business-record, voucher, reconciliation, workflow or AI-evidence resource endpoint is called until mainline publishes and implements that contract.
 
 ## Connected in the first native build
 
@@ -40,7 +40,7 @@ The review decision body is exactly `{ decision, reason }`; reviewer identity is
 
 The decision response keeps the Harness status vocabulary: an accepted human decision returns `status: "accepted"`, and a rejection returns `status: "rejected"`. Human provenance is represented separately by `resolution.decision` and `resolution.reviewer`; it is not encoded into `status`.
 
-If the server-side classifier is not configured, analysis returns `503` with `IMPORT_AI_NOT_CONFIGURED`; the client surfaces the server message and does not fall back to an on-device or direct-provider call.
+`features.importAnalysis` includes `{ available, reason, contract, decisions }`. With a configured provider it reports `available=true, reason=null`; otherwise it reports `available=false, reason="provider_not_configured"`. The native screen disables verification and checks the same capability again immediately before sending, so it does not call `/api/import-analysis` when unavailable. A server-side `503 IMPORT_AI_NOT_CONFIGURED` remains a defensive race-condition fallback; the client never falls back to an on-device or direct-provider call.
 
 ### Native import safety boundary
 

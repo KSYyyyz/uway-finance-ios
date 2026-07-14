@@ -4,6 +4,7 @@
 
 - Accept the optional `financeSchemaVersion` returned by backend 0.9.0 while remaining compatible with 0.8.x health responses.
 - Negotiate the real `GET /api/capabilities` contract and safely fall back to `legacy_state_v1` when an older server returns 404 or does not expose the endpoint.
+- Treat `features.importAnalysis.available/reason` as runtime truth. When the provider is not configured, disable AI verification, explain the state and prevent analysis requests.
 - Treat Finance Domain V2 as a server-side mirror while `financeResources` is unavailable; iOS continues to read and write through `/api/state` and does not probe future feature endpoints.
 - Preserve legacy JSON amount fields while converting network/domain amounts to integer cents at the Codable boundary.
 - Show the detected finance schema and active compatibility mode in Profile.

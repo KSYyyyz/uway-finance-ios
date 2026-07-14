@@ -12,6 +12,8 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(contract.capabilities.source, .legacyFallback)
         XCTAssertFalse(contract.capabilities.financeResourceAPI)
+        XCTAssertFalse(contract.capabilities.importAnalysis.available)
+        XCTAssertEqual(contract.capabilities.importAnalysis.reason, "capabilities_unavailable")
         XCTAssertFalse(contract.capabilities.documentUpload)
         XCTAssertFalse(contract.capabilities.ocr)
     }
@@ -34,6 +36,21 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.money.financeV2Encoding, "decimal_string")
         XCTAssertEqual(contract.capabilities.money.databasePrecision, 18)
         XCTAssertEqual(contract.capabilities.money.databaseScale, 2)
+        XCTAssertTrue(contract.capabilities.importAnalysis.available)
+        XCTAssertNil(contract.capabilities.importAnalysis.reason)
+    }
+
+    func testCapabilitiesV090ReportsUnconfiguredImportProvider() throws {
+        let health = try JSONDecoder().decode(HealthResponse.self, from: fixture(named: "health-v0.9.0"))
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-v0.9.0-import-disabled")
+        )
+        let contract = BackendContract(health: health, negotiated: response)
+
+        XCTAssertFalse(contract.capabilities.importAnalysis.available)
+        XCTAssertEqual(contract.capabilities.importAnalysis.reason, "provider_not_configured")
+        XCTAssertEqual(contract.capabilities.importAnalysis.statusDisplay, "未配置模型服务")
     }
 
     func testNegotiatedFeaturesAndSafetyRemainUnavailableAndReadOnly() throws {

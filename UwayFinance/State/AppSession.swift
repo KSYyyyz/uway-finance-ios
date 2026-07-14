@@ -24,6 +24,11 @@ final class AppSession: ObservableObject {
     private var pendingSave: Task<Void, Never>?
     private var unsavedSnapshot: AppStatePayload?
 
+    var importAnalysisCapability: ImportAnalysisCapability {
+        guard case .available(let contract) = serverState else { return .serviceUnavailable }
+        return contract.capabilities.importAnalysis
+    }
+
     init(api: any FinanceAPI, saveDelay: Duration = .milliseconds(650)) {
         self.api = api
         self.saveDelay = saveDelay

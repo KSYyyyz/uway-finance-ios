@@ -40,6 +40,7 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/health-v0.8.1.json',
   'UwayFinanceTests/Fixtures/health-v0.9.0.json',
   'UwayFinanceTests/Fixtures/capabilities-v0.9.0.json',
+  'UwayFinanceTests/Fixtures/capabilities-v0.9.0-import-disabled.json',
   'CHANGELOG.md',
 ]
 
@@ -56,6 +57,7 @@ const fixtures = [
   'health-v0.8.1.json',
   'health-v0.9.0.json',
   'capabilities-v0.9.0.json',
+  'capabilities-v0.9.0-import-disabled.json',
 ]
 for (const fixture of fixtures) {
   JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', fixture), 'utf8'))
@@ -82,6 +84,10 @@ if (contractSnapshot.capabilities?.financeDomainV2Mirror !== true
     || contractSnapshot.capabilities?.financeResourceAPI !== false) {
   throw new Error('V2 mirror/resource capabilities do not match the 0.9.0 backend boundary')
 }
+if (contractSnapshot.capabilities?.importAnalysis?.availability !== 'runtime'
+    || contractSnapshot.capabilities?.importAnalysis?.reasonWhenUnavailable !== 'provider_not_configured') {
+  throw new Error('import-analysis capability must remain runtime-negotiated')
+}
 if (!['accepted', 'review', 'rejected'].every((status) => contractSnapshot.decisionStatuses.includes(status))) {
   throw new Error('backend contract snapshot must preserve Harness three-state status')
 }
@@ -97,6 +103,15 @@ if (capabilitiesFixture.apiContractVersion !== expectedAPIContractVersion
     || capabilitiesFixture.sync?.preferredMode !== 'legacy_state_v1'
     || capabilitiesFixture.sync?.availableModes?.join(',') !== 'legacy_state_v1') {
   throw new Error('capabilities fixture must publish only legacy_state_v1')
+}
+if (capabilitiesFixture.features?.importAnalysis?.available !== true
+    || capabilitiesFixture.features?.importAnalysis?.reason !== null) {
+  throw new Error('configured import-analysis fixture must report available=true/reason=null')
+}
+const disabledCapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.9.0-import-disabled.json'), 'utf8'))
+if (disabledCapabilitiesFixture.features?.importAnalysis?.available !== false
+    || disabledCapabilitiesFixture.features?.importAnalysis?.reason !== 'provider_not_configured') {
+  throw new Error('unconfigured import-analysis fixture must expose provider_not_configured')
 }
 for (const feature of ['financeResources', 'unifiedDashboardMetrics', 'workflowTasks', 'aiClassification', 'documentUpload', 'ocr']) {
   const value = feature === 'financeResources'
@@ -164,11 +179,14 @@ for (const marker of ['<string>https</string>', '<string>115.29.239.217</string>
 }
 
 const profile = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'ProfileView.swift'), 'utf8')
-for (const marker of ['Bundle.main', 'CFBundleShortVersionString', 'value: appVersion']) {
+for (const marker of ['Bundle.main', 'CFBundleShortVersionString', 'value: appVersion', 'contract.capabilities.importAnalysis.statusDisplay']) {
   if (!profile.includes(marker)) throw new Error(`Profile bundle version marker missing: ${marker}`)
 }
 if (profile.includes(`value: "${expectedMarketingVersion}"`)) {
   throw new Error('Profile version must not be hardcoded')
+}
+if (profile.includes('主线接口已连接')) {
+  throw new Error('Profile must not hardcode import-analysis availability')
 }
 
 const swiftEndpoints = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'APIEndpoint.swift'), 'utf8')
@@ -199,8 +217,12 @@ for (const marker of ['maximumBatchRows = 30', 'maximumFileSize = 5 * 1024 * 102
   if (!importPipeline.includes(marker)) throw new Error(`native import safety marker missing: ${marker}`)
 }
 const importView = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'RecordImportView.swift'), 'utf8')
-for (const marker of ['.fileImporter(', 'confirmPendingOwnership()', 'importSession.analyze', 'importSession.commit']) {
+for (const marker of ['.fileImporter(', 'confirmPendingOwnership()', 'importSession.analyze', 'importSession.commit', 'importAnalysisCapability.available', 'unavailableMessage']) {
   if (!importView.includes(marker)) throw new Error(`native import flow marker missing: ${marker}`)
+}
+const importSession = fs.readFileSync(path.join(root, 'UwayFinance', 'State', 'RecordImportSession.swift'), 'utf8')
+for (const marker of ['session.importAnalysisCapability', 'guard capability.available else', 'capability.unavailableMessage']) {
+  if (!importSession.includes(marker)) throw new Error(`import request capability gate missing: ${marker}`)
 }
 const quickSheet = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'QuickSheetView.swift'), 'utf8')
 if (!quickSheet.includes('case .importFile:\n            RecordImportView()')) {
@@ -218,6 +240,12 @@ for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amo
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
 for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'financeResourceAPI: false', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
+}
+for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
+  if (!backendContract.includes(marker)) throw new Error(`dynamic import capability marker missing: ${marker}`)
+}
+if (backendContract.includes('importAnalysis: true')) {
+  throw new Error('import-analysis availability must never be hardcoded true')
 }
 
 const moneyAmount = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'MoneyAmount.swift'), 'utf8')
@@ -253,8 +281,12 @@ if (hasLocalBackend) {
   if (!server.includes('financeSchemaVersion: FINANCE_SCHEMA_VERSION')) {
     throw new Error('local health response must expose financeSchemaVersion')
   }
+  if (!server.includes('createServerCapabilities({ importAnalysisAvailable: importClassifier !== null })')) {
+    throw new Error('local capabilities endpoint must derive import availability from configured classifier state')
+  }
   const capabilities = fs.readFileSync(capabilitiesPath, 'utf8')
   for (const marker of [
+    'createServerCapabilities',
     `API_CONTRACT_VERSION = '${expectedAPIContractVersion}'`,
     "preferredMode: 'legacy_state_v1'",
     "availableModes: ['legacy_state_v1']",
@@ -264,6 +296,7 @@ if (hasLocalBackend) {
     'databaseScale: 2',
     'aiMayWriteBusinessRecords: false',
     'aiMayPostJournalVouchers: false',
+    "reason: options.importAnalysisAvailable ? null : 'provider_not_configured'",
   ]) {
     if (!capabilities.includes(marker)) throw new Error(`local capabilities marker missing: ${marker}`)
   }

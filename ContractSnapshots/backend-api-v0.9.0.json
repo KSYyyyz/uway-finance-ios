@@ -11,7 +11,11 @@
   },
   "capabilities": {
     "financeDomainV2Mirror": true,
-    "financeResourceAPI": false
+    "financeResourceAPI": false,
+    "importAnalysis": {
+      "availability": "runtime",
+      "reasonWhenUnavailable": "provider_not_configured"
+    }
   },
   "endpoints": [
     { "method": "get", "path": "/api/health", "swift": "method: .get, path: \"/api/health\"" },

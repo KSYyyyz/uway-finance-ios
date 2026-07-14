@@ -39,8 +39,8 @@ struct ProfileView: View {
                         "V2 资源接口",
                         value: contract.capabilities.financeResourceAPI ? "已开放" : "尚未开放"
                     )
+                    LabeledContent("导入分析", value: contract.capabilities.importAnalysis.statusDisplay)
                 }
-                LabeledContent("导入分析", value: "主线接口已连接")
                 LabeledContent("OCR与附件", value: "等待后端")
                 Button("检查服务与同步", systemImage: "arrow.clockwise") {
                     Task {
