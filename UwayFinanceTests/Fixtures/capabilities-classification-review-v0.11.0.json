@@ -1,11 +1,18 @@
 {
   "version": "0.10.2",
-  "apiContractVersion": "20260714_006",
+  "apiContractVersion": "20260714_007",
   "financeSchemaVersion": "20260714_003_classification_review",
   "sync": {
     "preferredMode": "legacy_state_v1",
     "availableModes": ["legacy_state_v1"],
-    "legacyState": { "readable": true, "writable": true, "conflictControl": "last_write_wins" },
+    "legacyState": {
+      "readable": true,
+      "writable": true,
+      "conflictControl": "optional_if_match",
+      "versionSource": "updatedAt",
+      "etagHeader": "ETag",
+      "conditionalWriteHeader": "If-Match"
+    },
     "financeResources": {
       "available": true,
       "reason": null,

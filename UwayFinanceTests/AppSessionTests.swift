@@ -23,6 +23,7 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.classificationReview?.available, true)
         XCTAssertEqual(contract.financeSchemaVersion, BackendContract.classificationReviewSchema)
         XCTAssertEqual(session.state.records.count, 1)
+        XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-14T00:00:00.000Z"))
         let fetchStateCallCount = await api.fetchStateCallCount()
         XCTAssertEqual(fetchStateCallCount, 1)
     }
@@ -125,6 +126,109 @@ final class AppSessionTests: XCTestCase {
         }
     }
 
+    func testContinuousSavesAdvanceAndReuseLatestRevision() async throws {
+        let api = FinanceAPISpy(saveUpdatedAts: [
+            "2026-07-15T00:01:00.000Z",
+            "2026-07-15T00:02:00.000Z",
+        ])
+        let session = AppSession(api: api, saveDelay: .zero)
+        await session.start()
+
+        var record = makeSessionTestRecord()
+        session.addRecord(record)
+        try await Task.sleep(for: .milliseconds(50))
+        record.description = "第二次本地编辑"
+        session.updateRecord(record)
+        try await Task.sleep(for: .milliseconds(50))
+
+        let revisions = await api.attemptedSaveRevisions()
+        XCTAssertEqual(revisions, [
+            StateRevision(updatedAt: "2026-07-14T00:00:00.000Z"),
+            StateRevision(updatedAt: "2026-07-15T00:01:00.000Z"),
+        ])
+        XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-15T00:02:00.000Z"))
+    }
+
+    func testFirstEmptyLedgerSaveUsesZeroRevision() async throws {
+        let api = FinanceAPISpy(
+            fetchEnvelopes: [StateEnvelope(data: .empty, updatedAt: nil)],
+            saveUpdatedAts: ["2026-07-15T00:01:00.000Z"]
+        )
+        let session = AppSession(api: api, saveDelay: .zero)
+        await session.start()
+
+        session.addRecord(makeSessionTestRecord())
+        try await Task.sleep(for: .milliseconds(50))
+
+        let revisions = await api.attemptedSaveRevisions()
+        XCTAssertEqual(revisions, [.empty])
+        XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-15T00:01:00.000Z"))
+    }
+
+    func testStateConflictKeepsUnsavedLocalStateAndExplicitRetryUsesLatestRevision() async throws {
+        let remoteOriginal = makeSessionState(description: "服务器旧内容")
+        let remoteChanged = makeSessionState(description: "其他设备新内容")
+        let api = FinanceAPISpy(
+            fetchEnvelopes: [
+                StateEnvelope(data: remoteOriginal, updatedAt: "2026-07-15T00:00:00.000Z"),
+                StateEnvelope(data: remoteChanged, updatedAt: "2026-07-15T00:01:00.000Z"),
+            ],
+            saveUpdatedAts: ["2026-07-15T00:02:00.000Z"]
+        )
+        let session = AppSession(api: api, saveDelay: .zero)
+        await session.start()
+        await api.setSaveError(.stateVersionConflict(currentUpdatedAt: "2026-07-15T00:01:00.000Z"))
+
+        var localRecord = makeSessionTestRecord()
+        localRecord.description = "本机尚未同步的修改"
+        session.updateRecord(localRecord)
+        try await Task.sleep(for: .milliseconds(50))
+
+        guard case .conflict(let message) = session.syncState else {
+            return XCTFail("stale conditional write must enter conflict state")
+        }
+        XCTAssertEqual(message, "其他设备已更新，需要核对")
+        XCTAssertEqual(session.state.records.first?.description, "本机尚未同步的修改")
+        await api.setSaveError(nil)
+
+        await session.resolveStateConflictAndRetry()
+
+        XCTAssertEqual(session.state.records.first?.description, "本机尚未同步的修改")
+        let revisions = await api.attemptedSaveRevisions()
+        XCTAssertEqual(revisions, [
+            StateRevision(updatedAt: "2026-07-15T00:00:00.000Z"),
+            StateRevision(updatedAt: "2026-07-15T00:01:00.000Z"),
+        ])
+        let saved = await api.lastSavedState()
+        XCTAssertEqual(saved?.records.first?.description, "本机尚未同步的修改")
+        XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-15T00:02:00.000Z"))
+        guard case .synced = session.syncState else {
+            return XCTFail("explicit conflict resolution should complete the pending save")
+        }
+    }
+
+    func testConflictPausesAutomaticSavesUntilExplicitResolution() async throws {
+        let api = FinanceAPISpy()
+        let session = AppSession(api: api, saveDelay: .zero)
+        await session.start()
+        await api.setSaveError(.stateVersionConflict(currentUpdatedAt: "2026-07-15T00:01:00.000Z"))
+        var record = makeSessionTestRecord()
+        record.description = "第一次本机修改"
+        session.updateRecord(record)
+        try await Task.sleep(for: .milliseconds(50))
+
+        record.description = "冲突后的继续编辑"
+        session.updateRecord(record)
+        try await Task.sleep(for: .milliseconds(50))
+
+        let revisions = await api.attemptedSaveRevisions()
+        XCTAssertEqual(revisions.count, 1)
+        XCTAssertEqual(session.state.records.first?.description, "冲突后的继续编辑")
+        guard case .conflict = session.syncState else {
+            return XCTFail("local edits must remain paused behind explicit conflict resolution")
+        }
+    }
+
     func testDashboardMetricsFailureCannotOverwriteUnsavedLegacyState() async throws {
         let api = FinanceAPISpy()
         let session = AppSession(api: api, saveDelay: .zero)
@@ -188,6 +292,12 @@ private func makeSessionTestRecord() -> BusinessRecord {
     )
 }
 
+private func makeSessionState(description: String) -> AppStatePayload {
+    var record = makeSessionTestRecord()
+    record.description = description
+    return AppStatePayload(records: [record], bankTransactions: [], completedLessons: [], completedClose: [])
+}
+
 private actor FinanceAPISpy: FinanceAPI {
     private let healthResponse: HealthResponse
     private let capabilitiesFixtureName: String
@@ -197,14 +307,24 @@ private actor FinanceAPISpy: FinanceAPI {
     private var savedStates: [AppStatePayload] = []
     private var auditEvents: [AuditEventRequest] = []
     private var fetchStateCalls = 0
+    private var fetchEnvelopes: [StateEnvelope]
+    private var saveUpdatedAts: [String]
+    private var saveRevisions: [StateRevision] = []
 
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
         version: "0.10.2",
         financeSchemaVersion: BackendContract.classificationReviewSchema
-    ), capabilitiesFixtureName: String = "capabilities-classification-review-v0.11.0") {
+    ), capabilitiesFixtureName: String = "capabilities-classification-review-v0.11.0",
+       fetchEnvelopes: [StateEnvelope] = [StateEnvelope(
+        data: makeSessionState(description: "待重试事项"),
+        updatedAt: "2026-07-14T00:00:00.000Z"
+       )],
+       saveUpdatedAts: [String] = ["2026-07-14T00:00:01.000Z"]) {
         self.healthResponse = healthResponse
         self.capabilitiesFixtureName = capabilitiesFixtureName
+        self.fetchEnvelopes = fetchEnvelopes
+        self.saveUpdatedAts = saveUpdatedAts
     }
 
     func setFetchError(_ error: APIError?) { fetchError = error }
@@ -213,6 +333,7 @@ private actor FinanceAPISpy: FinanceAPI {
     func lastSavedState() -> AppStatePayload? { savedStates.last }
     func lastAuditEvent() -> AuditEventRequest? { auditEvents.last }
     func fetchStateCallCount() -> Int { fetchStateCalls }
+    func attemptedSaveRevisions() -> [StateRevision] { saveRevisions }
 
     func health() async throws -> HealthResponse {
         healthResponse
@@ -238,21 +359,18 @@ private actor FinanceAPISpy: FinanceAPI {
     func fetchState() async throws -> StateEnvelope {
         if let fetchError { throw fetchError }
         fetchStateCalls += 1
-        return StateEnvelope(
-            data: AppStatePayload(
-                records: [makeSessionTestRecord()],
-                bankTransactions: [],
-                completedLessons: [],
-                completedClose: []
-            ),
-            updatedAt: "2026-07-14T00:00:00.000Z"
-        )
+        guard !fetchEnvelopes.isEmpty else { throw APIError.invalidResponse }
+        if fetchEnvelopes.count == 1 { return fetchEnvelopes[0] }
+        return fetchEnvelopes.removeFirst()
     }
 
-    func saveState(_ state: AppStatePayload) async throws -> String {
+    func saveState(_ state: AppStatePayload, ifMatch revision: StateRevision) async throws -> StateRevision {
+        saveRevisions.append(revision)
         if let saveError { throw saveError }
         savedStates.append(state)
-        return "2026-07-14T00:00:00.000Z"
+        guard !saveUpdatedAts.isEmpty else { throw APIError.invalidResponse }
+        let updatedAt = saveUpdatedAts.count == 1 ? saveUpdatedAts[0] : saveUpdatedAts.removeFirst()
+        return StateRevision(updatedAt: updatedAt)
     }
 
     func audit(_ event: AuditEventRequest) async throws { auditEvents.append(event) }

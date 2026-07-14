@@ -22,7 +22,7 @@ protocol FinanceAPI: Sendable {
     func currentUser() async throws -> SessionUser
     func logout() async throws
     func fetchState() async throws -> StateEnvelope
-    func saveState(_ state: AppStatePayload) async throws -> String
+    func saveState(_ state: AppStatePayload, ifMatch revision: StateRevision) async throws -> StateRevision
     func audit(_ event: AuditEventRequest) async throws
 }
 
@@ -61,9 +61,16 @@ actor LiveFinanceAPI: FinanceAPI {
         try await transport.send(.state)
     }
 
-    func saveState(_ state: AppStatePayload) async throws -> String {
-        let response: MutationResponse = try await transport.send(.saveState, body: state)
-        return response.updatedAt ?? ISO8601DateFormatter().string(from: Date())
+    func saveState(_ state: AppStatePayload, ifMatch revision: StateRevision) async throws -> StateRevision {
+        let response: MutationResponse = try await transport.send(
+            .saveState,
+            body: state,
+            headers: ["If-Match": revision.ifMatchHeaderValue]
+        )
+        guard let updatedAt = response.updatedAt else {
+            throw APIError.decoding("条件写入响应缺少 updatedAt")
+        }
+        return StateRevision(updatedAt: updatedAt)
     }
 
     func audit(_ event: AuditEventRequest) async throws {

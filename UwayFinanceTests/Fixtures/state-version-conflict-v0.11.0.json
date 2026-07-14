@@ -1,0 +1,7 @@
+{
+  "error": "账本已被另一客户端更新，本机改动未覆盖服务器数据",
+  "code": "STATE_VERSION_CONFLICT",
+  "details": {
+    "currentUpdatedAt": "2026-07-15T00:01:00.000Z"
+  }
+}

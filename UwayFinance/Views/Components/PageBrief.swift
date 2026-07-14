@@ -36,6 +36,9 @@ struct SyncStatusLabel: View {
             case .failed:
                 Image(systemName: "icloud.slash.fill")
                 Text("同步失败")
+            case .conflict:
+                Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+                Text("需要核对")
             }
         }
         .font(.caption)
@@ -89,9 +92,35 @@ struct SyncRecoveryBanner: View {
     }
 }
 
+struct StateConflictBanner: View {
+    let message: String
+    let resolve: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+                .foregroundStyle(AppTheme.warning)
+            Text(message)
+                .font(.caption)
+                .lineLimit(2)
+            Spacer(minLength: 8)
+            Button("处理冲突", action: resolve)
+                .font(.caption.weight(.semibold))
+                .buttonStyle(.borderedProminent)
+                .accessibilityHint("选择是否保留本机未同步内容并按服务器最新版本重试")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(.regularMaterial)
+        .overlay(alignment: .bottom) { Divider() }
+        .accessibilityElement(children: .contain)
+    }
+}
+
 private extension AppSession.SyncState {
     var isFailure: Bool {
         if case .failed = self { return true }
+        if case .conflict = self { return true }
         return false
     }
 }

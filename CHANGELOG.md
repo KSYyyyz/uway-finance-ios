@@ -2,11 +2,12 @@
 
 ## 0.11.0 - 2026-07-14
 
-- Negotiate API contract `20260714_006` and the optional classification-review/closed-set AI capabilities while preserving 0.10.2 and older capability decoding.
+- Negotiate API contract `20260714_007`, optional classification-review/closed-set AI capabilities and legacy-state conditional-write metadata while preserving 0.10.2 and older capability decoding.
 - Add exact-decimal classification-review DTOs and authenticated list/analyze/decision clients with opaque cursor pagination, stable idempotency keys and dual record/classification version checks.
 - Add the native classification-review workbench for pending/accepted/rejected queues, manual confirm/correct/reject decisions and fail-closed Harness handling.
 - On `409`, refresh current server versions without overwriting local reason/correction drafts; offline, timeout and `503` retries reuse the identical command and key.
 - Keep `AppSession` exclusively on `/api/state`; classification suggestions and decisions never rewrite raw `BusinessRecord` facts or bypass Import Harness status boundaries.
+- Send the last fetched/saved `updatedAt` as quoted `If-Match` on every `/api/state` write (`"0"` for an empty ledger). A `STATE_VERSION_CONFLICT` pauses automatic saves, preserves the local unsaved snapshot and requires an explicit user action before fetching the latest revision and retrying.
 
 ## 0.10.2 - 2026-07-14
 

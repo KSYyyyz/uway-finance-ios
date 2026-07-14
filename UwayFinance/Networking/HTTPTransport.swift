@@ -5,6 +5,7 @@ enum APIError: LocalizedError, Equatable {
     case unauthorized
     case server(status: Int, code: String?, message: String)
     case versionConflict(expectedVersion: Int, currentVersion: Int?)
+    case stateVersionConflict(currentUpdatedAt: String?)
     case transport(String)
     case decoding(String)
     case unavailable(String)
@@ -17,6 +18,8 @@ enum APIError: LocalizedError, Equatable {
         case .versionConflict(_, let currentVersion):
             if let currentVersion { return "经营事项已在其他设备更新（当前版本 \(currentVersion)），请刷新后重试" }
             return "经营事项已在其他设备更新，请刷新后重试"
+        case .stateVersionConflict:
+            return "其他设备已更新，需要核对"
         case .transport: return "暂时无法连接服务器，请检查网络后重试"
         case .decoding: return "服务器数据格式与客户端不一致"
         case .unavailable(let message): return message
@@ -34,6 +37,7 @@ private struct ErrorEnvelope: Decodable {
 private struct ErrorDetails: Decodable {
     let expectedVersion: Int?
     let currentVersion: Int?
+    let currentUpdatedAt: String?
 }
 
 actor HTTPTransport {
@@ -109,6 +113,9 @@ actor HTTPTransport {
                     expectedVersion: expectedVersion,
                     currentVersion: envelope?.details?.currentVersion
                 )
+            }
+            if http.statusCode == 409, envelope?.code == "STATE_VERSION_CONFLICT" {
+                throw APIError.stateVersionConflict(currentUpdatedAt: envelope?.details?.currentUpdatedAt)
             }
             throw APIError.server(
                 status: http.statusCode,

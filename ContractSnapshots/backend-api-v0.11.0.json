@@ -1,7 +1,7 @@
 {
   "version": "0.11.0",
   "backendAppVersion": "0.10.2",
-  "apiContractVersion": "20260714_006",
+  "apiContractVersion": "20260714_007",
   "financeSchemaVersion": "20260714_003_classification_review",
   "syncMode": "legacy_state_v1",
   "money": {
@@ -12,6 +12,14 @@
   },
   "capabilities": {
     "financeDomainV2Mirror": true,
+    "legacyState": {
+      "readable": true,
+      "writable": true,
+      "conflictControl": "optional_if_match",
+      "versionSource": "updatedAt",
+      "etagHeader": "ETag",
+      "conditionalWriteHeader": "If-Match"
+    },
     "financeResources": {
       "available": true,
       "cutoverState": "shadow",

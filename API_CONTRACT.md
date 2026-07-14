@@ -1,10 +1,10 @@
 # UwayFinance iOS API contract
 
-The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.11.0.json` is the checked-in iOS 0.11.0 baseline used by Windows and macOS CI; it targets backend app 0.10.2 and the frozen API contract `20260714_006`. The full workspace validator also cross-checks it against local backend sources when they are present.
+The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.11.0.json` is the checked-in iOS 0.11.0 baseline used by Windows and macOS CI; it targets backend app 0.10.2 and the frozen API contract `20260714_007`. The full workspace validator also cross-checks it against local backend sources when they are present.
 
 ## Classification-review capability handshake
 
-`GET /api/health` returns `status`, `version` and `financeSchemaVersion: "20260714_003_classification_review"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260714_006`.
+`GET /api/health` returns the database/migration-ready response including `status`, `version` and `financeSchemaVersion: "20260714_003_classification_review"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260714_007`. The server also exposes `GET /api/live` for process liveness and `GET /api/ready` for database/migration readiness; iOS intentionally continues using compatibility `/api/health`.
 
 The capabilities response is the machine-readable source of truth. `financeResources.available=true` with `cutoverState=shadow` means the context and business-record slice can be compiled and contract-tested, not that the active app should cut over. Because `preferredMode` and `availableModes` still contain only `legacy_state_v1`, `AppSession` continues exclusively through `/api/state`. If capabilities are missing or invalid, old 0.8/0.9 fallback remains available.
 
@@ -32,7 +32,11 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 | POST | `/api/v2/classification-reviews/:recordId/decision` | `ClassificationReviewAPI.decide(...)` — authenticated human decision |
 | POST | `/api/audit-events` | `FinanceAPI.audit(...)` |
 
-`PUT /api/state` remains a compatibility bridge. It is suitable for the current single-user pilot but does not provide record-level conflict protection.
+`PUT /api/state` remains the compatibility bridge and now provides whole-state optimistic concurrency. Capabilities advertise `conflictControl=optional_if_match`, `versionSource=updatedAt`, `etagHeader=ETag` and `conditionalWriteHeader=If-Match`. Older clients may temporarily omit the header, but iOS 0.11.0 never does.
+
+`GET /api/state` still returns `{ data, updatedAt }` and the same revision as a quoted `ETag`. iOS stores `updatedAt` as its current `StateRevision`; a missing value for an empty ledger maps to revision `0`. Every write sends `If-Match: "<revision>"`, including `If-Match: "0"` on the first empty-ledger write. A successful save must return a new `updatedAt`; the client never invents a revision locally.
+
+`409 STATE_VERSION_CONFLICT` carries `details.currentUpdatedAt`. `AppSession` keeps the local state and `unsavedSnapshot`, cancels automatic retry and shows “其他设备已更新，需要核对”. Pull-to-refresh and generic retry cannot overwrite the local snapshot while this state is active. “处理冲突” opens an explicit confirmation explaining that remote content will not be merged; only “保留本机修改并重试” fetches the latest envelope to obtain its revision without assigning its data, then conditionally retries the latest local snapshot with that revision.
 
 Legacy state and import JSON keep their existing numeric `amount` keys. Swift decodes them through `MoneyAmount` into signed 64-bit integer cents and encodes a decimal JSON number on write. The existing UI may temporarily consume a compatibility `Double`, but network/domain state has an exact-cent projection and no new financial model should introduce a raw `Double` boundary. The negotiated future V2 boundary is `decimal_string`; `MoneyAmount` already accepts decimal strings and converts them losslessly to cents.
 

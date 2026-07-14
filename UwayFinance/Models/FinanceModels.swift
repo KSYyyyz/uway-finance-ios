@@ -95,6 +95,18 @@ struct StateEnvelope: Codable {
     let updatedAt: String?
 }
 
+struct StateRevision: Equatable, Sendable {
+    let value: String
+
+    static let empty = StateRevision(updatedAt: nil)
+
+    init(updatedAt: String?) {
+        value = updatedAt ?? "0"
+    }
+
+    var ifMatchHeaderValue: String { "\"\(value)\"" }
+}
+
 struct SessionUser: Codable, Identifiable, Equatable {
     let id: String
     let username: String

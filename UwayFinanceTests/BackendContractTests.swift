@@ -49,6 +49,9 @@ final class BackendContractTests: XCTestCase {
         XCTAssertNil(response.sync.financeResources.cutoverReadiness)
         XCTAssertEqual(response.sync.financeResources.cutoverState, "shadow")
         XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])
+        XCTAssertNil(response.sync.legacyState.versionSource)
+        XCTAssertNil(response.sync.legacyState.etagHeader)
+        XCTAssertNil(response.sync.legacyState.conditionalWriteHeader)
     }
 
     func testCapabilitiesV0101ExposeReadOnlyCutoverReadinessWithoutSwitchingSyncMode() throws {
@@ -116,10 +119,16 @@ final class BackendContractTests: XCTestCase {
         )
         let contract = BackendContract(health: health, negotiated: response)
 
-        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260714_006")
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260714_007")
         XCTAssertEqual(contract.financeSchemaVersion, BackendContract.classificationReviewSchema)
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])
+        XCTAssertEqual(response.sync.legacyState.conflictControl, "optional_if_match")
+        XCTAssertEqual(response.sync.legacyState.versionSource, "updatedAt")
+        XCTAssertEqual(response.sync.legacyState.etagHeader, "ETag")
+        XCTAssertEqual(response.sync.legacyState.conditionalWriteHeader, "If-Match")
+        XCTAssertEqual(contract.capabilities.legacyState.conflictControl, "optional_if_match")
+        XCTAssertEqual(contract.capabilities.legacyState.conditionalWriteHeader, "If-Match")
         let review = try XCTUnwrap(contract.capabilities.classificationReview)
         XCTAssertEqual(review.defaultPageSize, 10)
         XCTAssertEqual(review.pagination, "cursor")

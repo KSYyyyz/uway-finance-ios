@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 final class AppSession: ObservableObject {
     enum Phase: Equatable { case starting, signedOut, signedIn }
-    enum SyncState: Equatable { case idle, syncing, synced(Date), failed(String) }
+    enum SyncState: Equatable { case idle, syncing, synced(Date), failed(String), conflict(String) }
     enum ServerState: Equatable {
         case checking
         case available(BackendContract)
@@ -16,6 +16,7 @@ final class AppSession: ObservableObject {
     @Published var state: AppStatePayload = .empty
     @Published private(set) var syncState: SyncState = .idle
     @Published private(set) var serverState: ServerState = .checking
+    @Published private(set) var stateRevision: StateRevision = .empty
     @Published var alertMessage: String?
 
     private let api: any FinanceAPI
@@ -23,6 +24,7 @@ final class AppSession: ObservableObject {
     private var didStart = false
     private var pendingSave: Task<Void, Never>?
     private var unsavedSnapshot: AppStatePayload?
+    private var conflictingServerRevision: StateRevision?
 
     var importAnalysisCapability: ImportAnalysisCapability {
         guard case .available(let contract) = serverState else { return .serviceUnavailable }
@@ -76,6 +78,8 @@ final class AppSession: ObservableObject {
         try? await api.logout()
         state = .empty
         unsavedSnapshot = nil
+        stateRevision = .empty
+        conflictingServerRevision = nil
         user = nil
         syncState = .idle
         phase = .signedOut
@@ -90,6 +94,8 @@ final class AppSession: ObservableObject {
         do {
             let envelope = try await api.fetchState()
             state = envelope.data
+            stateRevision = StateRevision(updatedAt: envelope.updatedAt)
+            conflictingServerRevision = nil
             syncState = .synced(Date())
         } catch APIError.unauthorized {
             handleUnauthorized()
@@ -156,6 +162,7 @@ final class AppSession: ObservableObject {
     }
 
     func recoverSync() async {
+        guard conflictingServerRevision == nil else { return }
         if case .unavailable = serverState {
             await checkServer()
             guard case .available = serverState else { return }
@@ -164,6 +171,23 @@ final class AppSession: ObservableObject {
             await save(snapshot)
         } else {
             try? await refresh()
+        }
+    }
+
+    func resolveStateConflictAndRetry() async {
+        guard conflictingServerRevision != nil, unsavedSnapshot != nil else { return }
+        syncState = .syncing
+        do {
+            let envelope = try await api.fetchState()
+            stateRevision = StateRevision(updatedAt: envelope.updatedAt)
+            conflictingServerRevision = nil
+            guard let latestLocalSnapshot = unsavedSnapshot else { return }
+            await save(latestLocalSnapshot)
+        } catch APIError.unauthorized {
+            handleUnauthorized()
+        } catch {
+            markServerUnavailableIfNeeded(error)
+            syncState = .conflict("其他设备已更新，需要核对；暂时无法取得最新版本")
         }
     }
 
@@ -176,6 +200,10 @@ final class AppSession: ObservableObject {
         syncState = .syncing
         let snapshot = state
         unsavedSnapshot = snapshot
+        if conflictingServerRevision != nil {
+            syncState = .conflict("其他设备已更新，需要核对")
+            return
+        }
         pendingSave = Task { [weak self] in
             guard let self else { return }
             try? await Task.sleep(for: self.saveDelay)
@@ -200,13 +228,20 @@ final class AppSession: ObservableObject {
 
     private func save(_ snapshot: AppStatePayload) async {
         syncState = .syncing
+        let revision = stateRevision
         do {
-            _ = try await api.saveState(snapshot)
-            guard !Task.isCancelled else { return }
+            let savedRevision = try await api.saveState(snapshot, ifMatch: revision)
+            stateRevision = savedRevision
+            conflictingServerRevision = nil
             if unsavedSnapshot == snapshot { unsavedSnapshot = nil }
-            syncState = .synced(Date())
+            syncState = unsavedSnapshot == nil ? .synced(Date()) : .syncing
         } catch APIError.unauthorized {
             handleUnauthorized()
+        } catch APIError.stateVersionConflict(let currentUpdatedAt) {
+            pendingSave?.cancel()
+            conflictingServerRevision = StateRevision(updatedAt: currentUpdatedAt)
+            unsavedSnapshot = unsavedSnapshot ?? snapshot
+            syncState = .conflict("其他设备已更新，需要核对")
         } catch {
             markServerUnavailableIfNeeded(error)
             syncState = .failed(error.localizedDescription)
@@ -217,6 +252,8 @@ final class AppSession: ObservableObject {
         pendingSave?.cancel()
         state = .empty
         unsavedSnapshot = nil
+        stateRevision = .empty
+        conflictingServerRevision = nil
         user = nil
         phase = .signedOut
         syncState = .failed("登录已失效")

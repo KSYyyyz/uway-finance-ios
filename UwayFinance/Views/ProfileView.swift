@@ -36,6 +36,12 @@ struct ProfileView: View {
                     LabeledContent("API 契约版本", value: contract.apiContractDisplay)
                     LabeledContent("当前同步模式", value: contract.capabilities.syncMode.displayName)
                     LabeledContent(
+                        "同步冲突保护",
+                        value: contract.capabilities.legacyState.conditionalWriteHeader == "If-Match"
+                            ? "If-Match 已启用"
+                            : "兼容模式"
+                    )
+                    LabeledContent(
                         "V2 资源接口",
                         value: contract.capabilities.financeResources.statusDisplay
                     )

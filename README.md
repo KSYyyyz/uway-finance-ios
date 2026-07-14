@@ -2,7 +2,7 @@
 
 SwiftUI client for the internal Uway finance workflow. This repository contains only the native iOS frontend; the Fastify/PostgreSQL backend is deployed separately on Alibaba Cloud and is accessed over HTTPS.
 
-Current marketing version: `0.11.0`, compatible with backend app `0.10.2`, API contract `20260714_006` and finance schema `20260714_003_classification_review`. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
+Current marketing version: `0.11.0`, compatible with backend app `0.10.2`, API contract `20260714_007` and finance schema `20260714_003_classification_review`. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
 
 ## Implemented stage
 
@@ -17,6 +17,7 @@ Current marketing version: `0.11.0`, compatible with backend app `0.10.2`, API c
 - Classification retries retain the same request body and `Idempotency-Key`. A `409` refreshes server versions while preserving local reason/correction drafts, and `503` AI unavailability leaves manual review available. Model review never auto-confirms; deterministic strong rules may be accepted and Harness rejection fails closed.
 - V2 writes use commands that retain one stable `Idempotency-Key` across retries. Updates always carry `expectedVersion`; `409 VERSION_CONFLICT` remains distinguishable from generic server failures.
 - Current `/api/state` read/write compatibility, debounced sync status and pull-to-refresh. The backend may mirror those writes into Finance Domain V2, but `AppSession` does not use V2 resources, classification review, document or OCR APIs as its synchronization source.
+- Every 0.11.0 state write is conditional: the client stores the last fetched/saved `updatedAt`, sends it as quoted `If-Match`, and uses `"0"` for a first empty-ledger write. A conflict never refreshes over local edits; automatic saves pause behind a visible “其他设备已更新，需要核对” state until the user explicitly confirms “保留本机修改并重试” after a non-merge warning.
 - Live `/api/health` status plus service app version, optional finance schema, API contract version and active sync-mode display; 0.8.x responses without `financeSchemaVersion` remain decodable. Failed saves keep their local snapshot and expose a one-tap retry instead of overwriting it with a refresh.
 - Exact-cent network/domain boundary: current JSON number amounts remain compatible, while Swift Codable converts them to integer cents before round-tripping state and import payloads.
 - “记一笔” `Form`, workbench cash summary, recent activity and a Swift Charts cash forecast.
@@ -69,4 +70,4 @@ It runs for iOS or checked-in contract-snapshot changes and can also be started 
 
 ## Current backend boundary
 
-The backend still publishes only `legacy_state_v1` in `preferredMode` and `availableModes`; production state synchronization and `AppSession` continue through `/api/state`. Classification review is a separate governed workflow: `modelCanAccept=false`, `writesBusinessRecords=false`, manual decisions use `confirm/correct/reject`, and raw operating facts remain unchanged. AI analysis is sent only when `features.aiClassification.available=true` and its closed-set safety fields match; otherwise the workbench remains manual. Attachment and OCR remain unavailable. Import analysis is operational only when `features.importAnalysis.available` is true.
+The backend still publishes only `legacy_state_v1` in `preferredMode` and `availableModes`; production state synchronization and `AppSession` continue through conditionally protected `/api/state`. `/api/live` reports process liveness, while `/api/ready` and compatibility `/api/health` require database and migration readiness. Classification review is a separate governed workflow: `modelCanAccept=false`, `writesBusinessRecords=false`, manual decisions use `confirm/correct/reject`, and raw operating facts remain unchanged. AI analysis is sent only when `features.aiClassification.available=true` and its closed-set safety fields match; otherwise the workbench remains manual. Attachment and OCR remain unavailable. Import analysis is operational only when `features.importAnalysis.available` is true.

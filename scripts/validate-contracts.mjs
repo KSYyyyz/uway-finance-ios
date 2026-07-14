@@ -6,7 +6,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
 const expectedMarketingVersion = '0.11.0'
 const expectedBackendVersion = '0.10.2'
-const expectedAPIContractVersion = '20260714_006'
+const expectedAPIContractVersion = '20260714_007'
 const expectedFinanceSchemaVersion = '20260714_003_classification_review'
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
 const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.11.0.json')
@@ -49,6 +49,7 @@ const requiredFiles = [
   'UwayFinanceTests/DashboardMetricsAPITests.swift',
   'UwayFinanceTests/ClassificationReviewAPITests.swift',
   'UwayFinanceTests/ClassificationReviewStoreTests.swift',
+  'UwayFinanceTests/LegacyStateConditionalWriteAPITests.swift',
   'UwayFinanceTests/RecordImportPipelineTests.swift',
   'UwayFinanceTests/Fixtures/harness-result.json',
   'UwayFinanceTests/Fixtures/import-analysis-request.json',
@@ -77,6 +78,9 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/version-conflict-v0.10.0.json',
   'UwayFinanceTests/Fixtures/health-classification-review-v0.11.0.json',
   'UwayFinanceTests/Fixtures/capabilities-classification-review-v0.11.0.json',
+  'UwayFinanceTests/Fixtures/state-empty-v0.11.0.json',
+  'UwayFinanceTests/Fixtures/state-save-v0.11.0.json',
+  'UwayFinanceTests/Fixtures/state-version-conflict-v0.11.0.json',
   'CHANGELOG.md',
 ]
 
@@ -127,6 +131,9 @@ const fixtures = [
   'classification-version-conflict-v0.11.0.json',
   'classification-forbidden-v0.11.0.json',
   'classification-ai-unavailable-v0.11.0.json',
+  'state-empty-v0.11.0.json',
+  'state-save-v0.11.0.json',
+  'state-version-conflict-v0.11.0.json',
 ]
 for (const fixture of fixtures) {
   JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', fixture), 'utf8'))
@@ -149,6 +156,15 @@ if (contractSnapshot.financeSchemaVersion !== expectedFinanceSchemaVersion) {
 }
 if (contractSnapshot.syncMode !== 'legacy_state_v1') {
   throw new Error('iOS must remain on the legacy-state compatibility path')
+}
+const legacyStateSnapshot = contractSnapshot.capabilities?.legacyState
+if (legacyStateSnapshot?.readable !== true
+    || legacyStateSnapshot?.writable !== true
+    || legacyStateSnapshot?.conflictControl !== 'optional_if_match'
+    || legacyStateSnapshot?.versionSource !== 'updatedAt'
+    || legacyStateSnapshot?.etagHeader !== 'ETag'
+    || legacyStateSnapshot?.conditionalWriteHeader !== 'If-Match') {
+  throw new Error('legacy state conditional-write snapshot mismatch')
 }
 const resourceSnapshot = contractSnapshot.capabilities?.financeResources
 if (contractSnapshot.capabilities?.financeDomainV2Mirror !== true
@@ -218,6 +234,14 @@ if (capabilitiesFixture.apiContractVersion !== expectedAPIContractVersion
     || capabilitiesFixture.sync?.preferredMode !== 'legacy_state_v1'
     || capabilitiesFixture.sync?.availableModes?.join(',') !== 'legacy_state_v1') {
   throw new Error('capabilities fixture must publish only legacy_state_v1')
+}
+if (capabilitiesFixture.sync?.legacyState?.readable !== true
+    || capabilitiesFixture.sync?.legacyState?.writable !== true
+    || capabilitiesFixture.sync?.legacyState?.conflictControl !== 'optional_if_match'
+    || capabilitiesFixture.sync?.legacyState?.versionSource !== 'updatedAt'
+    || capabilitiesFixture.sync?.legacyState?.etagHeader !== 'ETag'
+    || capabilitiesFixture.sync?.legacyState?.conditionalWriteHeader !== 'If-Match') {
+  throw new Error('capabilities fixture must advertise optional If-Match state protection')
 }
 if (capabilitiesFixture.features?.importAnalysis?.available !== true
     || capabilitiesFixture.features?.importAnalysis?.reason !== null) {
@@ -351,6 +375,15 @@ for (const [name, code] of classificationErrorCodes) {
   const value = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', name), 'utf8'))
   if (value.code !== code) throw new Error(`classification error fixture mismatch: ${name}`)
 }
+const emptyStateFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'state-empty-v0.11.0.json'), 'utf8'))
+const stateSaveFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'state-save-v0.11.0.json'), 'utf8'))
+const stateConflictFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'state-version-conflict-v0.11.0.json'), 'utf8'))
+if (emptyStateFixture.updatedAt !== null
+    || stateSaveFixture.updatedAt !== '2026-07-15T00:02:00.000Z'
+    || stateConflictFixture.code !== 'STATE_VERSION_CONFLICT'
+    || stateConflictFixture.details?.currentUpdatedAt !== '2026-07-15T00:01:00.000Z') {
+  throw new Error('legacy state revision fixtures must preserve empty, saved and conflict revisions')
+}
 
 for (const asset of [
   'Contents.json',
@@ -457,12 +490,12 @@ const financeModels = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', '
 for (const field of contractSnapshot.ledgerProvenanceFields) {
   if (!financeModels.includes(field)) throw new Error(`ledger provenance field mismatch: ${field}`)
 }
-for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amount: Double']) {
+for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amount: Double', 'struct StateRevision', 'static let empty', 'ifMatchHeaderValue']) {
   if (!financeModels.includes(marker)) throw new Error(`legacy compatibility model marker missing: ${marker}`)
 }
 
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
-for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', '"accepted", "review", "rejected"']) {
+for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
 }
 for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
@@ -527,12 +560,22 @@ for (const marker of ['closed_set_existing_operating_item_v1', 'modelCanAccept =
   if (!classificationView.includes(marker)) throw new Error(`classification workbench safety marker missing: ${marker}`)
 }
 const httpTransport = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'HTTPTransport.swift'), 'utf8')
-for (const marker of ['case versionConflict', 'VERSION_CONFLICT', 'headers: [String: String]']) {
+for (const marker of ['case versionConflict', 'case stateVersionConflict', 'STATE_VERSION_CONFLICT', 'currentUpdatedAt', 'headers: [String: String]']) {
   if (!httpTransport.includes(marker)) throw new Error(`V2 transport marker missing: ${marker}`)
+}
+const financeAPI = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'FinanceAPI.swift'), 'utf8')
+for (const marker of ['ifMatch revision: StateRevision', 'headers: ["If-Match": revision.ifMatchHeaderValue]', 'StateRevision(updatedAt: updatedAt)']) {
+  if (!financeAPI.includes(marker)) throw new Error(`legacy state conditional-write API marker missing: ${marker}`)
+}
+if (financeAPI.includes('ISO8601DateFormatter().string(from: Date())')) {
+  throw new Error('conditional state revision must never be invented client-side')
 }
 const appSession = fs.readFileSync(path.join(root, 'UwayFinance', 'State', 'AppSession.swift'), 'utf8')
 if (appSession.includes('FinanceResourceAPI') || appSession.includes('CutoverReadinessAPI') || appSession.includes('DashboardMetricsAPI') || appSession.includes('ClassificationReviewAPI') || appSession.includes('/api/v2')) {
   throw new Error('shadow V2 clients must not become the AppSession data source')
+}
+for (const marker of ['stateRevision', 'unsavedSnapshot', 'conflictingServerRevision', 'catch APIError.stateVersionConflict', 'resolveStateConflictAndRetry', '其他设备已更新，需要核对']) {
+  if (!appSession.includes(marker)) throw new Error(`AppSession conflict preservation marker missing: ${marker}`)
 }
 
 const serverPath = path.join(workspace, 'server', 'index.ts')
@@ -580,6 +623,10 @@ if (hasLocalBackend) {
     `API_CONTRACT_VERSION = '${expectedAPIContractVersion}'`,
     "preferredMode: 'legacy_state_v1'",
     "availableModes: ['legacy_state_v1']",
+    "conflictControl: 'optional_if_match'",
+    "versionSource: 'updatedAt'",
+    "etagHeader: 'ETag'",
+    "conditionalWriteHeader: 'If-Match'",
     "cutoverState: 'shadow'",
     "contextEndpoint: '/api/v2/context'",
     "endpoint: '/api/v2/cutover-readiness'",
@@ -602,6 +649,17 @@ if (hasLocalBackend) {
     "reason: options.importAnalysisAvailable ? null : 'provider_not_configured'",
   ]) {
     if (!capabilities.includes(marker)) throw new Error(`local capabilities marker missing: ${marker}`)
+  }
+  for (const marker of [
+    "app.get('/api/live'",
+    "app.get('/api/ready'",
+    "app.get('/api/health'",
+    "reply.header('ETag'",
+    "parseIfMatch(request.headers['if-match'])",
+    "code: 'STATE_VERSION_CONFLICT'",
+    'details: { currentUpdatedAt:',
+  ]) {
+    if (!server.includes(marker)) throw new Error(`local conditional state/health marker missing: ${marker}`)
   }
   const financeResources = fs.readFileSync(financeResourcesPath, 'utf8')
   for (const marker of ['amount::text', 'nextCursor', 'expectedVersion', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_REUSED']) {

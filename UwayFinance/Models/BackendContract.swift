@@ -53,6 +53,9 @@ struct LegacyStateCapability: Codable, Equatable, Sendable {
     let readable: Bool
     let writable: Bool
     let conflictControl: String
+    let versionSource: String?
+    let etagHeader: String?
+    let conditionalWriteHeader: String?
 }
 
 struct BusinessRecordResourceCapability: Codable, Equatable, Sendable {
@@ -185,6 +188,7 @@ enum CapabilityNegotiationSource: Equatable, Sendable {
 
 struct ServerCapabilities: Equatable, Sendable {
     let syncMode: FinanceSyncMode
+    let legacyState: LegacyStateCapability
     let financeDomainV2Mirror: Bool
     let financeResources: FinanceResourceCapability
     let importHarnessStatuses: Set<String>
@@ -214,6 +218,7 @@ struct ServerCapabilities: Equatable, Sendable {
 
         return ServerCapabilities(
             syncMode: .legacyStateV1,
+            legacyState: response.sync.legacyState,
             financeDomainV2Mirror: BackendContract.isFinanceDomainV2Schema(financeSchemaVersion),
             financeResources: response.sync.financeResources,
             importHarnessStatuses: Set(response.features.importAnalysis.decisions),
@@ -236,6 +241,14 @@ struct ServerCapabilities: Equatable, Sendable {
     static func legacyFallback(financeSchemaVersion: String?) -> ServerCapabilities {
         ServerCapabilities(
             syncMode: .legacyStateV1,
+            legacyState: LegacyStateCapability(
+                readable: true,
+                writable: true,
+                conflictControl: "unknown",
+                versionSource: nil,
+                etagHeader: nil,
+                conditionalWriteHeader: nil
+            ),
             financeDomainV2Mirror: BackendContract.isFinanceDomainV2Schema(financeSchemaVersion),
             financeResources: .unavailable,
             importHarnessStatuses: ["accepted", "review", "rejected"],
@@ -282,7 +295,7 @@ struct ServerCapabilities: Equatable, Sendable {
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260714_006"
+    static let apiContractVersion = "20260714_007"
     static let financeDomainV2Schema = "20260714_002_finance_resource_api"
     static let classificationReviewSchema = "20260714_003_classification_review"
 
