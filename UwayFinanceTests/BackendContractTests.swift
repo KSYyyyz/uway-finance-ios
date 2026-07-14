@@ -93,6 +93,7 @@ final class BackendContractTests: XCTestCase {
         let contract = BackendContract(health: health, negotiated: response)
 
         XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260714_004")
+        XCTAssertEqual(contract.serverVersion, "0.10.2")
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])
         XCTAssertTrue(contract.capabilities.unifiedDashboardMetrics)
@@ -120,6 +121,7 @@ final class BackendContractTests: XCTestCase {
         let contract = BackendContract(health: health, negotiated: response)
 
         XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260714_007")
+        XCTAssertEqual(contract.serverVersion, "0.11.0")
         XCTAssertEqual(contract.financeSchemaVersion, BackendContract.classificationReviewSchema)
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])

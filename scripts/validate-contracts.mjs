@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
 const expectedMarketingVersion = '0.11.0'
-const expectedBackendVersion = '0.10.2'
+const expectedBackendVersion = '0.11.0'
 const expectedAPIContractVersion = '20260714_007'
 const expectedFinanceSchemaVersion = '20260714_003_classification_review'
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
@@ -230,7 +230,8 @@ if (healthFixture.version !== expectedBackendVersion
     || healthFixture.financeSchemaVersion !== expectedFinanceSchemaVersion) {
   throw new Error('classification-review health fixture version/schema mismatch')
 }
-if (capabilitiesFixture.apiContractVersion !== expectedAPIContractVersion
+if (capabilitiesFixture.version !== expectedBackendVersion
+    || capabilitiesFixture.apiContractVersion !== expectedAPIContractVersion
     || capabilitiesFixture.sync?.preferredMode !== 'legacy_state_v1'
     || capabilitiesFixture.sync?.availableModes?.join(',') !== 'legacy_state_v1') {
   throw new Error('capabilities fixture must publish only legacy_state_v1')
@@ -256,7 +257,7 @@ if (capabilitiesFixture.sync?.financeResources?.available !== true
     || capabilitiesFixture.sync?.financeResources?.cutoverState !== 'shadow'
     || capabilitiesFixture.sync?.financeResources?.cutoverReadiness?.clientWritesEnabled !== false
     || capabilitiesFixture.sync?.financeResources?.businessRecords?.moneyEncoding !== 'decimal_string') {
-  throw new Error('0.10.2 capabilities fixture must preserve read-only readiness and the shadow resource slice')
+  throw new Error('current 0.11.0 capabilities fixture must preserve read-only readiness and the shadow resource slice')
 }
 const oldCapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.0.json'), 'utf8'))
 if ('cutoverReadiness' in (oldCapabilitiesFixture.sync?.financeResources ?? {})) {
@@ -322,6 +323,13 @@ if (capabilitiesFixture.safety?.aiMayWriteBusinessRecords !== false
 const oldClassificationCapability = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.2.json'), 'utf8')).features?.classificationReview
 if (oldClassificationCapability !== undefined) {
   throw new Error('0.10.2 fixture must prove classificationReview is optional')
+}
+const historicalHealthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-v0.10.2.json'), 'utf8'))
+const historicalCapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.2.json'), 'utf8'))
+if (historicalHealthFixture.version !== '0.10.2'
+    || historicalCapabilitiesFixture.version !== '0.10.2'
+    || historicalCapabilitiesFixture.apiContractVersion !== '20260714_004') {
+  throw new Error('dedicated 0.10.2 backward-compat fixtures must remain historical and immutable')
 }
 const reviewCapability = capabilitiesFixture.features?.classificationReview
 if (reviewCapability?.available !== true
@@ -591,6 +599,28 @@ const classificationReviewPath = path.join(workspace, 'server', 'classification-
 const classificationAnalysisPath = path.join(workspace, 'server', 'classification-analysis.ts')
 const apiContractDocumentPath = path.join(workspace, 'API-V2-CONTRACT.md')
 const mainPackagePath = path.join(workspace, 'package.json')
+const hasMainPackage = fs.existsSync(mainPackagePath)
+const hasMainContractDocument = fs.existsSync(apiContractDocumentPath)
+if (hasMainPackage !== hasMainContractDocument) {
+  throw new Error('mainline package.json and API-V2-CONTRACT.md must be validated together')
+}
+if (hasMainPackage && hasMainContractDocument) {
+  const mainPackage = JSON.parse(fs.readFileSync(mainPackagePath, 'utf8'))
+  if (mainPackage.version !== expectedBackendVersion) {
+    throw new Error(`mainline package.json version ${mainPackage.version} does not match frozen backend ${expectedBackendVersion}`)
+  }
+  const apiContractDocument = fs.readFileSync(apiContractDocumentPath, 'utf8')
+  for (const marker of [
+    `- 应用版本：\`${expectedBackendVersion}\``,
+    `- API 契约版本：\`${expectedAPIContractVersion}\``,
+    `- 财务结构版本：\`${expectedFinanceSchemaVersion}\``,
+    '- 当前同步模式：`legacy_state_v1`',
+  ]) {
+    if (!apiContractDocument.includes(marker)) {
+      throw new Error(`mainline API-V2-CONTRACT.md frozen marker mismatch: ${marker}`)
+    }
+  }
+}
 const hasLocalBackend = process.env.UWAY_SKIP_LOCAL_BACKEND !== '1'
   && [serverPath, healthPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, classificationReviewPath, classificationAnalysisPath, apiContractDocumentPath].every(fs.existsSync)
 if (hasLocalBackend) {
@@ -681,20 +711,6 @@ if (hasLocalBackend) {
   const classificationAnalysisRoute = `${server}\n${classificationAnalysis}`
   for (const marker of ['CLASSIFICATION_AI_UNAVAILABLE', 'Idempotency-Key', 'expectedRecordVersion', 'expectedClassificationVersion', 'writesBusinessRecord: false', 'modelCanAccept: false', 'modelWritesBusinessRecords: false']) {
     if (!classificationAnalysisRoute.includes(marker)) throw new Error(`local classification analysis marker missing: ${marker}`)
-  }
-  const apiContractDocument = fs.readFileSync(apiContractDocumentPath, 'utf8')
-  const staleDocumentMarkers = []
-  for (const marker of [expectedBackendVersion, expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1']) {
-    if (!apiContractDocument.includes(marker)) staleDocumentMarkers.push(marker)
-  }
-  if (staleDocumentMarkers.length > 0) {
-    console.warn(`mainline API-V2-CONTRACT.md is stale for candidate markers: ${staleDocumentMarkers.join(', ')}`)
-  }
-  if (fs.existsSync(mainPackagePath)) {
-    const mainPackage = JSON.parse(fs.readFileSync(mainPackagePath, 'utf8'))
-    if (mainPackage.version !== expectedBackendVersion) {
-      console.warn(`mainline package.json version is ${mainPackage.version}; backend contract expects ${expectedBackendVersion}`)
-    }
   }
 }
 

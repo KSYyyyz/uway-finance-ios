@@ -12,9 +12,9 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
         guard case .available(let contract) = session.serverState else {
-            return XCTFail("0.10.2 server should be available")
+            return XCTFail("0.11.0 server should be available")
         }
-        XCTAssertEqual(contract.serverVersion, "0.10.2")
+        XCTAssertEqual(contract.serverVersion, "0.11.0")
         XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
         XCTAssertEqual(contract.capabilities.source, .server)
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
@@ -43,6 +43,31 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.source, .legacyFallback)
         XCTAssertNil(contract.negotiatedAPIContractVersion)
         XCTAssertNil(contract.financeSchemaVersion)
+    }
+
+    func testBackendV0102SessionAndCapabilityFixturesRemainBackwardCompatible() async {
+        let api = FinanceAPISpy(
+            healthResponse: HealthResponse(
+                status: "ok",
+                version: "0.10.2",
+                financeSchemaVersion: BackendContract.financeDomainV2Schema
+            ),
+            capabilitiesFixtureName: "capabilities-v0.10.2"
+        )
+        let session = AppSession(api: api, saveDelay: .zero)
+
+        await session.start()
+
+        XCTAssertEqual(session.phase, .signedIn)
+        guard case .available(let contract) = session.serverState else {
+            return XCTFail("historical 0.10.2 backend must remain usable")
+        }
+        XCTAssertEqual(contract.serverVersion, "0.10.2")
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260714_004")
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        XCTAssertNil(contract.capabilities.legacyState.conditionalWriteHeader)
+        XCTAssertNil(contract.capabilities.classificationReview)
+        XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-14T00:00:00.000Z"))
     }
 
     func testUnavailableImportCapabilityBlocksAnalysisRequest() async throws {
@@ -313,7 +338,7 @@ private actor FinanceAPISpy: FinanceAPI {
 
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
-        version: "0.10.2",
+        version: "0.11.0",
         financeSchemaVersion: BackendContract.classificationReviewSchema
     ), capabilitiesFixtureName: String = "capabilities-classification-review-v0.11.0",
        fetchEnvelopes: [StateEnvelope] = [StateEnvelope(

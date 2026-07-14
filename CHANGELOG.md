@@ -2,6 +2,7 @@
 
 ## 0.11.0 - 2026-07-14
 
+- Align the current health, capabilities and contract snapshot with the formally frozen backend app version 0.11.0 while retaining dedicated 0.10.2 compatibility fixtures and tests.
 - Negotiate API contract `20260714_007`, optional classification-review/closed-set AI capabilities and legacy-state conditional-write metadata while preserving 0.10.2 and older capability decoding.
 - Add exact-decimal classification-review DTOs and authenticated list/analyze/decision clients with opaque cursor pagination, stable idempotency keys and dual record/classification version checks.
 - Add the native classification-review workbench for pending/accepted/rejected queues, manual confirm/correct/reject decisions and fail-closed Harness handling.

@@ -1,6 +1,6 @@
 # UwayFinance iOS API contract
 
-The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.11.0.json` is the checked-in iOS 0.11.0 baseline used by Windows and macOS CI; it targets backend app 0.10.2 and the frozen API contract `20260714_007`. The full workspace validator also cross-checks it against local backend sources when they are present.
+The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.11.0.json` is the checked-in iOS 0.11.0 baseline used by Windows and macOS CI; it targets backend app 0.11.0 and the frozen API contract `20260714_007`. The full workspace validator also cross-checks it against local backend sources when they are present.
 
 ## Classification-review capability handshake
 
