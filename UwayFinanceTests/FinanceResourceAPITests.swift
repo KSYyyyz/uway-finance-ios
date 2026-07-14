@@ -5,6 +5,7 @@ final class FinanceResourceAPITests: XCTestCase {
     override func tearDown() {
         FinanceResourceURLProtocol.handler = nil
         FinanceResourceURLProtocol.capturedRequests = []
+        FinanceResourceURLProtocol.capturedBodies = []
         super.tearDown()
     }
 
@@ -67,7 +68,7 @@ final class FinanceResourceAPITests: XCTestCase {
             $0.value(forHTTPHeaderField: "Idempotency-Key")
         }
         XCTAssertEqual(Set(headers), Set(["ios-create-record-00000000-0000-0000-0000-000000000001"]))
-        let body = try XCTUnwrap(capturedRequest().httpBody)
+        let body = try XCTUnwrap(FinanceResourceURLProtocol.capturedBodies.last ?? nil)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
         XCTAssertEqual(json["amount"] as? String, "0.30")
     }
@@ -98,7 +99,7 @@ final class FinanceResourceAPITests: XCTestCase {
 
         let request = capturedRequest()
         XCTAssertEqual(request.value(forHTTPHeaderField: "Idempotency-Key"), "ios-update-record-00000000-0000-0000-0000-000000000002")
-        let body = try XCTUnwrap(request.httpBody)
+        let body = try XCTUnwrap(FinanceResourceURLProtocol.capturedBodies.last ?? nil)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
         XCTAssertEqual(json["expectedVersion"] as? Int, 3)
     }
@@ -147,6 +148,7 @@ final class FinanceResourceAPITests: XCTestCase {
 private final class FinanceResourceURLProtocol: URLProtocol {
     static var handler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
     static var capturedRequests: [URLRequest] = []
+    static var capturedBodies: [Data?] = []
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -158,6 +160,7 @@ private final class FinanceResourceURLProtocol: URLProtocol {
         }
         do {
             Self.capturedRequests.append(request)
+            Self.capturedBodies.append(Self.bodyData(from: request))
             let (response, data) = try handler(request)
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: data)
@@ -168,4 +171,22 @@ private final class FinanceResourceURLProtocol: URLProtocol {
     }
 
     override func stopLoading() {}
+
+    private static func bodyData(from request: URLRequest) -> Data? {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        let bufferSize = 4_096
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        defer { buffer.deallocate() }
+        var data = Data()
+        while true {
+            let count = stream.read(buffer, maxLength: bufferSize)
+            if count < 0 { return nil }
+            if count == 0 { break }
+            data.append(buffer, count: count)
+        }
+        return data
+    }
 }
