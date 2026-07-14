@@ -11,6 +11,7 @@ struct UwayFinanceApp: App {
                 .environmentObject(container.session)
                 .environment(\.importAnalysisAPI, container.importAnalysisAPI)
                 .environment(\.documentAPI, container.documentAPI)
+                .environment(\.classificationReviewAPI, container.classificationReviewAPI)
                 .tint(Color("BrandGreen"))
         }
     }

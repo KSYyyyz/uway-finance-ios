@@ -1,0 +1,5 @@
+{
+  "error": "分类建议已被其他复核人更新，请刷新后重试",
+  "code": "CLASSIFICATION_VERSION_CONFLICT",
+  "details": { "expectedVersion": 2, "currentVersion": 3 }
+}

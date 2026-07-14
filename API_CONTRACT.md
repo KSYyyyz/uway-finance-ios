@@ -1,10 +1,10 @@
 # UwayFinance iOS API contract
 
-The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.10.2.json` is the checked-in 0.10.2 baseline used by Windows and macOS CI; the full workspace validator also cross-checks it against local backend sources when they are present.
+The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.11.0.json` is the checked-in iOS 0.11.0 baseline used by Windows and macOS CI; it targets backend app 0.10.2 and the frozen API contract `20260714_006`. The full workspace validator also cross-checks it against local backend sources when they are present.
 
-## Backend 0.10.2 capability handshake
+## Classification-review capability handshake
 
-`GET /api/health` returns `status`, `version` and `financeSchemaVersion: "20260714_002_finance_resource_api"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose `apiContractVersion` is `20260714_004`.
+`GET /api/health` returns `status`, `version` and `financeSchemaVersion: "20260714_003_classification_review"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260714_006`.
 
 The capabilities response is the machine-readable source of truth. `financeResources.available=true` with `cutoverState=shadow` means the context and business-record slice can be compiled and contract-tested, not that the active app should cut over. Because `preferredMode` and `availableModes` still contain only `legacy_state_v1`, `AppSession` continues exclusively through `/api/state`. If capabilities are missing or invalid, old 0.8/0.9 fallback remains available.
 
@@ -27,6 +27,9 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 | PATCH | `/api/v2/business-records/:recordId` | `FinanceResourceAPI.updateBusinessRecord(...)` — shadow only |
 | GET | `/api/v2/cutover-readiness` | `CutoverReadinessAPI.readiness(...)` — read-only diagnostics |
 | GET | `/api/v2/dashboard-metrics` | `DashboardMetricsAPI.metrics(...)` — governed shadow read model |
+| GET | `/api/v2/classification-reviews` | `ClassificationReviewAPI.list(...)` — max 10, opaque cursor |
+| POST | `/api/v2/classification-reviews/:recordId/analyze` | `ClassificationReviewAPI.analyze(...)` — idempotent AI suggestion |
+| POST | `/api/v2/classification-reviews/:recordId/decision` | `ClassificationReviewAPI.decide(...)` — authenticated human decision |
 | POST | `/api/audit-events` | `FinanceAPI.audit(...)` |
 
 `PUT /api/state` remains a compatibility bridge. It is suitable for the current single-user pilot but does not provide record-level conflict protection.
@@ -37,7 +40,17 @@ The V2 client encodes every amount as a decimal string and decodes it into the s
 
 `financeResources.cutoverReadiness` is optional so 0.8/0.9/0.10.0 responses remain decodable. In 0.10.1 it advertises cursor pagination, zero-difference and zero-shadow-only requirements, and `clientWritesEnabled=false`. The corresponding client is GET-only. It decodes snapshot digests, exact-cent summaries, blockers and paginated difference metadata; `403 CUTOVER_READINESS_FORBIDDEN` and `400 INVALID_CUTOVER_CURSOR` remain recognizable server errors. It does not update `AppSession`, replace `/api/state`, or overwrite locally unsynchronized changes.
 
-`features.unifiedDashboardMetrics` remains decodable when older servers send only `{ available: false }`. In 0.10.2 it advertises `/api/v2/dashboard-metrics`, decimal-string money and `finance_v2_shadow_read_model`; `rawRecordsMerged=false`. The GET-only client decodes overview, five-period trend, category/same-type groups, trace provenance, classification coverage and safety flags. Negative `netCashFlow` uses the same signed integer-cent model. `features.aiClassification.available` remains false; `deterministicGroupingAvailable=true` does not grant a model permission to classify or write records. Metrics errors never refresh or replace `AppSession` state.
+`features.unifiedDashboardMetrics` remains decodable when older servers send only `{ available: false }`. It advertises `/api/v2/dashboard-metrics`, decimal-string money and `finance_v2_shadow_read_model`; `rawRecordsMerged=false`. The GET-only client decodes overview, trend, groups, trace provenance, classification coverage and safety flags. Metrics errors never refresh or replace `AppSession` state.
+
+## Classification review boundary
+
+`features.classificationReview` is optional for compatibility with 0.10.2 and older responses. When available it publishes the three endpoints, cursor pagination, a default page size of 10, `Idempotency-Key`, the concurrency fields `expectedRecordVersion` and `expectedClassificationVersion`, and decisions `confirm/correct/reject`. The current server body field is `normalizedItemName`; the client intentionally does not send the older prompt vocabulary `accept` or `normalizedGroupName`.
+
+List and analysis amounts are decimal strings decoded through `V2DecimalAmount` into exact integer cents. The client stores the server cursor as an opaque string and keeps a local previous-page cursor stack. Analysis results preserve `accepted/review/rejected`: a deterministic strong rule may produce accepted, model review always needs an explicit human decision, and rejected remains fail closed. `modelCanAccept=false`, `writesBusinessRecords=false`, `rawBusinessRecordChanged=false` and the Import Harness boundary are enforced independently of display state.
+
+Analyze and decision commands retain one stable request body and idempotency key across network, timeout and 503 retries. Decisions carry both expected versions. On `VERSION_CONFLICT`, `CLASSIFICATION_VERSION_CONFLICT` or source change, the store reloads current server versions but keeps the user's local reason, taxonomy and normalized-name draft. A 503 disables only the AI suggestion path; manual review remains available. A 403 becomes a read-only unavailable state.
+
+This workflow is not an `AppSession` data source. `AppSession` still reads and writes only `/api/state`; neither suggestions nor decisions replace locally unsynchronized state or mutate the raw `BusinessRecord` facts.
 
 ## Connected mainline import-analysis boundary
 

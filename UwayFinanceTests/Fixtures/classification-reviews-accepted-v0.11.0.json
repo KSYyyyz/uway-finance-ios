@@ -1,0 +1,27 @@
+{
+  "accountBook": {
+    "id": "11", "name": "默认账套", "baseCurrency": "CNY",
+    "organization": { "id": "7", "name": "有为科技" }, "role": "finance",
+    "permissions": { "readBusinessRecords": true, "writeBusinessRecords": true }
+  },
+  "taxonomy": [{ "code": "software_cloud", "name": "软件、云与订阅", "direction": "expense", "version": 1 }],
+  "filters": { "period": null, "state": "accepted" },
+  "items": [{
+    "record": {
+      "id": "102", "externalId": "R-2", "eventDate": "2026-07-02", "direction": "expense",
+      "amount": "1170.00", "category": "软件服务", "counterparty": "OpenAI", "description": "Codex 续费", "version": 3
+    },
+    "reviewState": "accepted",
+    "proposal": {
+      "classificationId": "601", "version": 3, "taxonomyCode": "software_cloud", "taxonomyName": "软件、云与订阅",
+      "normalizedItemName": "Codex / OpenAI", "groupKey": "expense:software_cloud:human:1234",
+      "classificationState": "accepted", "persistedStatus": "accepted", "origin": "human", "confidence": null,
+      "reasonCode": "persisted_classification", "reason": "财务已核对订阅合同", "sourceFactHash": "aaaaaaaaaaaaaaaa",
+      "stale": false, "reviewedAt": "2026-07-14T12:00:00.000Z"
+    },
+    "allowedActions": ["confirm", "correct", "reject"],
+    "safety": { "rawBusinessRecordChanged": false, "modelCanAccept": false }
+  }],
+  "page": { "limit": 10, "nextCursor": null },
+  "safety": { "rawBusinessRecordsChanged": false, "modelCanAccept": false }
+}

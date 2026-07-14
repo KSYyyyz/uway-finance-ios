@@ -1,0 +1,27 @@
+{
+  "accountBook": {
+    "id": "11", "name": "默认账套", "baseCurrency": "CNY",
+    "organization": { "id": "7", "name": "有为科技" }, "role": "finance",
+    "permissions": { "readBusinessRecords": true, "writeBusinessRecords": true }
+  },
+  "taxonomy": [{ "code": "professional_services", "name": "专业及外包服务", "direction": "expense", "version": 1 }],
+  "filters": { "period": null, "state": "rejected" },
+  "items": [{
+    "record": {
+      "id": "103", "externalId": "R-3", "eventDate": "2026-07-03", "direction": "expense",
+      "amount": "830.00", "category": "", "counterparty": "未知供应商", "description": "技术服务", "version": 1
+    },
+    "reviewState": "rejected",
+    "proposal": {
+      "classificationId": "602", "version": 1, "taxonomyCode": null, "taxonomyName": "待确认分类",
+      "normalizedItemName": "未知供应商", "groupKey": "pending:103", "classificationState": "unclassified",
+      "persistedStatus": "rejected", "origin": "human", "confidence": null, "reasonCode": "persisted_rejection",
+      "reason": "证据不足，拒绝分类", "sourceFactHash": "bbbbbbbbbbbbbbbb", "stale": false,
+      "reviewedAt": "2026-07-14T12:05:00.000Z"
+    },
+    "allowedActions": ["confirm", "correct", "reject"],
+    "safety": { "rawBusinessRecordChanged": false, "modelCanAccept": false }
+  }],
+  "page": { "limit": 10, "nextCursor": null },
+  "safety": { "rawBusinessRecordsChanged": false, "modelCanAccept": false }
+}

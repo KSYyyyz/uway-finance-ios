@@ -101,6 +101,37 @@ final class BackendContractTests: XCTestCase {
         XCTAssertFalse(contract.capabilities.aiClassification)
         XCTAssertTrue(contract.capabilities.deterministicGroupingAvailable)
         XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
+        XCTAssertNil(contract.capabilities.classificationReview)
+        XCTAssertNil(contract.capabilities.aiClassificationCapability.contract)
+    }
+
+    func testClassificationReviewCapabilityNegotiatesCurrentSafetyContractWithoutChangingSyncMode() throws {
+        let health = try JSONDecoder().decode(
+            HealthResponse.self,
+            from: fixture(named: "health-classification-review-v0.11.0")
+        )
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-classification-review-v0.11.0")
+        )
+        let contract = BackendContract(health: health, negotiated: response)
+
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260714_006")
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.classificationReviewSchema)
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])
+        let review = try XCTUnwrap(contract.capabilities.classificationReview)
+        XCTAssertEqual(review.defaultPageSize, 10)
+        XCTAssertEqual(review.pagination, "cursor")
+        XCTAssertEqual(review.decisions, ["confirm", "correct", "reject"])
+        XCTAssertEqual(review.concurrencyControl, ["expectedRecordVersion", "expectedClassificationVersion"])
+        XCTAssertFalse(review.modelCanAccept)
+        XCTAssertTrue(review.deterministicRuleMayAccept)
+        XCTAssertFalse(review.rawBusinessRecordsChanged)
+        XCTAssertTrue(contract.capabilities.aiClassification)
+        XCTAssertEqual(contract.capabilities.aiClassificationCapability.contract, "closed_set_existing_operating_item_v1")
+        XCTAssertFalse(contract.capabilities.aiClassificationCapability.modelCanAccept ?? true)
+        XCTAssertFalse(contract.capabilities.aiClassificationCapability.writesBusinessRecords ?? true)
     }
 
     func testCapabilitiesV090ReportsUnconfiguredImportProvider() throws {

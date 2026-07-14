@@ -1,0 +1,54 @@
+{
+  "accountBook": {
+    "id": "11", "name": "默认账套", "baseCurrency": "CNY",
+    "organization": { "id": "7", "name": "有为科技" },
+    "role": "finance",
+    "permissions": { "readBusinessRecords": true, "writeBusinessRecords": true }
+  },
+  "taxonomy": [
+    { "code": "service_revenue", "name": "主营及服务收入", "direction": "income", "version": 1 },
+    { "code": "software_cloud", "name": "软件、云与订阅", "direction": "expense", "version": 1 },
+    { "code": "professional_services", "name": "专业及外包服务", "direction": "expense", "version": 1 }
+  ],
+  "filters": { "period": "2026-07", "state": "pending" },
+  "items": [
+    {
+      "record": {
+        "id": "102", "externalId": "R-2", "eventDate": "2026-07-02", "direction": "expense",
+        "amount": "1170.00", "category": "软件服务", "counterparty": "OpenAI",
+        "description": "Codex 续费开通", "version": 3
+      },
+      "reviewState": "pending",
+      "proposal": {
+        "classificationId": "501", "version": 2, "taxonomyCode": "software_cloud",
+        "taxonomyName": "软件、云与订阅", "normalizedItemName": "Codex / OpenAI",
+        "groupKey": "expense:software_cloud:codex_openai", "classificationState": "review",
+        "persistedStatus": "review", "origin": "model", "confidence": 0.83,
+        "reasonCode": "persisted_classification", "reason": "模型建议，等待人工确认",
+        "sourceFactHash": "aaaaaaaaaaaaaaaa", "stale": false, "reviewedAt": null
+      },
+      "allowedActions": ["confirm", "correct", "reject"],
+      "safety": { "rawBusinessRecordChanged": false, "modelCanAccept": false }
+    },
+    {
+      "record": {
+        "id": "103", "externalId": "R-3", "eventDate": "2026-07-03", "direction": "expense",
+        "amount": "830.00", "category": "", "counterparty": "未知供应商",
+        "description": "技术服务", "version": 1
+      },
+      "reviewState": "pending",
+      "proposal": {
+        "classificationId": null, "version": 0, "taxonomyCode": null,
+        "taxonomyName": "待确认分类", "normalizedItemName": "未知供应商",
+        "groupKey": "pending:103", "classificationState": "unclassified",
+        "persistedStatus": null, "origin": "rule", "confidence": null,
+        "reasonCode": "insufficient_evidence", "reason": null,
+        "sourceFactHash": "bbbbbbbbbbbbbbbb", "stale": false, "reviewedAt": null
+      },
+      "allowedActions": ["confirm", "correct", "reject"],
+      "safety": { "rawBusinessRecordChanged": false, "modelCanAccept": false }
+    }
+  ],
+  "page": { "limit": 10, "nextCursor": "opaque+/next=" },
+  "safety": { "rawBusinessRecordsChanged": false, "modelCanAccept": false }
+}

@@ -20,6 +20,8 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
         XCTAssertEqual(contract.capabilities.financeResources.cutoverReadiness?.available, true)
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        XCTAssertEqual(contract.capabilities.classificationReview?.available, true)
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.classificationReviewSchema)
         XCTAssertEqual(session.state.records.count, 1)
         let fetchStateCallCount = await api.fetchStateCallCount()
         XCTAssertEqual(fetchStateCallCount, 1)
@@ -199,8 +201,8 @@ private actor FinanceAPISpy: FinanceAPI {
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
         version: "0.10.2",
-        financeSchemaVersion: BackendContract.financeDomainV2Schema
-    ), capabilitiesFixtureName: String = "capabilities-v0.10.2") {
+        financeSchemaVersion: BackendContract.classificationReviewSchema
+    ), capabilitiesFixtureName: String = "capabilities-classification-review-v0.11.0") {
         self.healthResponse = healthResponse
         self.capabilitiesFixtureName = capabilitiesFixtureName
     }

@@ -4,15 +4,16 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
-const expectedMarketingVersion = '0.10.2'
-const expectedAPIContractVersion = '20260714_004'
-const expectedFinanceSchemaVersion = '20260714_002_finance_resource_api'
+const expectedMarketingVersion = '0.11.0'
+const expectedBackendVersion = '0.10.2'
+const expectedAPIContractVersion = '20260714_006'
+const expectedFinanceSchemaVersion = '20260714_003_classification_review'
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
-const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.10.2.json')
+const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.11.0.json')
 
 const requiredFiles = [
   'project.yml',
-  'ContractSnapshots/backend-api-v0.10.2.json',
+  'ContractSnapshots/backend-api-v0.11.0.json',
   'UwayFinance/App/UwayFinanceApp.swift',
   'UwayFinance/Networking/APIEndpoint.swift',
   'UwayFinance/Networking/FinanceAPI.swift',
@@ -21,15 +22,19 @@ const requiredFiles = [
   'UwayFinance/Networking/FinanceResourceAPI.swift',
   'UwayFinance/Networking/CutoverReadinessAPI.swift',
   'UwayFinance/Networking/DashboardMetricsAPI.swift',
+  'UwayFinance/Networking/ClassificationReviewAPI.swift',
   'UwayFinance/Models/BackendContract.swift',
   'UwayFinance/Models/FinanceResourceModels.swift',
   'UwayFinance/Models/CutoverReadinessModels.swift',
   'UwayFinance/Models/DashboardMetricsModels.swift',
+  'UwayFinance/Models/ClassificationReviewModels.swift',
   'UwayFinance/Models/MoneyAmount.swift',
   'UwayFinance/Models/RecordImportPipeline.swift',
   'UwayFinance/State/RecordImportSession.swift',
+  'UwayFinance/State/ClassificationReviewStore.swift',
   'UwayFinance/Views/RecordImportView.swift',
   'UwayFinance/Views/LedgerView.swift',
+  'UwayFinance/Views/ClassificationReviewView.swift',
   'UwayFinance/Resources/Info.plist',
   'UwayFinance/Resources/Assets.xcassets/Contents.json',
   'UwayFinance/Resources/Assets.xcassets/AccentColor.colorset/Contents.json',
@@ -42,6 +47,8 @@ const requiredFiles = [
   'UwayFinanceTests/FinanceResourceAPITests.swift',
   'UwayFinanceTests/CutoverReadinessAPITests.swift',
   'UwayFinanceTests/DashboardMetricsAPITests.swift',
+  'UwayFinanceTests/ClassificationReviewAPITests.swift',
+  'UwayFinanceTests/ClassificationReviewStoreTests.swift',
   'UwayFinanceTests/RecordImportPipelineTests.swift',
   'UwayFinanceTests/Fixtures/harness-result.json',
   'UwayFinanceTests/Fixtures/import-analysis-request.json',
@@ -68,6 +75,8 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/business-records-page-v0.10.0.json',
   'UwayFinanceTests/Fixtures/business-record-response-v0.10.0.json',
   'UwayFinanceTests/Fixtures/version-conflict-v0.10.0.json',
+  'UwayFinanceTests/Fixtures/health-classification-review-v0.11.0.json',
+  'UwayFinanceTests/Fixtures/capabilities-classification-review-v0.11.0.json',
   'CHANGELOG.md',
 ]
 
@@ -103,6 +112,21 @@ const fixtures = [
   'business-records-page-v0.10.0.json',
   'business-record-response-v0.10.0.json',
   'version-conflict-v0.10.0.json',
+  'health-classification-review-v0.11.0.json',
+  'capabilities-classification-review-v0.11.0.json',
+  'classification-reviews-pending-v0.11.0.json',
+  'classification-reviews-accepted-v0.11.0.json',
+  'classification-reviews-rejected-v0.11.0.json',
+  'classification-analysis-accepted-v0.11.0.json',
+  'classification-analysis-review-v0.11.0.json',
+  'classification-analysis-rejected-v0.11.0.json',
+  'classification-decision-confirm-v0.11.0.json',
+  'classification-decision-correct-v0.11.0.json',
+  'classification-decision-reject-v0.11.0.json',
+  'classification-record-conflict-v0.11.0.json',
+  'classification-version-conflict-v0.11.0.json',
+  'classification-forbidden-v0.11.0.json',
+  'classification-ai-unavailable-v0.11.0.json',
 ]
 for (const fixture of fixtures) {
   JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', fixture), 'utf8'))
@@ -116,6 +140,7 @@ if (decisionResponse.resolution?.decision !== 'accept' || !decisionResponse.reso
 
 const contractSnapshot = JSON.parse(fs.readFileSync(contractSnapshotPath, 'utf8'))
 if (contractSnapshot.version !== expectedMarketingVersion) throw new Error('backend contract snapshot version mismatch')
+if (contractSnapshot.backendAppVersion !== expectedBackendVersion) throw new Error('backend app version snapshot mismatch')
 if (contractSnapshot.apiContractVersion !== expectedAPIContractVersion) {
   throw new Error('backend contract snapshot API contract version mismatch')
 }
@@ -139,7 +164,7 @@ if (contractSnapshot.capabilities?.financeDomainV2Mirror !== true
     || resourceSnapshot?.businessRecords?.pagination !== 'cursor'
     || resourceSnapshot?.businessRecords?.idempotencyHeader !== 'Idempotency-Key'
     || resourceSnapshot?.businessRecords?.concurrencyControl !== 'expectedVersion') {
-  throw new Error('V2 shadow resource capabilities do not match the 0.10.2 backend boundary')
+  throw new Error('V2 shadow resource capabilities do not match the classification-review backend boundary')
 }
 const metricsSnapshot = contractSnapshot.capabilities?.unifiedDashboardMetrics
 if (metricsSnapshot?.available !== true
@@ -147,10 +172,27 @@ if (metricsSnapshot?.available !== true
     || metricsSnapshot?.moneyEncoding !== 'decimal_string'
     || metricsSnapshot?.source !== 'finance_v2_shadow_read_model'
     || metricsSnapshot?.rawRecordsMerged !== false
-    || metricsSnapshot?.classificationStates?.join(',') !== 'accepted,review,unclassified'
-    || contractSnapshot.capabilities?.aiClassification?.available !== false
-    || contractSnapshot.capabilities?.aiClassification?.deterministicGroupingAvailable !== true) {
+    || metricsSnapshot?.classificationStates?.join(',') !== 'accepted,review,unclassified') {
   throw new Error('dashboard metrics snapshot must remain governed, read-only and deterministic')
+}
+const classificationSnapshot = contractSnapshot.capabilities?.classificationReview
+const classificationAISnapshot = contractSnapshot.capabilities?.aiClassification
+if (classificationSnapshot?.available !== true
+    || classificationSnapshot?.listEndpoint !== '/api/v2/classification-reviews'
+    || classificationSnapshot?.pagination !== 'cursor'
+    || classificationSnapshot?.defaultPageSize !== 10
+    || classificationSnapshot?.decisions?.join(',') !== 'confirm,correct,reject'
+    || classificationSnapshot?.idempotencyHeader !== 'Idempotency-Key'
+    || classificationSnapshot?.concurrencyControl?.join(',') !== 'expectedRecordVersion,expectedClassificationVersion'
+    || classificationSnapshot?.modelCanAccept !== false
+    || classificationSnapshot?.deterministicRuleMayAccept !== true
+    || classificationSnapshot?.rawBusinessRecordsChanged !== false
+    || classificationAISnapshot?.available !== 'runtime'
+    || classificationAISnapshot?.contract !== 'closed_set_existing_operating_item_v1'
+    || classificationAISnapshot?.deterministicGroupingAvailable !== true
+    || classificationAISnapshot?.modelCanAccept !== false
+    || classificationAISnapshot?.writesBusinessRecords !== false) {
+  throw new Error('classification review snapshot safety boundary mismatch')
 }
 if (contractSnapshot.capabilities?.importAnalysis?.availability !== 'runtime'
     || contractSnapshot.capabilities?.importAnalysis?.reasonWhenUnavailable !== 'provider_not_configured') {
@@ -166,11 +208,11 @@ if (contractSnapshot.money?.legacyStateEncoding !== 'json_number'
   throw new Error('backend contract snapshot money boundary mismatch')
 }
 
-const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.2.json'), 'utf8'))
-const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-v0.10.2.json'), 'utf8'))
-if (healthFixture.version !== expectedMarketingVersion
+const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-classification-review-v0.11.0.json'), 'utf8'))
+const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-classification-review-v0.11.0.json'), 'utf8'))
+if (healthFixture.version !== expectedBackendVersion
     || healthFixture.financeSchemaVersion !== expectedFinanceSchemaVersion) {
-  throw new Error('0.10.2 health fixture version/schema mismatch')
+  throw new Error('classification-review health fixture version/schema mismatch')
 }
 if (capabilitiesFixture.apiContractVersion !== expectedAPIContractVersion
     || capabilitiesFixture.sync?.preferredMode !== 'legacy_state_v1'
@@ -237,9 +279,12 @@ if (forbiddenMetricsFixture.code !== 'DASHBOARD_METRICS_FORBIDDEN'
 }
 if (capabilitiesFixture.features?.unifiedDashboardMetrics?.available !== true
     || capabilitiesFixture.features?.unifiedDashboardMetrics?.rawRecordsMerged !== false
-    || capabilitiesFixture.features?.aiClassification?.available !== false
+    || capabilitiesFixture.features?.aiClassification?.available !== true
+    || capabilitiesFixture.features?.aiClassification?.contract !== 'closed_set_existing_operating_item_v1'
+    || capabilitiesFixture.features?.aiClassification?.modelCanAccept !== false
+    || capabilitiesFixture.features?.aiClassification?.writesBusinessRecords !== false
     || capabilitiesFixture.features?.aiClassification?.deterministicGroupingAvailable !== true) {
-  throw new Error('dashboard metrics capability must not claim AI classification or raw-record merging')
+  throw new Error('classification AI capability must remain closed-set and non-writing')
 }
 for (const feature of ['workflowTasks', 'documentUpload', 'ocr']) {
   const value = capabilitiesFixture.features?.[feature]
@@ -248,6 +293,63 @@ for (const feature of ['workflowTasks', 'documentUpload', 'ocr']) {
 if (capabilitiesFixture.safety?.aiMayWriteBusinessRecords !== false
     || capabilitiesFixture.safety?.aiMayPostJournalVouchers !== false) {
   throw new Error('capabilities fixture must preserve AI write safety')
+}
+
+const oldClassificationCapability = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.2.json'), 'utf8')).features?.classificationReview
+if (oldClassificationCapability !== undefined) {
+  throw new Error('0.10.2 fixture must prove classificationReview is optional')
+}
+const reviewCapability = capabilitiesFixture.features?.classificationReview
+if (reviewCapability?.available !== true
+    || reviewCapability?.defaultPageSize !== 10
+    || reviewCapability?.pagination !== 'cursor'
+    || reviewCapability?.decisions?.join(',') !== 'confirm,correct,reject'
+    || reviewCapability?.modelCanAccept !== false
+    || reviewCapability?.deterministicRuleMayAccept !== true
+    || reviewCapability?.rawBusinessRecordsChanged !== false) {
+  throw new Error('classification review capability fixture is unsafe or incomplete')
+}
+const pendingReviews = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'classification-reviews-pending-v0.11.0.json'), 'utf8'))
+const acceptedReviews = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'classification-reviews-accepted-v0.11.0.json'), 'utf8'))
+const rejectedReviews = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'classification-reviews-rejected-v0.11.0.json'), 'utf8'))
+if (pendingReviews.page?.limit !== 10
+    || typeof pendingReviews.page?.nextCursor !== 'string'
+    || pendingReviews.items?.[0]?.record?.amount !== '1170.00'
+    || pendingReviews.items?.[0]?.proposal?.classificationState !== 'review'
+    || pendingReviews.safety?.rawBusinessRecordsChanged !== false
+    || pendingReviews.safety?.modelCanAccept !== false
+    || acceptedReviews.items?.[0]?.reviewState !== 'accepted'
+    || rejectedReviews.items?.[0]?.reviewState !== 'rejected') {
+  throw new Error('classification list fixtures must preserve cursor, decimal money and three-state review boundaries')
+}
+for (const [name, expectedStatus] of [
+  ['classification-analysis-accepted-v0.11.0.json', 'accepted'],
+  ['classification-analysis-review-v0.11.0.json', 'review'],
+  ['classification-analysis-rejected-v0.11.0.json', 'rejected'],
+]) {
+  const value = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', name), 'utf8'))
+  if (value.analysis?.status !== expectedStatus
+      || value.analysis?.writesBusinessRecord !== false
+      || value.safety?.modelCanAccept !== false
+      || value.safety?.modelWritesBusinessRecords !== false) {
+    throw new Error(`classification analysis safety mismatch: ${name}`)
+  }
+}
+for (const action of ['confirm', 'correct', 'reject']) {
+  const value = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', `classification-decision-${action}-v0.11.0.json`), 'utf8'))
+  if (value.decision?.action !== action || value.safety?.rawBusinessRecordChanged !== false) {
+    throw new Error(`classification decision fixture mismatch: ${action}`)
+  }
+}
+const classificationErrorCodes = [
+  ['classification-record-conflict-v0.11.0.json', 'VERSION_CONFLICT'],
+  ['classification-version-conflict-v0.11.0.json', 'CLASSIFICATION_VERSION_CONFLICT'],
+  ['classification-forbidden-v0.11.0.json', 'CLASSIFICATION_REVIEW_FORBIDDEN'],
+  ['classification-ai-unavailable-v0.11.0.json', 'CLASSIFICATION_AI_UNAVAILABLE'],
+]
+for (const [name, code] of classificationErrorCodes) {
+  const value = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', name), 'utf8'))
+  if (value.code !== code) throw new Error(`classification error fixture mismatch: ${name}`)
 }
 
 for (const asset of [
@@ -360,7 +462,7 @@ for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amo
 }
 
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
-for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'deterministicGroupingAvailable', 'businessRecords', '"accepted", "review", "rejected"']) {
+for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
 }
 for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
@@ -405,16 +507,36 @@ for (const marker of ['protocol DashboardMetricsAPI', 'func metrics(', '.dashboa
 if (/\b(post|put|patch|delete)\b/i.test(metricsAPI)) {
   throw new Error('dashboard metrics client must remain read-only')
 }
+const classificationModels = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'ClassificationReviewModels.swift'), 'utf8')
+for (const marker of ['V2DecimalAmount', 'case confirm', 'case correct', 'case reject', 'expectedRecordVersion', 'expectedClassificationVersion', 'normalizedItemName', 'ClassificationAnalyzeCommand', 'ClassificationDecisionCommand']) {
+  if (!classificationModels.includes(marker)) throw new Error(`classification model marker missing: ${marker}`)
+}
+if (classificationModels.includes('normalizedGroupName') || /\n\s*case accept\s*\n/.test(classificationModels)) {
+  throw new Error('classification client must use current server confirm/normalizedItemName vocabulary')
+}
+const classificationAPI = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'ClassificationReviewAPI.swift'), 'utf8')
+for (const marker of ['protocol ClassificationReviewAPI', 'Idempotency-Key', 'command.idempotencyKey.rawValue', '.analyzeClassification', '.decideClassification']) {
+  if (!classificationAPI.includes(marker)) throw new Error(`classification API marker missing: ${marker}`)
+}
+const classificationStore = fs.readFileSync(path.join(root, 'UwayFinance', 'State', 'ClassificationReviewStore.swift'), 'utf8')
+for (const marker of ['limit: 10', 'cursorStack', 'pendingAnalyze', 'pendingDecision', 'CLASSIFICATION_AI_UNAVAILABLE', 'CLASSIFICATION_VERSION_CONFLICT', '本地理由和更正草稿仍然保留']) {
+  if (!classificationStore.includes(marker)) throw new Error(`classification retry/draft marker missing: ${marker}`)
+}
+const classificationView = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'ClassificationReviewView.swift'), 'utf8')
+for (const marker of ['closed_set_existing_operating_item_v1', 'modelCanAccept == false', 'writesBusinessRecords == false', '每页最多 10 条']) {
+  if (!classificationView.includes(marker)) throw new Error(`classification workbench safety marker missing: ${marker}`)
+}
 const httpTransport = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'HTTPTransport.swift'), 'utf8')
 for (const marker of ['case versionConflict', 'VERSION_CONFLICT', 'headers: [String: String]']) {
   if (!httpTransport.includes(marker)) throw new Error(`V2 transport marker missing: ${marker}`)
 }
 const appSession = fs.readFileSync(path.join(root, 'UwayFinance', 'State', 'AppSession.swift'), 'utf8')
-if (appSession.includes('FinanceResourceAPI') || appSession.includes('CutoverReadinessAPI') || appSession.includes('DashboardMetricsAPI') || appSession.includes('/api/v2')) {
+if (appSession.includes('FinanceResourceAPI') || appSession.includes('CutoverReadinessAPI') || appSession.includes('DashboardMetricsAPI') || appSession.includes('ClassificationReviewAPI') || appSession.includes('/api/v2')) {
   throw new Error('shadow V2 clients must not become the AppSession data source')
 }
 
 const serverPath = path.join(workspace, 'server', 'index.ts')
+const healthPath = path.join(workspace, 'server', 'health.ts')
 const importSchemaPath = path.join(workspace, 'server', 'import-analysis.ts')
 const stateSchemaPath = path.join(workspace, 'server', 'schema.ts')
 const financeDomainPath = path.join(workspace, 'server', 'finance-domain.ts')
@@ -422,10 +544,12 @@ const capabilitiesPath = path.join(workspace, 'server', 'capabilities.ts')
 const financeResourcesPath = path.join(workspace, 'server', 'finance-resources.ts')
 const financeCutoverPath = path.join(workspace, 'server', 'finance-cutover.ts')
 const dashboardMetricsPath = path.join(workspace, 'server', 'dashboard-metrics.ts')
+const classificationReviewPath = path.join(workspace, 'server', 'classification-review.ts')
+const classificationAnalysisPath = path.join(workspace, 'server', 'classification-analysis.ts')
 const apiContractDocumentPath = path.join(workspace, 'API-V2-CONTRACT.md')
 const mainPackagePath = path.join(workspace, 'package.json')
 const hasLocalBackend = process.env.UWAY_SKIP_LOCAL_BACKEND !== '1'
-  && [serverPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, apiContractDocumentPath].every(fs.existsSync)
+  && [serverPath, healthPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, classificationReviewPath, classificationAnalysisPath, apiContractDocumentPath].every(fs.existsSync)
 if (hasLocalBackend) {
   const server = fs.readFileSync(serverPath, 'utf8')
   for (const { method, path: endpoint } of currentContracts) {
@@ -443,7 +567,8 @@ if (hasLocalBackend) {
   if (!financeDomain.includes(`FINANCE_SCHEMA_VERSION = '${expectedFinanceSchemaVersion}'`)) {
     throw new Error('local finance domain schema version mismatch')
   }
-  if (!server.includes('financeSchemaVersion: FINANCE_SCHEMA_VERSION')) {
+  const health = fs.readFileSync(healthPath, 'utf8')
+  if (!health.includes('financeSchemaVersion: FINANCE_SCHEMA_VERSION')) {
     throw new Error('local health response must expose financeSchemaVersion')
   }
   if (!server.includes('createServerCapabilities({ importAnalysisAvailable: importClassifier !== null })')) {
@@ -490,9 +615,18 @@ if (hasLocalBackend) {
   for (const marker of ['DASHBOARD_METRICS_FORBIDDEN', 'INVALID_DASHBOARD_PERIOD', 'netCashFlow', 'rawBusinessRecordsMerged: false', 'modelWritesBusinessRecords: false', 'reviewSuggestionsAffectRawFacts: false']) {
     if (!dashboardMetrics.includes(marker)) throw new Error(`local dashboard metrics marker missing: ${marker}`)
   }
+  const classificationReview = fs.readFileSync(classificationReviewPath, 'utf8')
+  for (const marker of ["action: z.enum(['confirm', 'correct', 'reject'])", 'normalizedItemName', 'expectedRecordVersion', 'expectedClassificationVersion', 'CLASSIFICATION_VERSION_CONFLICT', 'CLASSIFICATION_REVIEW_FORBIDDEN', 'rawBusinessRecordChanged: false', 'modelCanAccept: false']) {
+    if (!classificationReview.includes(marker)) throw new Error(`local classification review marker missing: ${marker}`)
+  }
+  const classificationAnalysis = fs.readFileSync(classificationAnalysisPath, 'utf8')
+  const classificationAnalysisRoute = `${server}\n${classificationAnalysis}`
+  for (const marker of ['CLASSIFICATION_AI_UNAVAILABLE', 'Idempotency-Key', 'expectedRecordVersion', 'expectedClassificationVersion', 'writesBusinessRecord: false', 'modelCanAccept: false', 'modelWritesBusinessRecords: false']) {
+    if (!classificationAnalysisRoute.includes(marker)) throw new Error(`local classification analysis marker missing: ${marker}`)
+  }
   const apiContractDocument = fs.readFileSync(apiContractDocumentPath, 'utf8')
   const staleDocumentMarkers = []
-  for (const marker of [expectedMarketingVersion, expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1']) {
+  for (const marker of [expectedBackendVersion, expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1']) {
     if (!apiContractDocument.includes(marker)) staleDocumentMarkers.push(marker)
   }
   if (staleDocumentMarkers.length > 0) {
@@ -500,8 +634,8 @@ if (hasLocalBackend) {
   }
   if (fs.existsSync(mainPackagePath)) {
     const mainPackage = JSON.parse(fs.readFileSync(mainPackagePath, 'utf8'))
-    if (mainPackage.version !== expectedMarketingVersion) {
-      console.warn(`mainline package.json version is ${mainPackage.version}; candidate contract expects ${expectedMarketingVersion}`)
+    if (mainPackage.version !== expectedBackendVersion) {
+      console.warn(`mainline package.json version is ${mainPackage.version}; backend contract expects ${expectedBackendVersion}`)
     }
   }
 }

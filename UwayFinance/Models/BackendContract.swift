@@ -27,7 +27,26 @@ struct UnifiedDashboardMetricsCapability: Codable, Equatable, Sendable {
 
 struct AIClassificationCapability: Codable, Equatable, Sendable {
     let available: Bool
+    let reason: String?
+    let contract: String?
     let deterministicGroupingAvailable: Bool?
+    let modelCanAccept: Bool?
+    let writesBusinessRecords: Bool?
+}
+
+struct ClassificationReviewCapability: Codable, Equatable, Sendable {
+    let available: Bool
+    let listEndpoint: String
+    let analyzeEndpoint: String
+    let decisionEndpoint: String
+    let pagination: String
+    let defaultPageSize: Int
+    let decisions: [String]
+    let idempotencyHeader: String
+    let concurrencyControl: [String]
+    let modelCanAccept: Bool
+    let deterministicRuleMayAccept: Bool
+    let rawBusinessRecordsChanged: Bool
 }
 
 struct LegacyStateCapability: Codable, Equatable, Sendable {
@@ -136,6 +155,7 @@ struct ImportAnalysisCapability: Codable, Equatable, Sendable {
 struct FeatureCapabilitiesResponse: Codable, Equatable, Sendable {
     let importAnalysis: ImportAnalysisCapability
     let unifiedDashboardMetrics: UnifiedDashboardMetricsCapability
+    let classificationReview: ClassificationReviewCapability?
     let workflowTasks: CapabilityAvailability
     let aiClassification: AIClassificationCapability
     let documentUpload: CapabilityAvailability
@@ -171,8 +191,10 @@ struct ServerCapabilities: Equatable, Sendable {
     let importAnalysis: ImportAnalysisCapability
     let unifiedDashboardMetrics: Bool
     let dashboardMetrics: UnifiedDashboardMetricsCapability
+    let classificationReview: ClassificationReviewCapability?
     let workflowTasks: Bool
     let aiClassification: Bool
+    let aiClassificationCapability: AIClassificationCapability
     let deterministicGroupingAvailable: Bool
     let documentUpload: Bool
     let ocr: Bool
@@ -192,14 +214,16 @@ struct ServerCapabilities: Equatable, Sendable {
 
         return ServerCapabilities(
             syncMode: .legacyStateV1,
-            financeDomainV2Mirror: financeSchemaVersion == BackendContract.financeDomainV2Schema,
+            financeDomainV2Mirror: BackendContract.isFinanceDomainV2Schema(financeSchemaVersion),
             financeResources: response.sync.financeResources,
             importHarnessStatuses: Set(response.features.importAnalysis.decisions),
             importAnalysis: response.features.importAnalysis,
             unifiedDashboardMetrics: response.features.unifiedDashboardMetrics.available,
             dashboardMetrics: response.features.unifiedDashboardMetrics,
+            classificationReview: response.features.classificationReview,
             workflowTasks: response.features.workflowTasks.available,
             aiClassification: response.features.aiClassification.available,
+            aiClassificationCapability: response.features.aiClassification,
             deterministicGroupingAvailable: response.features.aiClassification.deterministicGroupingAvailable ?? false,
             documentUpload: response.features.documentUpload.available,
             ocr: response.features.ocr.available,
@@ -212,7 +236,7 @@ struct ServerCapabilities: Equatable, Sendable {
     static func legacyFallback(financeSchemaVersion: String?) -> ServerCapabilities {
         ServerCapabilities(
             syncMode: .legacyStateV1,
-            financeDomainV2Mirror: financeSchemaVersion == BackendContract.financeDomainV2Schema,
+            financeDomainV2Mirror: BackendContract.isFinanceDomainV2Schema(financeSchemaVersion),
             financeResources: .unavailable,
             importHarnessStatuses: ["accepted", "review", "rejected"],
             importAnalysis: .unavailableFallback,
@@ -225,8 +249,17 @@ struct ServerCapabilities: Equatable, Sendable {
                 rawRecordsMerged: nil,
                 classificationStates: nil
             ),
+            classificationReview: nil,
             workflowTasks: false,
             aiClassification: false,
+            aiClassificationCapability: AIClassificationCapability(
+                available: false,
+                reason: "capabilities_unavailable",
+                contract: nil,
+                deterministicGroupingAvailable: false,
+                modelCanAccept: false,
+                writesBusinessRecords: false
+            ),
             deterministicGroupingAvailable: false,
             documentUpload: false,
             ocr: false,
@@ -249,8 +282,13 @@ struct ServerCapabilities: Equatable, Sendable {
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260714_004"
+    static let apiContractVersion = "20260714_006"
     static let financeDomainV2Schema = "20260714_002_finance_resource_api"
+    static let classificationReviewSchema = "20260714_003_classification_review"
+
+    static func isFinanceDomainV2Schema(_ value: String?) -> Bool {
+        value == financeDomainV2Schema || value == classificationReviewSchema
+    }
 
     let serverVersion: String
     let financeSchemaVersion: String?

@@ -2,7 +2,7 @@
 
 SwiftUI client for the internal Uway finance workflow. This repository contains only the native iOS frontend; the Fastify/PostgreSQL backend is deployed separately on Alibaba Cloud and is accessed over HTTPS.
 
-Current marketing version: `0.10.2`, compatible with the `20260714_004` API contract and `20260714_002_finance_resource_api` schema. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
+Current marketing version: `0.11.0`, compatible with backend app `0.10.2`, API contract `20260714_006` and finance schema `20260714_003_classification_review`. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
 
 ## Implemented stage
 
@@ -13,8 +13,10 @@ Current marketing version: `0.10.2`, compatible with the `20260714_004` API cont
 - A separate, compiled `FinanceResourceAPI` supports V2 context and cursor-based business-record list/create/update contracts. It is intentionally not injected into `AppSession` while capabilities still prefer only `legacy_state_v1`, so existing screens cannot write through the shadow API.
 - A separate `CutoverReadinessAPI` can read the server's shadow reconciliation report, exact-cent summaries, blockers and opaque difference pages. It has no write method and is not injected into `AppSession` or any business screen.
 - A separate GET-only `DashboardMetricsAPI` decodes the governed Finance V2 shadow read model, including signed decimal-string money, classification coverage, trace origins/reasons and non-mutation safety flags. It is not an `AppSession` dependency or a source of raw ledger facts.
+- A separate `ClassificationReviewAPI` and native workbench expose pending/accepted/rejected queues, AI suggestions and authenticated manual confirm/correct/reject actions. Pages are limited to 10 records with an opaque cursor stack; all amounts decode from decimal strings into integer cents.
+- Classification retries retain the same request body and `Idempotency-Key`. A `409` refreshes server versions while preserving local reason/correction drafts, and `503` AI unavailability leaves manual review available. Model review never auto-confirms; deterministic strong rules may be accepted and Harness rejection fails closed.
 - V2 writes use commands that retain one stable `Idempotency-Key` across retries. Updates always carry `expectedVersion`; `409 VERSION_CONFLICT` remains distinguishable from generic server failures.
-- Current `/api/state` read/write compatibility, debounced sync status and pull-to-refresh. The backend may mirror those writes into Finance Domain V2, but the iOS client does not call unavailable resource, metric, workflow, classification, document or OCR APIs.
+- Current `/api/state` read/write compatibility, debounced sync status and pull-to-refresh. The backend may mirror those writes into Finance Domain V2, but `AppSession` does not use V2 resources, classification review, document or OCR APIs as its synchronization source.
 - Live `/api/health` status plus service app version, optional finance schema, API contract version and active sync-mode display; 0.8.x responses without `financeSchemaVersion` remain decodable. Failed saves keep their local snapshot and expose a one-tap retry instead of overwriting it with a refresh.
 - Exact-cent network/domain boundary: current JSON number amounts remain compatible, while Swift Codable converts them to integer cents before round-tripping state and import payloads.
 - “记一笔” `Form`, workbench cash summary, recent activity and a Swift Charts cash forecast.
@@ -63,8 +65,8 @@ The repository workflow `.github/workflows/ios-ci.yml` runs on GitHub's `macos-2
 4. builds the app and runs XCTest without signing;
 5. uploads the `.xcresult` bundle and build log for 14 days.
 
-It runs for iOS or checked-in contract-snapshot changes and can also be started manually with `workflow_dispatch`. `ContractSnapshots/backend-api-v0.10.2.json` is the standalone frontend contract baseline; when the repository is located inside the full Uway workspace, the validator additionally cross-checks the local backend resource routes, capability factory, read-only metrics/cutover implementations and Finance Domain schema constant. No Apple signing secret is required for this simulator job.
+It runs for iOS or checked-in contract-snapshot changes and can also be started manually with `workflow_dispatch`. `ContractSnapshots/backend-api-v0.11.0.json` is the standalone frontend contract baseline; when the repository is located inside the full Uway workspace, the validator additionally cross-checks the local backend routes, capability factory, classification safety rules and Finance Domain schema constant. No Apple signing secret is required for this simulator job.
 
 ## Current backend boundary
 
-The 0.10.2 backend also exposes governed dashboard metrics from `finance_v2_shadow_read_model`. Capabilities still publish only `legacy_state_v1` in `preferredMode` and `availableModes`; production UI and `AppSession` continue through `/api/state`. Metrics are read-only, raw records are not merged, deterministic grouping does not claim AI classification, and no report enables client writes. Delete, workflow, AI classification, attachment and OCR remain unavailable. Import analysis is operational only when `features.importAnalysis.available` is true.
+The backend still publishes only `legacy_state_v1` in `preferredMode` and `availableModes`; production state synchronization and `AppSession` continue through `/api/state`. Classification review is a separate governed workflow: `modelCanAccept=false`, `writesBusinessRecords=false`, manual decisions use `confirm/correct/reject`, and raw operating facts remain unchanged. AI analysis is sent only when `features.aiClassification.available=true` and its closed-set safety fields match; otherwise the workbench remains manual. Attachment and OCR remain unavailable. Import analysis is operational only when `features.importAnalysis.available` is true.

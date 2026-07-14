@@ -1,0 +1,4 @@
+{
+  "error": "AI 分类服务尚未配置，当前仍可人工复核",
+  "code": "CLASSIFICATION_AI_UNAVAILABLE"
+}

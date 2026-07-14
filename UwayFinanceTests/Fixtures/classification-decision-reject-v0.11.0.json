@@ -1,0 +1,12 @@
+{
+  "recordId": "103",
+  "decision": {
+    "action": "reject",
+    "classification": {
+      "id": "703", "version": 1, "status": "rejected", "taxonomyCode": null, "taxonomyName": null,
+      "normalizedItemName": "未知供应商", "groupKey": "rejected:103", "sourceFactHash": "bbbbbbbbbbbbbbbb",
+      "reviewedAt": "2026-07-14T13:02:00.000Z"
+    }
+  },
+  "safety": { "rawBusinessRecordChanged": false, "modelCanAccept": false }
+}

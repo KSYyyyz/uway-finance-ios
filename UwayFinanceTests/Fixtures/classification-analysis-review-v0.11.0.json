@@ -1,0 +1,11 @@
+{
+  "recordId": "102",
+  "analysis": {
+    "id": "run-review", "status": "review", "origin": "model", "taxonomyCode": "software_cloud",
+    "normalizedItemName": "Codex / OpenAI", "groupKey": "expense:software_cloud:codex_openai",
+    "evidenceRefs": ["fact:description"], "reasonCode": "model_suggestion_requires_review",
+    "confidence": 0.82, "issueCodes": [], "writesBusinessRecord": false,
+    "classificationVersion": 3, "persistedClassification": true
+  },
+  "safety": { "rawBusinessRecordChanged": false, "modelCanAccept": false, "modelWritesBusinessRecords": false }
+}

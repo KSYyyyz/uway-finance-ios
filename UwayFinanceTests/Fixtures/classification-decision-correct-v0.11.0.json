@@ -1,0 +1,13 @@
+{
+  "recordId": "102",
+  "decision": {
+    "action": "correct",
+    "classification": {
+      "id": "702", "version": 3, "status": "accepted", "taxonomyCode": "professional_services",
+      "taxonomyName": "专业及外包服务", "normalizedItemName": "研发外包服务",
+      "groupKey": "expense:professional_services:human:5678", "sourceFactHash": "aaaaaaaaaaaaaaaa",
+      "reviewedAt": "2026-07-14T13:01:00.000Z"
+    }
+  },
+  "safety": { "rawBusinessRecordChanged": false, "modelCanAccept": false }
+}

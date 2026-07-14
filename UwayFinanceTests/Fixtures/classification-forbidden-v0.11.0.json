@@ -1,0 +1,4 @@
+{
+  "error": "当前角色无权查看全账套分类复核任务",
+  "code": "CLASSIFICATION_REVIEW_FORBIDDEN"
+}

@@ -1,0 +1,10 @@
+{
+  "recordId": "103",
+  "analysis": {
+    "id": "run-rejected", "status": "rejected", "origin": "model", "taxonomyCode": null,
+    "normalizedItemName": null, "groupKey": null, "evidenceRefs": [], "reasonCode": "insufficient_evidence",
+    "confidence": 0.31, "issueCodes": ["EVIDENCE_INSUFFICIENT"], "writesBusinessRecord": false,
+    "classificationVersion": 0, "persistedClassification": false
+  },
+  "safety": { "rawBusinessRecordChanged": false, "modelCanAccept": false, "modelWritesBusinessRecords": false }
+}

@@ -15,6 +15,7 @@ private enum PendingFilter: String, CaseIterable, Identifiable {
 
 struct PendingView: View {
     @EnvironmentObject private var session: AppSession
+    @Environment(\.classificationReviewAPI) private var classificationReviewAPI
     @State private var filter: PendingFilter = .all
     @State private var resolvedTrigger = 0
 
@@ -90,6 +91,25 @@ struct PendingView: View {
                 ForEach(PendingFilter.allCases) { Text($0.label).tag($0) }
             }
             .pickerStyle(.segmented)
+
+            NavigationLink {
+                ClassificationReviewView(api: classificationReviewAPI)
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.bubble")
+                        .foregroundStyle(AppTheme.brand)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("分类复核工作台").font(.subheadline.weight(.semibold))
+                        Text("AI 建议、人工确认、更正与拒绝").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                }
+                .padding(12)
+                .background(AppTheme.elevatedSurface, in: RoundedRectangle(cornerRadius: AppTheme.compactRadius))
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("打开经营事项分类复核队列")
         }
         .padding()
         .background(AppTheme.pageBackground)
@@ -129,4 +149,3 @@ private struct PendingRow: View {
         .appCard()
     }
 }
-

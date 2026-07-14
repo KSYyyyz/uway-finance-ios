@@ -54,6 +54,25 @@ struct APIEndpoint: Hashable {
         return APIEndpoint(method: .get, path: path("/api/v2/dashboard-metrics", queryItems: items))
     }
 
+    static func classificationReviews(_ query: ClassificationReviewQuery) -> APIEndpoint {
+        var items = [
+            URLQueryItem(name: "state", value: query.state.rawValue),
+            URLQueryItem(name: "limit", value: String(query.limit)),
+        ]
+        if let value = query.cursor { items.append(URLQueryItem(name: "cursor", value: value)) }
+        if let value = query.accountBookId { items.append(URLQueryItem(name: "accountBookId", value: value)) }
+        if let value = query.period { items.append(URLQueryItem(name: "period", value: value)) }
+        return APIEndpoint(method: .get, path: path("/api/v2/classification-reviews", queryItems: items))
+    }
+
+    static func analyzeClassification(recordId: String) -> APIEndpoint {
+        APIEndpoint(method: .post, path: classificationPath(recordId: recordId, suffix: "analyze"))
+    }
+
+    static func decideClassification(recordId: String) -> APIEndpoint {
+        APIEndpoint(method: .post, path: classificationPath(recordId: recordId, suffix: "decision"))
+    }
+
     static func updateBusinessRecord(recordId: String) -> APIEndpoint {
         let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
         let encoded = recordId.addingPercentEncoding(withAllowedCharacters: allowed) ?? recordId
@@ -72,6 +91,12 @@ struct APIEndpoint: Hashable {
         components.path = path
         components.queryItems = queryItems
         return components.string ?? path
+    }
+
+    private static func classificationPath(recordId: String, suffix: String) -> String {
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
+        let encoded = recordId.addingPercentEncoding(withAllowedCharacters: allowed) ?? recordId
+        return "/api/v2/classification-reviews/\(encoded)/\(suffix)"
     }
 }
 
