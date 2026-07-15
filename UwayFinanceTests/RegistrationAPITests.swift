@@ -66,7 +66,9 @@ final class RegistrationAPITests: XCTestCase {
             } catch APIError.server(let status, let code, _) {
                 XCTAssertEqual(status, item.status)
                 XCTAssertEqual(code, item.code)
-                XCTAssertFalse(RegistrationErrorMessage.localized(.server(status: status, code: code, message: item.error)).isEmpty)
+                XCTAssertFalse(RegistrationErrorMessage.localized(
+                    APIError.server(status: status, code: code, message: item.error)
+                ).isEmpty)
             } catch {
                 XCTFail("unexpected error for \(item.code): \(error)")
             }
