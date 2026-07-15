@@ -12,7 +12,7 @@ final class RegistrationAPITests: XCTestCase {
 
         let response = try await makeAPI().requestRegistrationCode(phone: "+8613800138000")
 
-        XCTAssertEqual(response.challengeId, "reg_20260716_abcdefghijklmnop")
+        XCTAssertEqual(response.challengeId, "challenge-20260716-abcdefghijklmnop")
         XCTAssertEqual(response.expiresInSeconds, 300)
         XCTAssertEqual(response.resendAfterSeconds, 60)
         let request = capturedRequests().first

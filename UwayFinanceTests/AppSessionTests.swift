@@ -466,7 +466,7 @@ private actor FinanceAPISpy: FinanceAPI {
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
         version: "0.14.0",
-        financeSchemaVersion: BackendContract.semanticPreferenceMemoryV2Schema
+        financeSchemaVersion: BackendContract.multiTenantRegistrationSchema
     ), capabilitiesFixtureName: String = "capabilities-semantic-preference-memory-v0.14.0",
        fetchEnvelopes: [StateEnvelope] = [StateEnvelope(
         data: makeSessionState(description: "待重试事项"),
