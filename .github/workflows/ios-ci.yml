@@ -132,6 +132,43 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             test-without-building 2>&1 | tee TestResults/test.log
 
+      - name: Build unsigned iPhone device app
+        env:
+          NSUnbufferedIO: "YES"
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project UwayFinance.xcodeproj \
+            -scheme UwayFinance \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath DeviceDerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build 2>&1 | tee TestResults/device-build.log
+
+      - name: Package unsigned IPA for local signing
+        run: |
+          set -euo pipefail
+          APP_PATH="$(find DeviceDerivedData/Build/Products/Release-iphoneos -maxdepth 2 -type d -name 'UwayFinance.app' -print -quit)"
+          test -n "$APP_PATH"
+          test -x "$APP_PATH/UwayFinance"
+          test ! -e "$APP_PATH/embedded.mobileprovision"
+          PLIST_PATH="$APP_PATH/Info.plist"
+          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$PLIST_PATH")"
+          SCHEME="$(/usr/libexec/PlistBuddy -c 'Print :UWAY_API_SCHEME' "$PLIST_PATH")"
+          HOST="$(/usr/libexec/PlistBuddy -c 'Print :UWAY_API_HOST' "$PLIST_PATH")"
+          test "$BUNDLE_ID" = "com.uway.finance"
+          test "$SCHEME" = "https"
+          test -n "$HOST"
+          mkdir -p DeviceBuild/Payload
+          ditto "$APP_PATH" DeviceBuild/Payload/UwayFinance.app
+          (cd DeviceBuild && ditto -c -k --sequesterRsrc --keepParent Payload UwayFinance-unsigned.ipa)
+          shasum -a 256 DeviceBuild/UwayFinance-unsigned.ipa > DeviceBuild/UwayFinance-unsigned.ipa.sha256
+          test -s DeviceBuild/UwayFinance-unsigned.ipa
+          file "$APP_PATH/UwayFinance"
+          echo "Packaged unsigned local-signing IPA for $BUNDLE_ID using $SCHEME://$HOST"
+
       - name: Upload Xcode results
         if: always()
         uses: actions/upload-artifact@v7
@@ -146,5 +183,15 @@ jobs:
         with:
           name: UwayFinance-simulator-${{ github.run_number }}
           path: SimulatorBuild
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload unsigned iPhone device build
+        uses: actions/upload-artifact@v7
+        with:
+          name: UwayFinance-device-unsigned-${{ github.run_number }}
+          path: |
+            DeviceBuild/UwayFinance-unsigned.ipa
+            DeviceBuild/UwayFinance-unsigned.ipa.sha256
           if-no-files-found: error
           retention-days: 14

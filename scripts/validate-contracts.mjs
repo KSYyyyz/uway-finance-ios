@@ -1024,9 +1024,15 @@ for (const marker of [
   'UwayFinance-simulator.zip',
   'shasum -a 256',
   'test-without-building',
+  'Build unsigned iPhone device app',
+  "-destination 'generic/platform=iOS'",
+  'Package unsigned IPA for local signing',
+  'UwayFinance-unsigned.ipa',
+  'test ! -e "$APP_PATH/embedded.mobileprovision"',
   'CODE_SIGNING_ALLOWED=NO',
   'uses: actions/upload-artifact@v7',
   'Upload interactive simulator build',
+  'Upload unsigned iPhone device build',
 ]) {
   if (!workflow.includes(marker)) throw new Error(`iOS CI marker missing: ${marker}`)
 }

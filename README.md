@@ -68,7 +68,8 @@ The repository workflow `.github/workflows/ios-ci.yml` runs on GitHub's `macos-2
 3. selects the newest available iPhone simulator instead of hardcoding a device model;
 4. builds the app and runs XCTest without signing;
 5. packages the real `UwayFinance.app` simulator build as `UwayFinance-simulator.zip` and records its SHA-256;
-6. uploads both the interactive build and the `.xcresult`/build logs for 14 days.
+6. after XCTest passes, builds a clean unsigned `iphoneos` app and packages it as `UwayFinance-unsigned.ipa` for local signing only;
+7. uploads the simulator build, unsigned device build and `.xcresult`/build logs for 14 days.
 
 It runs for iOS or checked-in contract-snapshot changes and can also be started manually with `workflow_dispatch`. `ContractSnapshots/backend-api-v0.13.0.json` is the standalone frontend contract baseline; when the repository is located inside the full Uway workspace, the validator additionally cross-checks the local backend routes, capability factory, evidence immutability rules and Finance Domain schema constant. No Apple signing secret is required for this simulator job.
 
@@ -77,6 +78,14 @@ It runs for iOS or checked-in contract-snapshot changes and can also be started 
 After a successful `iOS CI` run, open its **Artifacts** section and download `UwayFinance-simulator-<run number>`. Extract that GitHub artifact once, then upload the inner `UwayFinance-simulator.zip` to an iOS browser-simulator provider such as Appetize. Do not unzip the inner archive: it contains the unsigned iOS Simulator `.app` expected by the provider. The build uses the same public HTTPS API configuration verified by CI and is the real SwiftUI client, not the web prototype.
 
 Use a dedicated test account, test account book and synthetic attachments on third-party cloud simulators. Browser simulators are suitable for navigation, API, state, accessibility and common photo-library flows, but physical camera, Face ID, HEIC/PDF import and device performance still require later Xcode Simulator or real-device validation.
+
+### Optional Windows real-device sideload
+
+This is a temporary internal-test route, not an Apple-supported distribution channel. After a successful `iOS CI` run, download `UwayFinance-device-unsigned-<run number>` from **Artifacts** and extract the GitHub wrapper once. The inner `UwayFinance-unsigned.ipa` is an unsigned real-device build; it cannot run until a local tool signs it for the connected iPhone.
+
+For Sideloadly, download only from `https://sideloadly.io/`, follow its Windows prerequisite for Apple's non-Microsoft-Store iTunes and iCloud packages, connect and trust the unlocked iPhone by USB, then drag `UwayFinance-unsigned.ipa` into Sideloadly. Use a dedicated test-only Apple ID, complete two-factor authentication, and enable **Settings > Privacy & Security > Developer Mode** plus the developer trust prompt if iOS asks. A free Apple ID signature normally lasts seven days and must be refreshed; Sideloadly states that app-specific passwords only work in a paid-developer configuration, so do not use a personal primary Apple ID for this experiment.
+
+Do not upload the IPA to online signing websites, do not store Apple credentials in this repository or GitHub Actions, and use only synthetic finance data until the TestFlight path is available. The CI artifact is intentionally unsigned and contains no provisioning profile, certificate or Apple credential.
 
 ## Current backend boundary
 
