@@ -55,7 +55,7 @@ final class BusinessRecordEvidenceCoverageStore: ObservableObject {
             loadState = .available
         } catch {
             guard loadGeneration == generation else { return }
-            records = []
+            records = [:]
             loadState = .failed(error.localizedDescription)
         }
     }
