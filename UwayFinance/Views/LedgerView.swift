@@ -28,11 +28,14 @@ private enum LedgerPeriod: String, CaseIterable, Identifiable {
 
 struct LedgerView: View {
     @EnvironmentObject private var session: AppSession
+    @EnvironmentObject private var evidenceCoverageStore: BusinessRecordEvidenceCoverageStore
+    @Environment(\.businessRecordEvidenceAPI) private var evidenceAPI
     @State private var filter: LedgerFilter = .all
     @State private var period: LedgerPeriod = .all
     @State private var query = ""
     @State private var searchVisible = false
     @State private var sheet: QuickSheet?
+    @State private var evidenceRoute: LedgerEvidenceRoute?
 
     private var filteredRecords: [BusinessRecord] {
         let calendar = Calendar(identifier: .gregorian)
@@ -53,7 +56,12 @@ struct LedgerView: View {
             case .all: true
             case .unsettled: record.settlementStatus == .unsettled
             case .materials:
-                record.invoiceStatus == .pending || record.contractStatus == .missing || record.supportingDocumentStatus == .pending
+                if let evidence = evidenceCoverageStore.coverage(for: record.id),
+                   evidence.requirementState != nil {
+                    evidence.isRequiredMissing
+                } else {
+                    record.invoiceStatus == .pending || record.contractStatus == .missing || record.supportingDocumentStatus == .pending
+                }
             case .unmatched: record.settlementStatus == .settled && record.bankReference == nil
             }
             let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -80,6 +88,34 @@ struct LedgerView: View {
         .background(AppTheme.pageBackground)
         .navigationBarHidden(true)
         .sheet(item: $sheet) { QuickSheetView(destination: $0) }
+        .sheet(item: $evidenceRoute) { route in
+            NavigationStack {
+                ScrollView {
+                    BusinessRecordEvidenceView(
+                        api: evidenceAPI,
+                        recordExternalId: route.recordID,
+                        maximumBytes: 10_000_000,
+                        autoPreviewFirstSupported: true
+                    )
+                    .padding()
+                }
+                .appScrollIndicatorsHidden()
+                .navigationTitle(route.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("关闭") { evidenceRoute = nil }
+                    }
+                }
+            }
+        }
+        .task(id: evidenceLoadTaskID) {
+            guard documentUploadAvailable else {
+                evidenceCoverageStore.clear()
+                return
+            }
+            await evidenceCoverageStore.load(userID: session.user?.id)
+        }
     }
 
     private var fixedControls: some View {
@@ -166,6 +202,12 @@ struct LedgerView: View {
     private var ledgerScroll: some View {
         ScrollView {
             LazyVStack(spacing: 14) {
+                if case .failed = evidenceCoverageStore.loadState {
+                    Label("材料覆盖状态读取失败，当前不显示“材料齐全”结论。", systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.warning)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 if filteredRecords.isEmpty {
                     ContentUnavailableView("没有符合条件的账目", systemImage: "doc.text.magnifyingglass")
                         .frame(minHeight: 300)
@@ -193,19 +235,39 @@ struct LedgerView: View {
                                     ForEach(day.records.indices, id: \.self) { index in
                                         let record = day.records[index]
                                         if index > 0 { Divider().padding(.leading, 56) }
-                                        NavigationLink {
-                                            RecordDetailView(route: RecordDeepLinkRoute(
-                                                recordID: record.id,
-                                                origin: .ledger,
-                                                canEdit: canEditRecords
-                                            ))
-                                        } label: {
-                                            RecordRow(record: record)
+                                        VStack(spacing: 0) {
+                                            NavigationLink {
+                                                RecordDetailView(route: RecordDeepLinkRoute(
+                                                    recordID: record.id,
+                                                    origin: .ledger,
+                                                    canEdit: canEditRecords
+                                                ))
+                                            } label: {
+                                                RecordRow(
+                                                    record: record,
+                                                    evidenceCoverage: evidenceCoverageStore.coverage(for: record.id)
+                                                )
                                                 .padding(.horizontal, 12)
                                                 .padding(.vertical, 10)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .accessibilityHint("打开经营事项详情")
+
+                                            if let coverage = evidenceCoverageStore.coverage(for: record.id),
+                                               coverage.activeEvidenceCount > 0 {
+                                                Button("查看附件（\(coverage.activeEvidenceCount)）", systemImage: "paperclip") {
+                                                    evidenceRoute = LedgerEvidenceRoute(
+                                                        recordID: record.id,
+                                                        title: record.counterparty.isEmpty ? "事项附件" : record.counterparty
+                                                    )
+                                                }
+                                                .font(.caption.weight(.medium))
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .padding(.horizontal, 12)
+                                                .padding(.bottom, 10)
+                                                .accessibilityHint("直接加载并预览有效附件")
+                                            }
                                         }
-                                        .buttonStyle(.plain)
-                                        .accessibilityHint("打开经营事项详情")
                                     }
                                 }
                                 .background(AppTheme.elevatedSurface, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
@@ -221,6 +283,26 @@ struct LedgerView: View {
             .padding()
         }
         .appScrollIndicatorsHidden()
-        .refreshable { try? await session.refresh() }
+        .refreshable {
+            try? await session.refresh()
+            if documentUploadAvailable {
+                await evidenceCoverageStore.load(userID: session.user?.id, force: true)
+            }
+        }
     }
+
+    private var documentUploadAvailable: Bool {
+        guard case .available(let contract) = session.serverState else { return false }
+        return contract.capabilities.documentUploadCapability.safeForClientUse
+    }
+
+    private var evidenceLoadTaskID: String {
+        "\(session.user?.id ?? "signed-out"):\(documentUploadAvailable)"
+    }
+}
+
+private struct LedgerEvidenceRoute: Identifiable {
+    let recordID: String
+    let title: String
+    var id: String { recordID }
 }

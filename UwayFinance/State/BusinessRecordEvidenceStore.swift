@@ -3,6 +3,13 @@ import Foundation
 
 @MainActor
 final class BusinessRecordEvidenceStore: ObservableObject {
+    enum CoverageLoadState: Equatable {
+        case idle
+        case loading
+        case available
+        case failed
+    }
+
     @Published private(set) var accountBook: FinanceAccountBookAccess?
     @Published private(set) var recordExternalId: String?
     @Published private(set) var items: [BusinessRecordEvidence] = []
@@ -11,6 +18,7 @@ final class BusinessRecordEvidenceStore: ObservableObject {
         invoiceEvidenceCount: 0,
         paymentEvidenceCount: 0
     )
+    @Published private(set) var coverageLoadState: CoverageLoadState = .idle
     @Published var includeRevoked = true
     @Published private(set) var selectedFile: SelectedEvidenceFile?
     @Published var selectedType: BusinessRecordEvidenceType = .invoice
@@ -202,14 +210,17 @@ final class BusinessRecordEvidenceStore: ObservableObject {
     private func reload(clearMessage: Bool) async {
         guard let accountBook, let recordExternalId else { return }
         if clearMessage { message = nil }
-        do {
-            async let listed = api.list(BusinessRecordEvidenceListQuery(
+        coverageLoadState = .loading
+        async let listed = capture { try await api.list(BusinessRecordEvidenceListQuery(
                 accountBookId: accountBook.id,
                 recordExternalId: recordExternalId,
                 includeRevoked: includeRevoked
-            ))
-            async let covered = api.coverage(accountBookId: accountBook.id)
-            let (listResponse, coverageResponse) = try await (listed, covered)
+            )) }
+        async let covered = capture { try await api.coverage(accountBookId: accountBook.id) }
+        let (listResult, coverageResult) = await (listed, covered)
+
+        switch listResult {
+        case .success(let listResponse):
             guard listResponse.items.allSatisfy({ $0.recordExternalId == recordExternalId }) else {
                 clearScopedState()
                 self.accountBook = accountBook
@@ -218,13 +229,26 @@ final class BusinessRecordEvidenceStore: ObservableObject {
                 return
             }
             items = listResponse.items
+        case .failure(let error):
+            message = error.localizedDescription
+        }
+
+        switch coverageResult {
+        case .success(let coverageResponse):
             coverage = coverageResponse.records[recordExternalId] ?? BusinessRecordEvidenceCoverage(
                 activeEvidenceCount: 0,
                 invoiceEvidenceCount: 0,
                 paymentEvidenceCount: 0
             )
-        } catch {
-            message = error.localizedDescription
+            coverageLoadState = .available
+        case .failure(let error):
+            coverage = BusinessRecordEvidenceCoverage(
+                activeEvidenceCount: 0,
+                invoiceEvidenceCount: 0,
+                paymentEvidenceCount: 0
+            )
+            coverageLoadState = .failed
+            message = "附件覆盖状态读取失败，当前不能判断材料是否齐全：\(error.localizedDescription)"
         }
     }
 
@@ -241,6 +265,11 @@ final class BusinessRecordEvidenceStore: ObservableObject {
         return error.localizedDescription
     }
 
+    private func capture<T>(_ operation: () async throws -> T) async -> Result<T, Error> {
+        do { return .success(try await operation()) }
+        catch { return .failure(error) }
+    }
+
     private func clearScopedState() {
         items = []
         coverage = BusinessRecordEvidenceCoverage(
@@ -248,6 +277,7 @@ final class BusinessRecordEvidenceStore: ObservableObject {
             invoiceEvidenceCount: 0,
             paymentEvidenceCount: 0
         )
+        coverageLoadState = .idle
         selectedFile = nil
         selectedType = .invoice
         uploadNote = ""

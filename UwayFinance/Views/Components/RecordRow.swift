@@ -2,6 +2,12 @@ import SwiftUI
 
 struct RecordRow: View {
     let record: BusinessRecord
+    var evidenceCoverage: BusinessRecordEvidenceCoverage?
+
+    init(record: BusinessRecord, evidenceCoverage: BusinessRecordEvidenceCoverage? = nil) {
+        self.record = record
+        self.evidenceCoverage = evidenceCoverage
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -26,7 +32,7 @@ struct RecordRow: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(record.direction == .income ? AppTheme.brand : .primary)
                     .monospacedDigit()
-                Text(record.statusLabel)
+                Text(record.statusLabel(evidenceCoverage: evidenceCoverage))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -36,11 +42,15 @@ struct RecordRow: View {
 }
 
 private extension BusinessRecord {
-    var statusLabel: String {
+    func statusLabel(evidenceCoverage: BusinessRecordEvidenceCoverage?) -> String {
         if settlementStatus == .unsettled { return direction == .income ? "待收款" : "待付款" }
+        if evidenceCoverage?.requirementState == .requiredMissing { return "缺材料" }
+        if evidenceCoverage?.requirementState == .satisfied || evidenceCoverage?.requirementState == .notRequired {
+            if financeStatus == .draft { return "待交记账" }
+            return "已处理"
+        }
         if invoiceStatus == .pending || contractStatus == .missing || supportingDocumentStatus == .pending { return "缺材料" }
         if financeStatus == .draft { return "待交代账" }
         return "已处理"
     }
 }
-

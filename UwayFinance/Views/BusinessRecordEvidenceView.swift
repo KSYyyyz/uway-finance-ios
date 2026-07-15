@@ -7,6 +7,7 @@ import UniformTypeIdentifiers
 struct BusinessRecordEvidenceView: View {
     @StateObject private var store: BusinessRecordEvidenceStore
     let recordExternalId: String
+    let autoPreviewFirstSupported: Bool
     @State private var showUpload = false
     @State private var revokeTarget: BusinessRecordEvidence?
     @State private var previewURL: URL?
@@ -15,10 +16,12 @@ struct BusinessRecordEvidenceView: View {
     init(
         api: any BusinessRecordEvidenceAPI,
         recordExternalId: String,
-        maximumBytes: Int
+        maximumBytes: Int,
+        autoPreviewFirstSupported: Bool = false
     ) {
         _store = StateObject(wrappedValue: BusinessRecordEvidenceStore(api: api, maximumBytes: maximumBytes))
         self.recordExternalId = recordExternalId
+        self.autoPreviewFirstSupported = autoPreviewFirstSupported
     }
 
     var body: some View {
@@ -29,7 +32,8 @@ struct BusinessRecordEvidenceView: View {
                     Text(coverageText).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if store.accountBook?.permissions.writeBusinessRecords == true {
+                if store.accountBook?.permissions.writeBusinessRecords == true,
+                   store.coverageLoadState != .available || store.coverage.allowsUpload {
                     Button("添加", systemImage: "paperclip") { showUpload = true }
                         .buttonStyle(.bordered)
                 }
@@ -40,6 +44,21 @@ struct BusinessRecordEvidenceView: View {
                 set: { value in Task { await store.setIncludeRevoked(value) } }
             ))
             .font(.subheadline)
+
+            if store.coverageLoadState == .available,
+               store.coverage.isRequiredMissing {
+                Label(
+                    "仍缺：\(store.coverage.missingRequiredTypes.map(\.label).joined(separator: "、"))",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption)
+                .foregroundStyle(AppTheme.warning)
+            } else if store.coverageLoadState == .available,
+                      store.coverage.requirementState == .notRequired {
+                Text("此事项无需补充材料；历史附件仍可查看和审计。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             if store.isLoading, store.items.isEmpty {
                 ProgressView("正在核对附件覆盖…")
@@ -66,7 +85,13 @@ struct BusinessRecordEvidenceView: View {
                 .foregroundStyle(.secondary)
         }
         .appCard()
-        .task(id: recordExternalId) { await store.restore(recordExternalId: recordExternalId) }
+        .task(id: recordExternalId) {
+            await store.restore(recordExternalId: recordExternalId)
+            if autoPreviewFirstSupported,
+               let evidence = store.items.first(where: { $0.status == .active && $0.supportsAutomaticPreview }) {
+                await openContent(evidence)
+            }
+        }
         .sheet(isPresented: $showUpload) {
             EvidenceUploadView(
                 store: store,
@@ -77,12 +102,23 @@ struct BusinessRecordEvidenceView: View {
             EvidenceRevokeView(store: store, evidence: evidence)
         }
         .quickLookPreview($previewURL)
+        .onChange(of: previewURL) { oldValue, newValue in
+            if newValue == nil, let oldValue { try? FileManager.default.removeItem(at: oldValue) }
+        }
         .sensoryFeedback(.success, trigger: store.successTrigger)
         .onDisappear { removePreviewFile() }
     }
 
     private var coverageText: String {
-        "有效 \(store.coverage.activeEvidenceCount) · 发票 \(store.coverage.invoiceEvidenceCount) · 付款凭证 \(store.coverage.paymentEvidenceCount)"
+        switch store.coverageLoadState {
+        case .idle, .loading:
+            return "正在读取材料覆盖状态"
+        case .failed:
+            return "覆盖状态未知，暂不能判断材料是否齐全"
+        case .available:
+            let coverage = store.coverage
+            return "\(coverage.requirementState?.label ?? "覆盖已读取") · 有效 \(coverage.activeEvidenceCount) · 图片 \(coverage.activeImageCount) · 发票 \(coverage.invoiceEvidenceCount) · 付款 \(coverage.paymentEvidenceCount) · 合同 \(coverage.contractEvidenceCount)"
+        }
     }
 
     private func evidenceRow(_ evidence: BusinessRecordEvidence) -> some View {
@@ -96,11 +132,13 @@ struct BusinessRecordEvidenceView: View {
                     .foregroundStyle(evidence.status == .active ? AppTheme.brand : .secondary)
             }
             Text(evidence.fileName).font(.subheadline).lineLimit(2)
-            HStack {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(ByteCountFormatter.string(fromByteCount: Int64(evidence.byteSize), countStyle: .file))
-                Text("版本 \(evidence.version)")
-                Text(String(evidence.sha256.prefix(10)))
+                Text("上传时间：\(evidence.createdAt)")
+                Text("上传者：\(evidence.uploadedByUserId)")
+                Text("SHA-256：\(evidence.sha256)")
                     .font(.caption.monospaced())
+                    .textSelection(.enabled)
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -111,7 +149,7 @@ struct BusinessRecordEvidenceView: View {
                 Text("作废原因：\(reason)").font(.caption).foregroundStyle(AppTheme.warning)
             }
             HStack {
-                Button("查看原件", systemImage: "doc.viewfinder") {
+                Button(evidence.supportsAutomaticPreview ? "预览原件" : "查看原件", systemImage: "doc.viewfinder") {
                     Task { await openContent(evidence) }
                 }
                 .disabled(loadingContentID != nil)

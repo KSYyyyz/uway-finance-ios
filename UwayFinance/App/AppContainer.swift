@@ -7,6 +7,7 @@ final class AppContainer: ObservableObject {
     let importAnalysisAPI: any ImportAnalysisAPI
     let documentAPI: any DocumentAPI
     let businessRecordEvidenceAPI: any BusinessRecordEvidenceAPI
+    let businessRecordEvidenceCoverageStore: BusinessRecordEvidenceCoverageStore
     let classificationReviewAPI: any ClassificationReviewAPI
     let classificationPreferenceAPI: any ClassificationPreferenceAPI
 
@@ -22,6 +23,7 @@ final class AppContainer: ObservableObject {
         self.importAnalysisAPI = importAnalysisAPI
         self.documentAPI = documentAPI
         self.businessRecordEvidenceAPI = businessRecordEvidenceAPI
+        self.businessRecordEvidenceCoverageStore = BusinessRecordEvidenceCoverageStore(api: businessRecordEvidenceAPI)
         self.classificationReviewAPI = classificationReviewAPI
         self.classificationPreferenceAPI = classificationPreferenceAPI
     }

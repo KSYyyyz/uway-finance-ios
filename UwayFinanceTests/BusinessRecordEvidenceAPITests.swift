@@ -50,6 +50,38 @@ final class BusinessRecordEvidenceAPITests: XCTestCase {
         XCTAssertEqual(query.first(where: { $0.name == "accountBookId" })?.value, "11")
     }
 
+    func testV014CoverageDecodesRequirementStatesAndExcludesRevokedFromActiveCounts() throws {
+        let list = try decode(
+            BusinessRecordEvidenceListResponse.self,
+            "business-record-evidence-list-v0.14.0"
+        )
+        let response = try decode(
+            BusinessRecordEvidenceCoverageResponse.self,
+            "business-record-evidence-coverage-v0.14.0"
+        )
+        let covered = try XCTUnwrap(response.records["R-EVIDENCE"])
+        XCTAssertEqual(list.items.count, 3)
+        XCTAssertEqual(list.items.filter { $0.status == .active }.count, covered.activeEvidenceCount)
+        XCTAssertEqual(covered.activeImageCount, 1)
+        XCTAssertEqual(covered.invoiceEvidenceCount, 1)
+        XCTAssertEqual(covered.contractEvidenceCount, 1)
+        XCTAssertEqual(covered.requirementState, .satisfied)
+        XCTAssertTrue(covered.missingRequiredTypes.isEmpty)
+        XCTAssertTrue(covered.allowsUpload)
+
+        let missing = try XCTUnwrap(response.records["R-MISSING"])
+        XCTAssertTrue(missing.isRequiredMissing)
+        XCTAssertEqual(missing.missingRequiredTypes, [.invoice, .supportingDocument])
+
+        let notRequired = try XCTUnwrap(response.records["R-NOT-REQUIRED"])
+        XCTAssertEqual(notRequired.requirementState, .notRequired)
+        XCTAssertFalse(notRequired.allowsUpload)
+        XCTAssertEqual(response.records["R-REVOKED-ONLY"]?.activeEvidenceCount, 0)
+
+        XCTAssertTrue(try XCTUnwrap(list.items.first).supportsAutomaticPreview)
+        XCTAssertFalse(try XCTUnwrap(list.items.last).supportsAutomaticPreview)
+    }
+
     func testUploadKeepsMetadataBeforeFileAndReusesIdenticalBodyAndKey() async throws {
         EvidenceURLProtocol.handler = fixtureResponse(named: "business-record-evidence-upload-v0.13.0", statusCode: 201)
         let operationID = try XCTUnwrap(UUID(uuidString: "00000000-0000-0000-0000-000000000130"))

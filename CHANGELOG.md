@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.0 - 2026-07-15
+
+- Target backend app `0.14.0`, API `20260715_010` and schema `20260715_006_semantic_preference_memory_v2` without rewriting any historical fixture. The delegated freeze supplied no mainline commit; the snapshot records that absence and full-workspace validation remains fail-closed while the root checkout is still v0.13.0.
+- Decode semantic preference-memory `learningState` (`shadow`, `provisional`, `active`) while keeping v0.12/v0.13 responses compatible and preserving `modelCanAccept=false` / `writesBusinessRecords=false`. Existing preference list/revoke UI is unchanged.
+- Decode active evidence/image/invoice/payment/contract counts, requirement state and missing required types. Revoked evidence never contributes to active counts.
+- Add one account-book-scoped coverage cache for ledger rows, clear it across user/account-book boundaries and discard stale conclusions on request failure. This avoids N+1 requests and never turns an unknown response into “材料齐全”.
+- Show `查看附件（N）` on ledger rows, directly preview verified JPEG/PNG/WebP/PDF, retain an original-view action for HEIC/HEIF, and display type, upload time, uploader and full SHA-256. Temporary preview files are removed on dismissal/exit.
+- Hide upload controls only for an authoritative `not_required` result while retaining attachment history; unify `required_missing` with the ledger material/risk state. Existing idempotency, 409 draft retention, account isolation, immutable bytes and AI non-writing boundaries remain unchanged.
+
 ## 0.13.0 - 2026-07-15
 
 - Align the native client with backend app `0.13.0`, API `20260715_009`, schema `20260715_005_immutable_record_evidence` and frozen mainline commit `7bd702c`, while retaining v0.12.0 and earlier fixtures unchanged.

@@ -51,6 +51,10 @@ struct BusinessRecordEvidence: Codable, Identifiable, Equatable, Sendable {
     let uploadedByUserId: String
     let revokedByUserId: String?
     let contentUrl: String
+
+    var supportsAutomaticPreview: Bool {
+        ["image/jpeg", "image/png", "image/webp", "application/pdf"].contains(mediaType.lowercased())
+    }
 }
 
 struct BusinessRecordEvidenceListQuery: Equatable, Sendable {
@@ -63,10 +67,74 @@ struct BusinessRecordEvidenceListResponse: Codable, Equatable, Sendable {
     let items: [BusinessRecordEvidence]
 }
 
+enum BusinessRecordEvidenceRequirementState: String, Codable, CaseIterable, Sendable {
+    case requiredMissing = "required_missing"
+    case satisfied
+    case notRequired = "not_required"
+
+    var label: String {
+        switch self {
+        case .requiredMissing: "材料不齐"
+        case .satisfied: "材料齐全"
+        case .notRequired: "无需材料"
+        }
+    }
+}
+
+enum BusinessRecordEvidenceMissingType: String, Codable, CaseIterable, Sendable {
+    case invoice
+    case contract
+    case supportingDocument = "supporting_document"
+
+    var label: String {
+        switch self {
+        case .invoice: "发票"
+        case .contract: "合同"
+        case .supportingDocument: "支持材料"
+        }
+    }
+}
+
 struct BusinessRecordEvidenceCoverage: Codable, Equatable, Sendable {
     let activeEvidenceCount: Int
+    let activeImageCount: Int
     let invoiceEvidenceCount: Int
     let paymentEvidenceCount: Int
+    let contractEvidenceCount: Int
+    let requirementState: BusinessRecordEvidenceRequirementState?
+    let missingRequiredTypes: [BusinessRecordEvidenceMissingType]
+
+    init(
+        activeEvidenceCount: Int,
+        activeImageCount: Int = 0,
+        invoiceEvidenceCount: Int,
+        paymentEvidenceCount: Int,
+        contractEvidenceCount: Int = 0,
+        requirementState: BusinessRecordEvidenceRequirementState? = nil,
+        missingRequiredTypes: [BusinessRecordEvidenceMissingType] = []
+    ) {
+        self.activeEvidenceCount = activeEvidenceCount
+        self.activeImageCount = activeImageCount
+        self.invoiceEvidenceCount = invoiceEvidenceCount
+        self.paymentEvidenceCount = paymentEvidenceCount
+        self.contractEvidenceCount = contractEvidenceCount
+        self.requirementState = requirementState
+        self.missingRequiredTypes = missingRequiredTypes
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        activeEvidenceCount = try values.decode(Int.self, forKey: .activeEvidenceCount)
+        activeImageCount = try values.decodeIfPresent(Int.self, forKey: .activeImageCount) ?? 0
+        invoiceEvidenceCount = try values.decode(Int.self, forKey: .invoiceEvidenceCount)
+        paymentEvidenceCount = try values.decode(Int.self, forKey: .paymentEvidenceCount)
+        contractEvidenceCount = try values.decodeIfPresent(Int.self, forKey: .contractEvidenceCount) ?? 0
+        requirementState = try values.decodeIfPresent(BusinessRecordEvidenceRequirementState.self, forKey: .requirementState)
+        missingRequiredTypes = try values.decodeIfPresent([BusinessRecordEvidenceMissingType].self, forKey: .missingRequiredTypes) ?? []
+    }
+
+    var allowsUpload: Bool { requirementState != .notRequired }
+    var isRequiredMissing: Bool { requirementState == .requiredMissing }
 }
 
 struct BusinessRecordEvidenceCoverageResponse: Codable, Equatable, Sendable {

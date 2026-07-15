@@ -9,6 +9,7 @@ struct UwayFinanceApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(container.session)
+                .environmentObject(container.businessRecordEvidenceCoverageStore)
                 .environment(\.importAnalysisAPI, container.importAnalysisAPI)
                 .environment(\.documentAPI, container.documentAPI)
                 .environment(\.businessRecordEvidenceAPI, container.businessRecordEvidenceAPI)

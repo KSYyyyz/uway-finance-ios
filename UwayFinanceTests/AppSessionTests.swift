@@ -12,9 +12,9 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
         guard case .available(let contract) = session.serverState else {
-            return XCTFail("0.13.0 server should be available")
+            return XCTFail("0.14.0 server should be available")
         }
-        XCTAssertEqual(contract.serverVersion, "0.13.0")
+        XCTAssertEqual(contract.serverVersion, "0.14.0")
         XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
         XCTAssertEqual(contract.capabilities.source, .server)
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
@@ -22,8 +22,9 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(contract.capabilities.classificationReview?.available, true)
         XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.safeForClientUse, true)
+        XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.learningState, .shadow)
         XCTAssertTrue(contract.capabilities.documentUploadCapability.safeForClientUse)
-        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.immutableRecordEvidenceSchema)
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.semanticPreferenceMemoryV2Schema)
         XCTAssertEqual(session.state.records.count, 1)
         XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-14T00:00:00.000Z"))
         let fetchStateCallCount = await api.fetchStateCallCount()
@@ -386,9 +387,9 @@ private actor FinanceAPISpy: FinanceAPI {
 
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
-        version: "0.13.0",
-        financeSchemaVersion: BackendContract.immutableRecordEvidenceSchema
-    ), capabilitiesFixtureName: String = "capabilities-immutable-evidence-v0.13.0",
+        version: "0.14.0",
+        financeSchemaVersion: BackendContract.semanticPreferenceMemoryV2Schema
+    ), capabilitiesFixtureName: String = "capabilities-semantic-preference-memory-v0.14.0",
        fetchEnvelopes: [StateEnvelope] = [StateEnvelope(
         data: makeSessionState(description: "待重试事项"),
         updatedAt: "2026-07-14T00:00:00.000Z"

@@ -176,6 +176,7 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(memory.concurrencyControl, "expectedVersion")
         XCTAssertFalse(memory.modelCanAccept)
         XCTAssertFalse(memory.writesBusinessRecords)
+        XCTAssertNil(memory.learningState)
         XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
         XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
         XCTAssertFalse(contract.capabilities.documentUploadCapability.safeForClientUse)
@@ -207,6 +208,31 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(evidence.deletion, false)
         XCTAssertEqual(evidence.accountBookScoped, true)
         XCTAssertEqual(evidence.idempotencyHeader, "Idempotency-Key")
+        XCTAssertNil(contract.capabilities.classificationPreferenceMemory?.learningState)
+        XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
+        XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
+    }
+
+    func testSemanticPreferenceMemoryV2NegotiatesLearningStateWithoutGrantingModelAuthority() throws {
+        let health = try JSONDecoder().decode(
+            HealthResponse.self,
+            from: fixture(named: "health-semantic-preference-memory-v0.14.0")
+        )
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-semantic-preference-memory-v0.14.0")
+        )
+        let contract = BackendContract(health: health, negotiated: response)
+
+        XCTAssertEqual(contract.serverVersion, "0.14.0")
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260715_010")
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.semanticPreferenceMemoryV2Schema)
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        let memory = try XCTUnwrap(contract.capabilities.classificationPreferenceMemory)
+        XCTAssertEqual(memory.learningState, .shadow)
+        XCTAssertTrue(memory.semanticV2SafeForClientUse)
+        XCTAssertFalse(memory.modelCanAccept)
+        XCTAssertFalse(memory.writesBusinessRecords)
         XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
         XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
     }

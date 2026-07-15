@@ -1,0 +1,40 @@
+{
+  "records": {
+    "R-EVIDENCE": {
+      "activeEvidenceCount": 2,
+      "activeImageCount": 1,
+      "invoiceEvidenceCount": 1,
+      "paymentEvidenceCount": 0,
+      "contractEvidenceCount": 1,
+      "requirementState": "satisfied",
+      "missingRequiredTypes": []
+    },
+    "R-MISSING": {
+      "activeEvidenceCount": 0,
+      "activeImageCount": 0,
+      "invoiceEvidenceCount": 0,
+      "paymentEvidenceCount": 0,
+      "contractEvidenceCount": 0,
+      "requirementState": "required_missing",
+      "missingRequiredTypes": ["invoice", "supporting_document"]
+    },
+    "R-NOT-REQUIRED": {
+      "activeEvidenceCount": 1,
+      "activeImageCount": 0,
+      "invoiceEvidenceCount": 0,
+      "paymentEvidenceCount": 1,
+      "contractEvidenceCount": 0,
+      "requirementState": "not_required",
+      "missingRequiredTypes": []
+    },
+    "R-REVOKED-ONLY": {
+      "activeEvidenceCount": 0,
+      "activeImageCount": 0,
+      "invoiceEvidenceCount": 0,
+      "paymentEvidenceCount": 0,
+      "contractEvidenceCount": 0,
+      "requirementState": "required_missing",
+      "missingRequiredTypes": ["contract"]
+    }
+  }
+}

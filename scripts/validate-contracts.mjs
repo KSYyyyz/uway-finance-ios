@@ -4,17 +4,17 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
-const expectedMarketingVersion = '0.13.0'
-const expectedBackendVersion = '0.13.0'
-const expectedAPIContractVersion = '20260715_009'
-const expectedFinanceSchemaVersion = '20260715_005_immutable_record_evidence'
-const expectedBackendBaselineCommit = '7bd702c'
+const expectedMarketingVersion = '0.14.0'
+const expectedBackendVersion = '0.14.0'
+const expectedAPIContractVersion = '20260715_010'
+const expectedFinanceSchemaVersion = '20260715_006_semantic_preference_memory_v2'
+const expectedBackendBaselineCommit = null
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
-const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.13.0.json')
+const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.14.0.json')
 
 const requiredFiles = [
   'project.yml',
-  'ContractSnapshots/backend-api-v0.13.0.json',
+  'ContractSnapshots/backend-api-v0.14.0.json',
   'UwayFinance/App/UwayFinanceApp.swift',
   'UwayFinance/Networking/APIEndpoint.swift',
   'UwayFinance/Networking/FinanceAPI.swift',
@@ -40,6 +40,7 @@ const requiredFiles = [
   'UwayFinance/State/ClassificationReviewStore.swift',
   'UwayFinance/State/ClassificationPreferenceStore.swift',
   'UwayFinance/State/BusinessRecordEvidenceStore.swift',
+  'UwayFinance/State/BusinessRecordEvidenceCoverageStore.swift',
   'UwayFinance/Views/RecordImportView.swift',
   'UwayFinance/Views/LedgerView.swift',
   'UwayFinance/Views/ClassificationReviewView.swift',
@@ -64,6 +65,7 @@ const requiredFiles = [
   'UwayFinanceTests/ClassificationPreferenceStoreTests.swift',
   'UwayFinanceTests/BusinessRecordEvidenceAPITests.swift',
   'UwayFinanceTests/BusinessRecordEvidenceStoreTests.swift',
+  'UwayFinanceTests/BusinessRecordEvidenceCoverageStoreTests.swift',
   'UwayFinanceTests/RecordDeepLinkTests.swift',
   'UwayFinanceTests/LegacyStateConditionalWriteAPITests.swift',
   'UwayFinanceTests/RecordImportPipelineTests.swift',
@@ -115,6 +117,10 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/business-record-evidence-version-conflict-v0.13.0.json',
   'UwayFinanceTests/Fixtures/business-record-evidence-forbidden-v0.13.0.json',
   'UwayFinanceTests/Fixtures/business-record-evidence-integrity-mismatch-v0.13.0.json',
+  'UwayFinanceTests/Fixtures/health-semantic-preference-memory-v0.14.0.json',
+  'UwayFinanceTests/Fixtures/capabilities-semantic-preference-memory-v0.14.0.json',
+  'UwayFinanceTests/Fixtures/business-record-evidence-list-v0.14.0.json',
+  'UwayFinanceTests/Fixtures/business-record-evidence-coverage-v0.14.0.json',
   'Docs/PERSONALIZATION_CONTRACT_REQUIREMENTS.md',
   'CHANGELOG.md',
 ]
@@ -187,6 +193,10 @@ const fixtures = [
   'business-record-evidence-version-conflict-v0.13.0.json',
   'business-record-evidence-forbidden-v0.13.0.json',
   'business-record-evidence-integrity-mismatch-v0.13.0.json',
+  'health-semantic-preference-memory-v0.14.0.json',
+  'capabilities-semantic-preference-memory-v0.14.0.json',
+  'business-record-evidence-list-v0.14.0.json',
+  'business-record-evidence-coverage-v0.14.0.json',
 ]
 for (const fixture of fixtures) {
   JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', fixture), 'utf8'))
@@ -302,7 +312,8 @@ if (preferenceMemorySnapshot?.available !== true
     || preferenceMemorySnapshot?.idempotencyHeader !== 'Idempotency-Key'
     || preferenceMemorySnapshot?.concurrencyControl !== 'expectedVersion'
     || preferenceMemorySnapshot?.modelCanAccept !== false
-    || preferenceMemorySnapshot?.writesBusinessRecords !== false) {
+    || preferenceMemorySnapshot?.writesBusinessRecords !== false
+    || !['shadow', 'provisional', 'active'].includes(preferenceMemorySnapshot?.learningState)) {
   throw new Error('classification preference-memory snapshot safety boundary mismatch')
 }
 const evidenceSnapshot = contractSnapshot.capabilities?.documentUpload
@@ -335,11 +346,11 @@ if (contractSnapshot.money?.legacyStateEncoding !== 'json_number'
   throw new Error('backend contract snapshot money boundary mismatch')
 }
 
-const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-immutable-evidence-v0.13.0.json'), 'utf8'))
-const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-immutable-evidence-v0.13.0.json'), 'utf8'))
+const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-semantic-preference-memory-v0.14.0.json'), 'utf8'))
+const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-semantic-preference-memory-v0.14.0.json'), 'utf8'))
 if (healthFixture.version !== expectedBackendVersion
     || healthFixture.financeSchemaVersion !== expectedFinanceSchemaVersion) {
-  throw new Error('immutable-evidence health fixture version/schema mismatch')
+  throw new Error('semantic preference-memory v2 health fixture version/schema mismatch')
 }
 if (capabilitiesFixture.version !== expectedBackendVersion
     || capabilitiesFixture.apiContractVersion !== expectedAPIContractVersion
@@ -368,7 +379,7 @@ if (capabilitiesFixture.sync?.financeResources?.available !== true
     || capabilitiesFixture.sync?.financeResources?.cutoverState !== 'shadow'
     || capabilitiesFixture.sync?.financeResources?.cutoverReadiness?.clientWritesEnabled !== false
     || capabilitiesFixture.sync?.financeResources?.businessRecords?.moneyEncoding !== 'decimal_string') {
-  throw new Error('current 0.13.0 capabilities fixture must preserve read-only readiness and the shadow resource slice')
+  throw new Error('current 0.14.0 capabilities fixture must preserve read-only readiness and the shadow resource slice')
 }
 const oldCapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.0.json'), 'utf8'))
 if ('cutoverReadiness' in (oldCapabilitiesFixture.sync?.financeResources ?? {})) {
@@ -460,6 +471,15 @@ if (historicalPreferenceHealthFixture.version !== '0.12.0'
     || 'listEndpoint' in (historicalPreferenceCapabilitiesFixture.features?.documentUpload ?? {})) {
   throw new Error('dedicated 0.12.0 backward-compat fixtures must remain historical and omit evidence endpoints')
 }
+const historicalEvidenceHealthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-immutable-evidence-v0.13.0.json'), 'utf8'))
+const historicalEvidenceCapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-immutable-evidence-v0.13.0.json'), 'utf8'))
+if (historicalEvidenceHealthFixture.version !== '0.13.0'
+    || historicalEvidenceCapabilitiesFixture.version !== '0.13.0'
+    || historicalEvidenceCapabilitiesFixture.apiContractVersion !== '20260715_009'
+    || historicalEvidenceCapabilitiesFixture.financeSchemaVersion !== '20260715_005_immutable_record_evidence'
+    || 'learningState' in (historicalEvidenceCapabilitiesFixture.features?.classificationPreferenceMemory ?? {})) {
+  throw new Error('dedicated 0.13.0 backward-compat fixtures must remain historical and omit semantic learning state')
+}
 const reviewCapability = capabilitiesFixture.features?.classificationReview
 if (reviewCapability?.available !== true
     || reviewCapability?.defaultPageSize !== 10
@@ -526,7 +546,8 @@ if (preferenceCapability?.available !== true
     || preferenceCapability?.idempotencyHeader !== 'Idempotency-Key'
     || preferenceCapability?.concurrencyControl !== 'expectedVersion'
     || preferenceCapability?.modelCanAccept !== false
-    || preferenceCapability?.writesBusinessRecords !== false) {
+    || preferenceCapability?.writesBusinessRecords !== false
+    || !['shadow', 'provisional', 'active'].includes(preferenceCapability?.learningState)) {
   throw new Error('classification preference-memory capability fixture is unsafe or incomplete')
 }
 const activePreferences = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'classification-preferences-active-v0.12.0.json'), 'utf8'))
@@ -585,6 +606,23 @@ if (evidenceListFixture.items?.[0]?.status !== 'active'
     || evidenceRevokeFixture.contentImmutable !== true
     || evidenceRevokeFixture.evidence?.status !== 'revoked') {
   throw new Error('evidence fixtures must preserve scope, immutable content and active/revoked lifecycle')
+}
+const currentEvidenceListFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'business-record-evidence-list-v0.14.0.json'), 'utf8'))
+const currentEvidenceCoverageFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'business-record-evidence-coverage-v0.14.0.json'), 'utf8'))
+const currentEvidence = currentEvidenceCoverageFixture.records?.['R-EVIDENCE']
+if (currentEvidenceListFixture.items?.filter((item) => item.status === 'active').length !== currentEvidence?.activeEvidenceCount
+    || currentEvidence?.activeImageCount !== 1
+    || currentEvidence?.invoiceEvidenceCount !== 1
+    || currentEvidence?.paymentEvidenceCount !== 0
+    || currentEvidence?.contractEvidenceCount !== 1
+    || currentEvidence?.requirementState !== 'satisfied'
+    || currentEvidence?.missingRequiredTypes?.length !== 0
+    || currentEvidenceCoverageFixture.records?.['R-MISSING']?.requirementState !== 'required_missing'
+    || currentEvidenceCoverageFixture.records?.['R-MISSING']?.missingRequiredTypes?.join(',') !== 'invoice,supporting_document'
+    || currentEvidenceCoverageFixture.records?.['R-NOT-REQUIRED']?.requirementState !== 'not_required'
+    || currentEvidenceCoverageFixture.records?.['R-REVOKED-ONLY']?.activeEvidenceCount !== 0
+    || currentEvidenceListFixture.items?.some((item) => typeof item.sha256 !== 'string' || item.sha256.length !== 64)) {
+  throw new Error('v0.14 evidence coverage must count active items only and preserve requirement semantics')
 }
 for (const [name, code] of [
   ['business-record-evidence-version-conflict-v0.13.0.json', 'EVIDENCE_VERSION_CONFLICT'],
@@ -714,7 +752,7 @@ for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amo
 }
 
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
-for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', '"accepted", "review", "rejected"']) {
+for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningState', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
 }
 for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
@@ -795,7 +833,7 @@ for (const marker of ['账套级分类记忆', '每页最多 10 条', '撤销这
   if (!preferenceView.includes(marker)) throw new Error(`classification preference UI marker missing: ${marker}`)
 }
 const evidenceModels = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BusinessRecordEvidenceModels.swift'), 'utf8')
-for (const marker of ['BusinessRecordEvidenceType', 'payment_proof', 'BusinessRecordEvidenceStatus', 'case active', 'case revoked', 'sha256', 'BusinessRecordEvidenceUploadCommand', 'BusinessRecordEvidenceRevokeCommand', 'expectedVersion', 'IdempotencyKey']) {
+for (const marker of ['BusinessRecordEvidenceType', 'payment_proof', 'BusinessRecordEvidenceStatus', 'case active', 'case revoked', 'sha256', 'activeImageCount', 'contractEvidenceCount', 'required_missing', 'not_required', 'supporting_document', 'BusinessRecordEvidenceUploadCommand', 'BusinessRecordEvidenceRevokeCommand', 'expectedVersion', 'IdempotencyKey']) {
   if (!evidenceModels.includes(marker)) throw new Error(`business record evidence model marker missing: ${marker}`)
 }
 const evidenceAPI = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'BusinessRecordEvidenceAPI.swift'), 'utf8')
@@ -803,12 +841,16 @@ for (const marker of ['protocol BusinessRecordEvidenceAPI', 'multipart/form-data
   if (!evidenceAPI.includes(marker)) throw new Error(`business record evidence API marker missing: ${marker}`)
 }
 const evidenceStore = fs.readFileSync(path.join(root, 'UwayFinance', 'State', 'BusinessRecordEvidenceStore.swift'), 'utf8')
-for (const marker of ['api.context', 'pendingUpload', 'pendingRevokes', 'EVIDENCE_VERSION_CONFLICT', '同一幂等请求', 'clearScopedState', 'contentDeleted == false', 'contentImmutable']) {
+for (const marker of ['api.context', 'pendingUpload', 'pendingRevokes', 'EVIDENCE_VERSION_CONFLICT', '同一幂等请求', 'clearScopedState', 'coverageLoadState', '不能判断材料是否齐全', 'contentDeleted == false', 'contentImmutable']) {
   if (!evidenceStore.includes(marker)) throw new Error(`business record evidence isolation/retry marker missing: ${marker}`)
 }
 const evidenceView = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'BusinessRecordEvidenceView.swift'), 'utf8')
-for (const marker of ['PhotosPicker', '.fileImporter(', '.quickLookPreview(', '票据与附件', '标记作废', '存在附件不代表自动记账', 'appScrollIndicatorsHidden']) {
+for (const marker of ['PhotosPicker', '.fileImporter(', '.quickLookPreview(', 'autoPreviewFirstSupported', 'supportsAutomaticPreview', '上传时间', '上传者', 'SHA-256', '无需补充材料', '票据与附件', '标记作废', '存在附件不代表自动记账', 'appScrollIndicatorsHidden']) {
   if (!evidenceView.includes(marker)) throw new Error(`business record evidence native UI marker missing: ${marker}`)
+}
+const evidenceCoverageStore = fs.readFileSync(path.join(root, 'UwayFinance', 'State', 'BusinessRecordEvidenceCoverageStore.swift'), 'utf8')
+for (const marker of ['api.coverage(accountBookId: incomingBook.id)', 'records = [:]', 'userScopeID', 'loadGeneration', 'case failed']) {
+  if (!evidenceCoverageStore.includes(marker)) throw new Error(`account-book evidence coverage cache marker missing: ${marker}`)
 }
 const httpTransport = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'HTTPTransport.swift'), 'utf8')
 for (const marker of ['case versionConflict', 'case stateVersionConflict', 'STATE_VERSION_CONFLICT', 'currentUpdatedAt', 'headers: [String: String]']) {
@@ -846,10 +888,11 @@ const apiContractDocumentPath = path.join(workspace, 'API-V2-CONTRACT.md')
 const mainPackagePath = path.join(workspace, 'package.json')
 const hasMainPackage = fs.existsSync(mainPackagePath)
 const hasMainContractDocument = fs.existsSync(apiContractDocumentPath)
-if (hasMainPackage !== hasMainContractDocument) {
+const validateMainline = process.env.UWAY_STANDALONE_CONTRACT !== '1'
+if (validateMainline && hasMainPackage !== hasMainContractDocument) {
   throw new Error('mainline package.json and API-V2-CONTRACT.md must be validated together')
 }
-if (hasMainPackage && hasMainContractDocument) {
+if (validateMainline && hasMainPackage && hasMainContractDocument) {
   const mainPackage = JSON.parse(fs.readFileSync(mainPackagePath, 'utf8'))
   if (mainPackage.version !== expectedBackendVersion) {
     throw new Error(`mainline package.json version ${mainPackage.version} does not match frozen backend ${expectedBackendVersion}`)
@@ -866,7 +909,7 @@ if (hasMainPackage && hasMainContractDocument) {
     }
   }
 }
-const hasLocalBackend = process.env.UWAY_SKIP_LOCAL_BACKEND !== '1'
+const hasLocalBackend = validateMainline && process.env.UWAY_SKIP_LOCAL_BACKEND !== '1'
   && [serverPath, healthPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, classificationReviewPath, classificationAnalysisPath, classificationPreferencesPath, businessRecordEvidencePath, apiContractDocumentPath].every(fs.existsSync)
 if (hasLocalBackend) {
   const server = fs.readFileSync(serverPath, 'utf8')
@@ -1012,6 +1055,9 @@ if (hasLocalBackend) {
 const ledger = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'LedgerView.swift'), 'utf8')
 if (!ledger.includes('fixedControls') || !ledger.includes('ledgerScroll')) throw new Error('ledger fixed/scroll boundary missing')
 if (ledger.includes('pinnedViews:')) throw new Error('month headings must not be sticky')
+for (const marker of ['查看附件（', 'evidenceCoverageStore.coverage(for:', 'autoPreviewFirstSupported: true', '当前不显示“材料齐全”结论']) {
+  if (!ledger.includes(marker)) throw new Error(`ledger evidence integration marker missing: ${marker}`)
+}
 
 const workflow = fs.readFileSync(workflowPath, 'utf8')
 for (const marker of [

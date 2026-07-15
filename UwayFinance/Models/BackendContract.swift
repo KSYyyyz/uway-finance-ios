@@ -49,6 +49,20 @@ struct ClassificationReviewCapability: Codable, Equatable, Sendable {
     let rawBusinessRecordsChanged: Bool
 }
 
+enum ClassificationPreferenceLearningState: String, Codable, CaseIterable, Sendable {
+    case shadow
+    case provisional
+    case active
+
+    var label: String {
+        switch self {
+        case .shadow: "影子学习"
+        case .provisional: "暂行学习"
+        case .active: "已生效"
+        }
+    }
+}
+
 struct ClassificationPreferenceMemoryCapability: Codable, Equatable, Sendable {
     let available: Bool
     let listEndpoint: String
@@ -64,6 +78,7 @@ struct ClassificationPreferenceMemoryCapability: Codable, Equatable, Sendable {
     let concurrencyControl: String
     let modelCanAccept: Bool
     let writesBusinessRecords: Bool
+    let learningState: ClassificationPreferenceLearningState?
 
     var safeForClientUse: Bool {
         available
@@ -82,7 +97,13 @@ struct ClassificationPreferenceMemoryCapability: Codable, Equatable, Sendable {
             && writesBusinessRecords == false
     }
 
-    var statusDisplay: String { safeForClientUse ? "账套级安全可用" : "未开放" }
+    var semanticV2SafeForClientUse: Bool { safeForClientUse && learningState != nil }
+
+    var statusDisplay: String {
+        guard safeForClientUse else { return "未开放" }
+        guard let learningState else { return "账套级安全可用（兼容模式）" }
+        return "账套级安全可用 · \(learningState.label)"
+    }
 }
 
 struct DocumentUploadCapability: Codable, Equatable, Sendable {
@@ -390,17 +411,19 @@ struct ServerCapabilities: Equatable, Sendable {
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260715_009"
+    static let apiContractVersion = "20260715_010"
     static let financeDomainV2Schema = "20260714_002_finance_resource_api"
     static let classificationReviewSchema = "20260714_003_classification_review"
     static let classificationPreferenceMemorySchema = "20260715_004_account_book_preference_memory"
     static let immutableRecordEvidenceSchema = "20260715_005_immutable_record_evidence"
+    static let semanticPreferenceMemoryV2Schema = "20260715_006_semantic_preference_memory_v2"
 
     static func isFinanceDomainV2Schema(_ value: String?) -> Bool {
         value == financeDomainV2Schema
             || value == classificationReviewSchema
             || value == classificationPreferenceMemorySchema
             || value == immutableRecordEvidenceSchema
+            || value == semanticPreferenceMemoryV2Schema
     }
 
     let serverVersion: String

@@ -195,6 +195,23 @@ final class BusinessRecordEvidenceStoreTests: XCTestCase {
         XCTAssertTrue(store.message?.contains("其他事项") == true)
     }
 
+    func testCoverageFailureKeepsHistoryButNeverReportsZeroAsAvailable() async throws {
+        let list = try decode(BusinessRecordEvidenceListResponse.self, "business-record-evidence-list-v0.14.0")
+        let api = BusinessRecordEvidenceAPISpy(
+            contexts: [.success(context(bookID: "11"))],
+            lists: [.success(list)],
+            coverages: [.failure(.transport("offline"))]
+        )
+        let store = BusinessRecordEvidenceStore(api: api)
+
+        await store.restore(recordExternalId: "R-EVIDENCE")
+
+        XCTAssertEqual(store.items.count, 3)
+        XCTAssertEqual(store.coverageLoadState, .failed)
+        XCTAssertNil(store.coverage.requirementState)
+        XCTAssertTrue(store.message?.contains("不能判断材料是否齐全") == true)
+    }
+
     private func context(bookID: String) -> FinanceContextResponse {
         let book = FinanceAccountBookAccess(
             id: bookID,
