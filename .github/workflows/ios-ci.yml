@@ -106,6 +106,16 @@ jobs:
           test -n "$HOST"
           echo "Verified API configuration: $SCHEME://$HOST"
 
+      - name: Package interactive simulator build
+        run: |
+          set -euo pipefail
+          APP_PATH="$(find DerivedData/Build/Products/Debug-iphonesimulator -maxdepth 2 -type d -name 'UwayFinance.app' -print -quit)"
+          test -n "$APP_PATH"
+          mkdir -p SimulatorBuild
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" SimulatorBuild/UwayFinance-simulator.zip
+          shasum -a 256 SimulatorBuild/UwayFinance-simulator.zip > SimulatorBuild/UwayFinance-simulator.zip.sha256
+          test -s SimulatorBuild/UwayFinance-simulator.zip
+
       - name: Run XCTest
         env:
           NSUnbufferedIO: "YES"
@@ -129,4 +139,12 @@ jobs:
           name: ios-test-results-${{ github.run_number }}
           path: TestResults
           if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload interactive simulator build
+        uses: actions/upload-artifact@v7
+        with:
+          name: UwayFinance-simulator-${{ github.run_number }}
+          path: SimulatorBuild
+          if-no-files-found: error
           retention-days: 14

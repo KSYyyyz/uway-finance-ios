@@ -67,9 +67,16 @@ The repository workflow `.github/workflows/ios-ci.yml` runs on GitHub's `macos-2
 2. installs XcodeGen and generates `UwayFinance.xcodeproj`;
 3. selects the newest available iPhone simulator instead of hardcoding a device model;
 4. builds the app and runs XCTest without signing;
-5. uploads the `.xcresult` bundle and build log for 14 days.
+5. packages the real `UwayFinance.app` simulator build as `UwayFinance-simulator.zip` and records its SHA-256;
+6. uploads both the interactive build and the `.xcresult`/build logs for 14 days.
 
 It runs for iOS or checked-in contract-snapshot changes and can also be started manually with `workflow_dispatch`. `ContractSnapshots/backend-api-v0.13.0.json` is the standalone frontend contract baseline; when the repository is located inside the full Uway workspace, the validator additionally cross-checks the local backend routes, capability factory, evidence immutability rules and Finance Domain schema constant. No Apple signing secret is required for this simulator job.
+
+### Interact from Windows without Apple Developer membership
+
+After a successful `iOS CI` run, open its **Artifacts** section and download `UwayFinance-simulator-<run number>`. Extract that GitHub artifact once, then upload the inner `UwayFinance-simulator.zip` to an iOS browser-simulator provider such as Appetize. Do not unzip the inner archive: it contains the unsigned iOS Simulator `.app` expected by the provider. The build uses the same public HTTPS API configuration verified by CI and is the real SwiftUI client, not the web prototype.
+
+Use a dedicated test account, test account book and synthetic attachments on third-party cloud simulators. Browser simulators are suitable for navigation, API, state, accessibility and common photo-library flows, but physical camera, Face ID, HEIC/PDF import and device performance still require later Xcode Simulator or real-device validation.
 
 ## Current backend boundary
 

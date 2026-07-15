@@ -1020,9 +1020,13 @@ for (const marker of [
   'xcodegen generate --spec project.yml',
   'build-for-testing',
   'Verify built API configuration',
+  'Package interactive simulator build',
+  'UwayFinance-simulator.zip',
+  'shasum -a 256',
   'test-without-building',
   'CODE_SIGNING_ALLOWED=NO',
   'uses: actions/upload-artifact@v7',
+  'Upload interactive simulator build',
 ]) {
   if (!workflow.includes(marker)) throw new Error(`iOS CI marker missing: ${marker}`)
 }
