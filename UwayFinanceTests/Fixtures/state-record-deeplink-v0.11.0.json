@@ -1,0 +1,26 @@
+{
+  "data": {
+    "records": [
+      {
+        "id": "102",
+        "date": "2026-07-02",
+        "direction": "expense",
+        "amount": 1170.00,
+        "category": "软件服务",
+        "counterparty": "OpenAI",
+        "project": "Uway",
+        "account": "公司银行",
+        "settlementStatus": "settled",
+        "invoiceStatus": "pending",
+        "financeStatus": "draft",
+        "contractStatus": "not_required",
+        "description": "Codex 续费开通",
+        "supportingDocumentStatus": "pending"
+      }
+    ],
+    "bankTransactions": [],
+    "completedLessons": [],
+    "completedClose": []
+  },
+  "updatedAt": "2026-07-15T00:00:00.000Z"
+}

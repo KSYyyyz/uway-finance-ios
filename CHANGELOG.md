@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Hide visual scroll indicators across every SwiftUI scrolling container without changing pull-to-refresh, keyboard focus or accessibility scrolling.
+- Deep-link workbench risk, pending and classification-review records to the matching ledger detail/edit flow by stable `recordId`; preserve filters and review drafts, and distinguish missing, forbidden and deleted states.
+- Document the field inventory needed for a future personalization-learning contract without adding speculative API models or endpoints.
+
 ## 0.11.0 - 2026-07-14
 
 - Align the current health, capabilities and contract snapshot with the formally frozen backend app version 0.11.0 while retaining dedicated 0.10.2 compatibility fixtures and tests.

@@ -17,6 +17,11 @@ struct WorkbenchView: View {
         return session.state.records.filter { $0.date.hasPrefix(month) }
     }
 
+    private var canEditRecords: Bool {
+        guard case .available(let contract) = session.serverState else { return false }
+        return contract.capabilities.legacyState.writable
+    }
+
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
@@ -32,6 +37,7 @@ struct WorkbenchView: View {
             }
             .padding()
         }
+        .appScrollIndicatorsHidden()
         .background(AppTheme.pageBackground)
         .refreshable {
             try? await session.refresh()
@@ -106,15 +112,26 @@ struct WorkbenchView: View {
                     .foregroundStyle(AppTheme.brand)
             } else {
                 ForEach(items.prefix(3)) { item in
-                    HStack(spacing: 10) {
-                        Image(systemName: item.severity == .high ? "exclamationmark.circle.fill" : "clock.fill")
-                            .foregroundStyle(item.severity == .high ? AppTheme.danger : AppTheme.warning)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.title).font(.subheadline.weight(.semibold))
-                            Text(item.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    NavigationLink {
+                        RecordDetailView(route: RecordDeepLinkRoute(
+                            recordID: item.recordId,
+                            origin: .workbench,
+                            canEdit: canEditRecords
+                        ))
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: item.severity == .high ? "exclamationmark.circle.fill" : "clock.fill")
+                                .foregroundStyle(item.severity == .high ? AppTheme.danger : AppTheme.warning)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title).font(.subheadline.weight(.semibold))
+                                Text(item.detail).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(.tertiary)
                         }
-                        Spacer()
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("直接打开对应经营事项")
                 }
             }
         }
@@ -131,8 +148,17 @@ struct WorkbenchView: View {
                     .frame(minHeight: 170)
             } else {
                 ForEach(session.state.records.sorted { $0.date > $1.date }.prefix(4)) { record in
-                    RecordRow(record: record)
-                        .padding(.vertical, 10)
+                    NavigationLink {
+                        RecordDetailView(route: RecordDeepLinkRoute(
+                            recordID: record.id,
+                            origin: .workbench,
+                            canEdit: canEditRecords
+                        ))
+                    } label: {
+                        RecordRow(record: record)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.plain)
                     if record.id != session.state.records.sorted(by: { $0.date > $1.date }).prefix(4).last?.id {
                         Divider()
                     }

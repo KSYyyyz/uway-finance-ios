@@ -19,6 +19,11 @@ enum MotionToken {
     static let enter = Animation.smooth(duration: 0.34)
 }
 
+enum AppScrollPolicy {
+    /// Scroll remains fully interactive and accessible; only the visual rail is removed.
+    static let hidesIndicators = true
+}
+
 extension View {
     func appCard(padding: CGFloat = 16) -> some View {
         self
@@ -29,5 +34,8 @@ extension View {
                     .stroke(AppTheme.separator.opacity(0.55), lineWidth: 0.5)
             }
     }
-}
 
+    func appScrollIndicatorsHidden() -> some View {
+        scrollIndicators(.hidden)
+    }
+}

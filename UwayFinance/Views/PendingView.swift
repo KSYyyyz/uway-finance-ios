@@ -18,6 +18,8 @@ struct PendingView: View {
     @Environment(\.classificationReviewAPI) private var classificationReviewAPI
     @State private var filter: PendingFilter = .all
     @State private var resolvedTrigger = 0
+    @State private var recordRoute: RecordDeepLinkRoute?
+    @State private var deepLinkFailure: RecordDeepLinkFailure?
 
     private var allItems: [PendingItem] { session.state.records.pendingItems }
     private var visibleItems: [PendingItem] {
@@ -42,6 +44,8 @@ struct PendingView: View {
                 } else {
                     ForEach(visibleItems) { item in
                         PendingRow(item: item) {
+                            openRecord(item)
+                        } resolve: {
                             withAnimation(MotionToken.normal) { session.resolve(item) }
                             resolvedTrigger += 1
                         }
@@ -51,13 +55,42 @@ struct PendingView: View {
                     }
                 }
             }
+            .appScrollIndicatorsHidden()
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .refreshable { try? await session.refresh() }
         }
         .background(AppTheme.pageBackground)
         .navigationBarHidden(true)
+        .navigationDestination(item: $recordRoute) { route in
+            RecordDetailView(route: route)
+        }
+        .alert(item: $deepLinkFailure) { failure in
+            Alert(
+                title: Text(failure.title),
+                message: Text(failure.message),
+                dismissButton: .default(Text("知道了"))
+            )
+        }
         .sensoryFeedback(.success, trigger: resolvedTrigger)
+    }
+
+    private func openRecord(_ item: PendingItem) {
+        let canEdit: Bool = {
+            guard case .available(let contract) = session.serverState else { return false }
+            return contract.capabilities.legacyState.writable
+        }()
+        let resolution = RecordDeepLinkResolver.resolve(
+            recordID: item.recordId,
+            availableRecordIDs: Set(session.state.records.map(\.id)),
+            canRead: true,
+            canEdit: canEdit,
+            origin: .pending(filter: filter.rawValue)
+        )
+        switch resolution {
+        case .destination(let route): recordRoute = route
+        case .failure(let failure): deepLinkFailure = failure
+        }
     }
 
     private var fixedSummary: some View {
@@ -118,6 +151,7 @@ struct PendingView: View {
 
 private struct PendingRow: View {
     let item: PendingItem
+    let openRecord: () -> Void
     let resolve: () -> Void
 
     var body: some View {
@@ -133,6 +167,16 @@ private struct PendingRow: View {
                     Text(item.detail).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button {
+                    openRecord()
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(.secondary)
+                        .padding(8)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("查看对应经营事项")
+                .accessibilityHint("保留当前筛选条件并打开账目详情")
             }
             Text(item.action)
                 .font(.footnote)

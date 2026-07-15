@@ -28,6 +28,7 @@ const requiredFiles = [
   'UwayFinance/Models/CutoverReadinessModels.swift',
   'UwayFinance/Models/DashboardMetricsModels.swift',
   'UwayFinance/Models/ClassificationReviewModels.swift',
+  'UwayFinance/Models/RecordDeepLink.swift',
   'UwayFinance/Models/MoneyAmount.swift',
   'UwayFinance/Models/RecordImportPipeline.swift',
   'UwayFinance/State/RecordImportSession.swift',
@@ -35,6 +36,7 @@ const requiredFiles = [
   'UwayFinance/Views/RecordImportView.swift',
   'UwayFinance/Views/LedgerView.swift',
   'UwayFinance/Views/ClassificationReviewView.swift',
+  'UwayFinance/Views/RecordDetailView.swift',
   'UwayFinance/Resources/Info.plist',
   'UwayFinance/Resources/Assets.xcassets/Contents.json',
   'UwayFinance/Resources/Assets.xcassets/AccentColor.colorset/Contents.json',
@@ -49,6 +51,7 @@ const requiredFiles = [
   'UwayFinanceTests/DashboardMetricsAPITests.swift',
   'UwayFinanceTests/ClassificationReviewAPITests.swift',
   'UwayFinanceTests/ClassificationReviewStoreTests.swift',
+  'UwayFinanceTests/RecordDeepLinkTests.swift',
   'UwayFinanceTests/LegacyStateConditionalWriteAPITests.swift',
   'UwayFinanceTests/RecordImportPipelineTests.swift',
   'UwayFinanceTests/Fixtures/harness-result.json',
@@ -81,6 +84,8 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/state-empty-v0.11.0.json',
   'UwayFinanceTests/Fixtures/state-save-v0.11.0.json',
   'UwayFinanceTests/Fixtures/state-version-conflict-v0.11.0.json',
+  'UwayFinanceTests/Fixtures/state-record-deeplink-v0.11.0.json',
+  'Docs/PERSONALIZATION_CONTRACT_REQUIREMENTS.md',
   'CHANGELOG.md',
 ]
 
@@ -134,9 +139,34 @@ const fixtures = [
   'state-empty-v0.11.0.json',
   'state-save-v0.11.0.json',
   'state-version-conflict-v0.11.0.json',
+  'state-record-deeplink-v0.11.0.json',
 ]
 for (const fixture of fixtures) {
   JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', fixture), 'utf8'))
+}
+
+const deepLinkStateFixture = JSON.parse(fs.readFileSync(
+  path.join(root, 'UwayFinanceTests', 'Fixtures', 'state-record-deeplink-v0.11.0.json'),
+  'utf8',
+))
+if (!deepLinkStateFixture.data?.records?.some((record) => record.id === '102')) {
+  throw new Error('record deep-link fixture must match the current classification-review recordId')
+}
+
+const viewDirectory = path.join(root, 'UwayFinance', 'Views')
+const listSwiftFiles = (directory) => fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+  const itemPath = path.join(directory, entry.name)
+  if (entry.isDirectory()) return listSwiftFiles(itemPath)
+  return entry.isFile() && entry.name.endsWith('.swift') ? [itemPath] : []
+})
+const viewFiles = listSwiftFiles(viewDirectory)
+for (const file of viewFiles) {
+  const source = fs.readFileSync(file, 'utf8')
+  const scrollContainerCount = (source.match(/\b(?:ScrollView|List|Form)\s*\{|\bTextEditor\s*\(|\bTextField\([^\n]*axis:\s*\.vertical/g) ?? []).length
+  const hiddenIndicatorCount = (source.match(/\.appScrollIndicatorsHidden\(\)/g) ?? []).length
+  if (scrollContainerCount !== hiddenIndicatorCount) {
+    throw new Error(`every scrolling container must hide only its visual indicator: ${path.relative(root, file)}`)
+  }
 }
 
 const decisionResponse = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'import-decision-response.json'), 'utf8'))

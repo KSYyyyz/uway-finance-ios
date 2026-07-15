@@ -79,8 +79,8 @@ struct MonthCloseView: View {
             }
             .padding()
         }
+        .appScrollIndicatorsHidden()
         .background(AppTheme.pageBackground)
         .navigationBarHidden(true)
     }
 }
-

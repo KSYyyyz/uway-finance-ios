@@ -31,6 +31,7 @@ struct RecordImportView: View {
                 }
                 .padding()
             }
+            .appScrollIndicatorsHidden()
             .background(AppTheme.pageBackground)
             .navigationTitle("导入流水")
             .navigationBarTitleDisplayMode(.inline)
@@ -355,7 +356,9 @@ private struct ImportReviewDecisionView: View {
                         .foregroundStyle(choice == .accept ? AppTheme.brand : AppTheme.danger)
                 }
                 Section("审计理由") {
-                    TextEditor(text: $reason).frame(minHeight: 110)
+                    TextEditor(text: $reason)
+                        .appScrollIndicatorsHidden()
+                        .frame(minHeight: 110)
                     Text("理由会由后端连同当前登录审核人写入审计记录。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -364,6 +367,7 @@ private struct ImportReviewDecisionView: View {
                     Section { Text(errorMessage).foregroundStyle(AppTheme.danger) }
                 }
             }
+            .appScrollIndicatorsHidden()
             .navigationTitle("人工复核")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

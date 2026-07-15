@@ -23,6 +23,7 @@ Current marketing version: `0.11.0`, compatible with backend app `0.11.0`, API c
 - “记一笔” `Form`, workbench cash summary, recent activity and a Swift Charts cash forecast.
 - Ledger fixed region: page brief, date filter, status filter and period totals stay fixed; only year/month/day ledger content scrolls. Month headings are not sticky.
 - Pending summary stays fixed while the task list scrolls; resolving a task changes the underlying record and updates every count.
+- All native scrolling containers keep scrolling, pull-to-refresh, VoiceOver actions and input focus while hiding visual scroll indicators. Risk and classification-review rows can deep-link by `recordId` to the matching local ledger detail/edit screen without resetting the source filter or review draft; missing, forbidden and subsequently deleted records fail with explicit messages.
 - Native CSV import flow with UTF-8/GB18030 parsing, duplicate and company-ownership gates, live AI Harness analysis, authenticated human review, provenance fields and one-batch state sync. Reviewer identity always comes from the authenticated server session.
 - Explicit `DocumentAPI` boundary for attachment upload and OCR jobs.
 
@@ -71,3 +72,5 @@ It runs for iOS or checked-in contract-snapshot changes and can also be started 
 ## Current backend boundary
 
 The backend still publishes only `legacy_state_v1` in `preferredMode` and `availableModes`; production state synchronization and `AppSession` continue through conditionally protected `/api/state`. `/api/live` reports process liveness, while `/api/ready` and compatibility `/api/health` require database and migration readiness. Classification review is a separate governed workflow: `modelCanAccept=false`, `writesBusinessRecords=false`, manual decisions use `confirm/correct/reject`, and raw operating facts remain unchanged. AI analysis is sent only when `features.aiClassification.available=true` and its closed-set safety fields match; otherwise the workbench remains manual. Attachment and OCR remain unavailable. Import analysis is operational only when `features.importAnalysis.available` is true.
+
+The proposed field inventory for the not-yet-frozen personalization-learning contract is documented in `Docs/PERSONALIZATION_CONTRACT_REQUIREMENTS.md`. It is intentionally documentation-only: no speculative DTO, endpoint or capability probe is present in the app.

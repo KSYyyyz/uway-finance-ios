@@ -4,6 +4,8 @@ import SwiftUI
 struct ClassificationReviewView: View {
     @EnvironmentObject private var session: AppSession
     @StateObject private var store: ClassificationReviewStore
+    @State private var recordRoute: RecordDeepLinkRoute?
+    @State private var deepLinkFailure: RecordDeepLinkFailure?
 
     init(api: any ClassificationReviewAPI) {
         _store = StateObject(wrappedValue: ClassificationReviewStore(api: api))
@@ -48,6 +50,16 @@ struct ClassificationReviewView: View {
         .task {
             guard reviewAvailable else { return }
             await store.restoreSession()
+        }
+        .navigationDestination(item: $recordRoute) { route in
+            RecordDetailView(route: route)
+        }
+        .alert(item: $deepLinkFailure) { failure in
+            Alert(
+                title: Text(failure.title),
+                message: Text(failure.message),
+                dismissButton: .default(Text("知道了"))
+            )
         }
         .sensoryFeedback(.success, trigger: store.successTrigger)
     }
@@ -100,6 +112,7 @@ struct ClassificationReviewView: View {
                         setReason: { store.setReason($0, for: item.id) },
                         setTaxonomy: { store.setTaxonomyCode($0, for: item.id) },
                         setNormalizedName: { store.setNormalizedItemName($0, for: item.id) },
+                        openRecord: { openRecord(item) },
                         analyze: { Task { await store.analyze(item, aiAvailable: aiAvailable) } },
                         submit: { Task { await store.submitDecision(item) } }
                     )
@@ -127,9 +140,26 @@ struct ClassificationReviewView: View {
             }
             .listRowBackground(Color.clear)
         }
+        .appScrollIndicatorsHidden()
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .refreshable { await store.refresh() }
+    }
+
+    private func openRecord(_ item: ClassificationReviewItem) {
+        let legacyWritesAvailable: Bool = {
+            guard case .available(let contract) = session.serverState else { return false }
+            return contract.capabilities.legacyState.writable
+        }()
+        let resolution = store.recordDeepLinkResolution(
+            for: item,
+            availableRecordIDs: Set(session.state.records.map(\.id)),
+            legacyWritesAvailable: legacyWritesAvailable
+        )
+        switch resolution {
+        case .destination(let route): recordRoute = route
+        case .failure(let failure): deepLinkFailure = failure
+        }
     }
 }
 
@@ -144,12 +174,18 @@ private struct ClassificationReviewRow: View {
     let setReason: (String) -> Void
     let setTaxonomy: (String?) -> Void
     let setNormalizedName: (String) -> Void
+    let openRecord: () -> Void
     let analyze: () -> Void
     let submit: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             recordHeader
+            Button("查看或编辑经营事项", systemImage: "arrow.up.forward.app") {
+                openRecord()
+            }
+            .buttonStyle(.bordered)
+            .accessibilityHint("保留当前复核状态和未提交草稿，打开对应账目")
             proposalCard
             if let analysis { analysisCard(analysis) }
             if !item.allowedActions.isEmpty { actionControls }
@@ -251,6 +287,7 @@ private struct ClassificationReviewRow: View {
 
             TextField("复核理由（必填）", text: Binding(get: { draft.reason }, set: setReason), axis: .vertical)
                 .lineLimit(2...5)
+                .appScrollIndicatorsHidden()
                 .textFieldStyle(.roundedBorder)
 
             Button(draft.action.label, systemImage: "checkmark.shield") {

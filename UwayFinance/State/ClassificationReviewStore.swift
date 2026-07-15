@@ -21,6 +21,8 @@ final class ClassificationReviewStore: ObservableObject {
     @Published var selectedState: ClassificationReviewState = .pending
     @Published var message: String?
     @Published private(set) var successTrigger = 0
+    @Published private(set) var canReadBusinessRecords = false
+    @Published private(set) var canWriteBusinessRecords = false
 
     private struct CursorPosition: Sendable { let value: String? }
 
@@ -95,6 +97,20 @@ final class ClassificationReviewStore: ObservableObject {
 
     func setNormalizedItemName(_ value: String, for recordID: String) {
         mutateDraft(recordID) { $0.normalizedItemName = value }
+    }
+
+    func recordDeepLinkResolution(
+        for item: ClassificationReviewItem,
+        availableRecordIDs: Set<String>,
+        legacyWritesAvailable: Bool
+    ) -> RecordDeepLinkResolution {
+        RecordDeepLinkResolver.resolve(
+            recordID: item.id,
+            availableRecordIDs: availableRecordIDs,
+            canRead: canReadBusinessRecords,
+            canEdit: canWriteBusinessRecords && legacyWritesAvailable,
+            origin: .classification(state: selectedState.rawValue)
+        )
     }
 
     func analyze(_ item: ClassificationReviewItem, aiAvailable: Bool) async {
@@ -196,6 +212,8 @@ final class ClassificationReviewStore: ObservableObject {
                 period: period
             ))
             accountBookId = response.accountBook.id
+            canReadBusinessRecords = response.accountBook.permissions.readBusinessRecords
+            canWriteBusinessRecords = response.accountBook.permissions.writeBusinessRecords
             items = response.items
             taxonomy = response.taxonomy
             nextCursor = response.page.nextCursor
@@ -206,6 +224,8 @@ final class ClassificationReviewStore: ObservableObject {
         } catch APIError.server(let status, _, let serverMessage) where status == 403 {
             items = []
             nextCursor = nil
+            canReadBusinessRecords = false
+            canWriteBusinessRecords = false
             message = serverMessage
         } catch {
             message = error.localizedDescription

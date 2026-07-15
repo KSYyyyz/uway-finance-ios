@@ -67,6 +67,7 @@ struct ProfileView: View {
                 }
             }
         }
+        .appScrollIndicatorsHidden()
         .listStyle(.insetGrouped)
         .navigationBarHidden(true)
     }

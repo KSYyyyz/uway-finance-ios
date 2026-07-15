@@ -124,6 +124,31 @@ final class ClassificationReviewStoreTests: XCTestCase {
         XCTAssertEqual(store.message, "当前角色没有分类复核权限")
     }
 
+    func testRecordDeepLinkKeepsClassificationFilterAndUnsubmittedDraft() async throws {
+        let page = try decodeList("classification-reviews-pending-v0.11.0")
+        let api = ClassificationReviewAPISpy(listResponses: [page])
+        let store = ClassificationReviewStore(api: api)
+        await store.restoreSession(accountBookId: "11")
+        let item = try XCTUnwrap(store.items.first)
+        store.setAction(.correct, for: item.id)
+        store.setReason("这是尚未提交的分类理由", for: item.id)
+
+        let resolution = store.recordDeepLinkResolution(
+            for: item,
+            availableRecordIDs: [item.id],
+            legacyWritesAvailable: true
+        )
+
+        guard case .destination(let route) = resolution else {
+            return XCTFail("复核条目应能进入对应经营事项")
+        }
+        XCTAssertEqual(route.origin, .classification(state: "pending"))
+        XCTAssertTrue(route.canEdit)
+        XCTAssertEqual(store.selectedState, .pending)
+        XCTAssertEqual(store.drafts[item.id]?.action, .correct)
+        XCTAssertEqual(store.drafts[item.id]?.reason, "这是尚未提交的分类理由")
+    }
+
     private func decodeList(_ name: String) throws -> ClassificationReviewListResponse {
         try decode(ClassificationReviewListResponse.self, name)
     }

@@ -66,6 +66,11 @@ struct LedgerView: View {
     private var income: Double { filteredRecords.filter { $0.direction == .income }.reduce(0) { $0 + $1.amount } }
     private var expense: Double { filteredRecords.filter { $0.direction == .expense }.reduce(0) { $0 + $1.amount } }
 
+    private var canEditRecords: Bool {
+        guard case .available(let contract) = session.serverState else { return false }
+        return contract.capabilities.legacyState.writable
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             fixedControls
@@ -188,9 +193,19 @@ struct LedgerView: View {
                                     ForEach(day.records.indices, id: \.self) { index in
                                         let record = day.records[index]
                                         if index > 0 { Divider().padding(.leading, 56) }
-                                        RecordRow(record: record)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 10)
+                                        NavigationLink {
+                                            RecordDetailView(route: RecordDeepLinkRoute(
+                                                recordID: record.id,
+                                                origin: .ledger,
+                                                canEdit: canEditRecords
+                                            ))
+                                        } label: {
+                                            RecordRow(record: record)
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 10)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityHint("打开经营事项详情")
                                     }
                                 }
                                 .background(AppTheme.elevatedSurface, in: RoundedRectangle(cornerRadius: AppTheme.cardRadius, style: .continuous))
@@ -205,6 +220,7 @@ struct LedgerView: View {
             }
             .padding()
         }
+        .appScrollIndicatorsHidden()
         .refreshable { try? await session.refresh() }
     }
 }

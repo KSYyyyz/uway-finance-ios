@@ -34,6 +34,7 @@ struct NewRecordView: View {
                 Section("经营事项") {
                     TextField("交易对方", text: $counterparty)
                     TextField("事项说明", text: $description, axis: .vertical)
+                        .appScrollIndicatorsHidden()
                     TextField("分类", text: $category)
                     TextField("项目", text: $project)
                     TextField("账户", text: $account)
@@ -50,6 +51,7 @@ struct NewRecordView: View {
                     }
                 }
             }
+            .appScrollIndicatorsHidden()
             .navigationTitle("记一笔")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -90,4 +92,3 @@ struct NewRecordView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { dismiss() }
     }
 }
-

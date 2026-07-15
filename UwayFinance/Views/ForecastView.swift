@@ -75,6 +75,7 @@ struct ForecastView: View {
             }
             .padding()
         }
+        .appScrollIndicatorsHidden()
         .background(AppTheme.pageBackground)
         .navigationTitle("资金预测")
         .navigationBarTitleDisplayMode(.inline)
@@ -99,4 +100,3 @@ struct ForecastView: View {
         }
     }
 }
-
