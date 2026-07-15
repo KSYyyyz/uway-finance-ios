@@ -22,9 +22,10 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(contract.capabilities.classificationReview?.available, true)
         XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.safeForClientUse, true)
-        XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.learningState, .shadow)
+        XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.semanticV2SafeForClientUse, true)
+        XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
         XCTAssertTrue(contract.capabilities.documentUploadCapability.safeForClientUse)
-        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.semanticPreferenceMemoryV2Schema)
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.multiTenantRegistrationSchema)
         XCTAssertEqual(session.state.records.count, 1)
         XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-14T00:00:00.000Z"))
         let fetchStateCallCount = await api.fetchStateCallCount()
@@ -150,8 +151,10 @@ final class AppSessionTests: XCTestCase {
 
     func testUnauthorizedRefreshReturnsToLogin() async {
         let api = FinanceAPISpy()
-        let session = AppSession(api: api, saveDelay: .zero)
+        let recorder = SessionClearRecorder()
+        let session = AppSession(api: api, saveDelay: .zero) { recorder.record() }
         await session.start()
+        let clearsBefore401 = recorder.count
         await api.setFetchError(.unauthorized)
 
         do {
@@ -161,6 +164,7 @@ final class AppSessionTests: XCTestCase {
             XCTAssertEqual(session.phase, .signedOut)
             XCTAssertNil(session.user)
             XCTAssertEqual(session.state, .empty)
+            XCTAssertEqual(recorder.count, clearsBefore401 + 1)
         } catch {
             XCTFail("unexpected error: \(error)")
         }
@@ -346,6 +350,78 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(event?.errorCount, 1)
         XCTAssertEqual(event?.fileName, "records.csv")
     }
+
+    func testRegistrationCreatesAuthenticatedIsolatedSessionWithoutPersistingSecrets() async throws {
+        let empty = StateEnvelope(data: .empty, updatedAt: nil)
+        let api = FinanceAPISpy(fetchEnvelopes: [empty])
+        let session = AppSession(api: api, saveDelay: .zero)
+        await session.checkServer()
+
+        let challenge = try await session.requestRegistrationCode(phone: "+8613800138000")
+        XCTAssertEqual(challenge.expiresInSeconds, 300)
+        XCTAssertEqual(challenge.resendAfterSeconds, 60)
+        try await session.register(RegistrationRequest(
+            username: "new_owner",
+            password: "SecurePass2026",
+            phone: "+8613800138000",
+            challengeId: challenge.challengeId,
+            code: "246810"
+        ))
+
+        XCTAssertEqual(session.phase, .signedIn)
+        XCTAssertEqual(session.user, SessionUser(id: "201", username: "new_owner"))
+        XCTAssertEqual(session.state, .empty)
+        XCTAssertEqual(session.stateRevision, .empty)
+        let request = await api.lastRegistrationRequest()
+        XCTAssertEqual(request?.challengeId, challenge.challengeId)
+        XCTAssertEqual(request?.code, "246810")
+    }
+
+    func testSlowLoginAResponseCannotOverwriteNewerUserB() async throws {
+        let api = FinanceAPISpy(
+            fetchEnvelopes: [StateEnvelope(
+                data: makeSessionState(description: "B 的独立账套"),
+                updatedAt: "2026-07-16T01:00:00.000Z"
+            )],
+            loginDelays: ["user-a": .milliseconds(120), "user-b": .milliseconds(10)]
+        )
+        let session = AppSession(api: api, saveDelay: .zero)
+        await session.checkServer()
+
+        async let oldAttempt: Void = session.login(username: "user-a", password: "PasswordA1")
+        try await Task.sleep(for: .milliseconds(15))
+        async let newAttempt: Void = session.login(username: "user-b", password: "PasswordB1")
+        _ = try? await oldAttempt
+        try await newAttempt
+
+        XCTAssertEqual(session.user, SessionUser(id: "id-user-b", username: "user-b"))
+        XCTAssertEqual(session.state.records.first?.description, "B 的独立账套")
+        XCTAssertEqual(session.phase, .signedIn)
+    }
+
+    func testLogoutClearsStateConflictAndAllRegisteredSessionCaches() async {
+        let api = FinanceAPISpy()
+        let recorder = SessionClearRecorder()
+        let session = AppSession(api: api, saveDelay: .zero) { recorder.record() }
+        await session.start()
+        let oldScope = session.sessionScopeID
+        let clearsBeforeLogout = recorder.count
+
+        await session.logout()
+
+        XCTAssertEqual(session.phase, .signedOut)
+        XCTAssertNil(session.user)
+        XCTAssertEqual(session.state, .empty)
+        XCTAssertEqual(session.stateRevision, .empty)
+        XCTAssertNotEqual(session.sessionScopeID, oldScope)
+        XCTAssertEqual(recorder.count, clearsBeforeLogout + 1)
+    }
+}
+
+@MainActor
+private final class SessionClearRecorder {
+    private(set) var count = 0
+    func record() { count += 1 }
 }
 
 private func makeSessionTestRecord() -> BusinessRecord {
@@ -384,6 +460,8 @@ private actor FinanceAPISpy: FinanceAPI {
     private var fetchEnvelopes: [StateEnvelope]
     private var saveUpdatedAts: [String]
     private var saveRevisions: [StateRevision] = []
+    private var registrationRequests: [RegistrationRequest] = []
+    private let loginDelays: [String: Duration]
 
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
@@ -394,11 +472,13 @@ private actor FinanceAPISpy: FinanceAPI {
         data: makeSessionState(description: "待重试事项"),
         updatedAt: "2026-07-14T00:00:00.000Z"
        )],
-       saveUpdatedAts: [String] = ["2026-07-14T00:00:01.000Z"]) {
+       saveUpdatedAts: [String] = ["2026-07-14T00:00:01.000Z"],
+       loginDelays: [String: Duration] = [:]) {
         self.healthResponse = healthResponse
         self.capabilitiesFixtureName = capabilitiesFixtureName
         self.fetchEnvelopes = fetchEnvelopes
         self.saveUpdatedAts = saveUpdatedAts
+        self.loginDelays = loginDelays
     }
 
     func setFetchError(_ error: APIError?) { fetchError = error }
@@ -408,6 +488,7 @@ private actor FinanceAPISpy: FinanceAPI {
     func lastAuditEvent() -> AuditEventRequest? { auditEvents.last }
     func fetchStateCallCount() -> Int { fetchStateCalls }
     func attemptedSaveRevisions() -> [StateRevision] { saveRevisions }
+    func lastRegistrationRequest() -> RegistrationRequest? { registrationRequests.last }
 
     func health() async throws -> HealthResponse {
         healthResponse
@@ -421,7 +502,26 @@ private actor FinanceAPISpy: FinanceAPI {
     }
 
     func login(username: String, password: String) async throws -> SessionUser {
-        SessionUser(id: "user-001", username: username)
+        if let delay = loginDelays[username] { try await Task.sleep(for: delay) }
+        return SessionUser(id: loginDelays.isEmpty ? "user-001" : "id-\(username)", username: username)
+    }
+
+    func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse {
+        RegistrationCodeResponse(
+            ok: true,
+            challengeId: "challenge-20260716-abcdefghijklmnop",
+            expiresInSeconds: 300,
+            resendAfterSeconds: 60
+        )
+    }
+
+    func register(_ request: RegistrationRequest) async throws -> RegistrationResponse {
+        registrationRequests.append(request)
+        return RegistrationResponse(
+            user: SessionUser(id: "201", username: request.username),
+            organizationId: "301",
+            accountBookId: "401"
+        )
     }
 
     func currentUser() async throws -> SessionUser {

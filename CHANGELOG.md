@@ -1,8 +1,10 @@
 # Changelog
 
-## 0.14.0 - 2026-07-15
+## 0.14.0 - 2026-07-16
 
-- Target backend app `0.14.0`, API `20260715_010` and schema `20260715_006_semantic_preference_memory_v2` without rewriting any historical fixture. The delegated freeze supplied no mainline commit; the snapshot records that absence and full-workspace validation remains fail-closed while the root checkout is still v0.13.0.
+- Target backend app `0.14.0`, API `20260715_010` and schema `20260715_007_multi_tenant_registration` in build 10 without rewriting any historical fixture. The root registration contract is present but uncommitted, so the snapshot truthfully keeps a null baseline commit and the validator cross-checks current root code fail-closed.
+- Add capability-gated SMS registration with login/register switching, server-driven challenge TTL/resend countdown, password confirmation, Chinese server-error mapping and VoiceOver/keyboard semantics. Passwords and codes remain transient JSON-body values and are never logged, persisted or put in URLs; no fake-code fallback exists.
+- Serialize live authentication requests and add a monotonic session generation so a slow user-A response cannot overwrite user B. Account switch, `401` and logout clear legacy state/revision/conflict drafts, account-book caches, view-local stores and temporary evidence previews.
 - Decode semantic preference-memory `learningState` (`shadow`, `provisional`, `active`) while keeping v0.12/v0.13 responses compatible and preserving `modelCanAccept=false` / `writesBusinessRecords=false`. Existing preference list/revoke UI is unchanged.
 - Decode active evidence/image/invoice/payment/contract counts, requirement state and missing required types. Revoked evidence never contributes to active counts.
 - Add one account-book-scoped coverage cache for ledger rows, clear it across user/account-book boundaries and discard stale conclusions on request failure. This avoids N+1 requests and never turns an unknown response into “材料齐全”.

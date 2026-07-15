@@ -19,11 +19,15 @@ final class AppContainer: ObservableObject {
         classificationReviewAPI: any ClassificationReviewAPI,
         classificationPreferenceAPI: any ClassificationPreferenceAPI
     ) {
-        self.session = AppSession(api: financeAPI)
+        let coverageStore = BusinessRecordEvidenceCoverageStore(api: businessRecordEvidenceAPI)
+        self.session = AppSession(api: financeAPI) {
+            coverageStore.clear()
+            EvidencePreviewFileManager.clearAll()
+        }
         self.importAnalysisAPI = importAnalysisAPI
         self.documentAPI = documentAPI
         self.businessRecordEvidenceAPI = businessRecordEvidenceAPI
-        self.businessRecordEvidenceCoverageStore = BusinessRecordEvidenceCoverageStore(api: businessRecordEvidenceAPI)
+        self.businessRecordEvidenceCoverageStore = coverageStore
         self.classificationReviewAPI = classificationReviewAPI
         self.classificationPreferenceAPI = classificationPreferenceAPI
     }

@@ -60,6 +60,32 @@ final class BusinessRecordEvidenceCoverageStoreTests: XCTestCase {
         guard case .failed = store.loadState else { return XCTFail("coverage failure must be visible") }
     }
 
+    func testDifferentUserNeverReusesSameAccountBookCoverageCache() async throws {
+        let first = try decode(BusinessRecordEvidenceCoverageResponse.self, "business-record-evidence-coverage-v0.14.0")
+        let second = BusinessRecordEvidenceCoverageResponse(records: [
+            "R-USER-B": BusinessRecordEvidenceCoverage(
+                activeEvidenceCount: 1,
+                invoiceEvidenceCount: 0,
+                paymentEvidenceCount: 1,
+                requirementState: .satisfied
+            ),
+        ])
+        let api = CoverageAPISpy(
+            contexts: [context(bookID: "11"), context(bookID: "11")],
+            coverages: [.success(first), .success(second)]
+        )
+        let store = BusinessRecordEvidenceCoverageStore(api: api)
+
+        await store.load(userID: "user-a")
+        XCTAssertNotNil(store.coverage(for: "R-EVIDENCE"))
+        await store.load(userID: "user-b")
+
+        XCTAssertNil(store.coverage(for: "R-EVIDENCE"))
+        XCTAssertEqual(store.coverage(for: "R-USER-B")?.paymentEvidenceCount, 1)
+        let requests = await api.coverageRequests()
+        XCTAssertEqual(requests, ["11", "11"])
+    }
+
     private func context(bookID: String) -> FinanceContextResponse {
         let book = FinanceAccountBookAccess(
             id: bookID,

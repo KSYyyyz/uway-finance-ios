@@ -15,6 +15,8 @@ struct APIEndpoint: Hashable {
     static let health = APIEndpoint(method: .get, path: "/api/health")
     static let capabilities = APIEndpoint(method: .get, path: "/api/capabilities")
     static let login = APIEndpoint(method: .post, path: "/api/auth/login")
+    static let registrationCode = APIEndpoint(method: .post, path: "/api/auth/registration-code")
+    static let register = APIEndpoint(method: .post, path: "/api/auth/register")
     static let currentUser = APIEndpoint(method: .get, path: "/api/auth/me")
     static let logout = APIEndpoint(method: .post, path: "/api/auth/logout")
     static let state = APIEndpoint(method: .get, path: "/api/state")

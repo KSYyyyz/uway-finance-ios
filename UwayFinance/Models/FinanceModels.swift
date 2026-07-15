@@ -107,7 +107,7 @@ struct StateRevision: Equatable, Sendable {
     var ifMatchHeaderValue: String { "\"\(value)\"" }
 }
 
-struct SessionUser: Codable, Identifiable, Equatable {
+struct SessionUser: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let username: String
 }

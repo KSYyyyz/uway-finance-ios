@@ -1,7 +1,7 @@
 {
   "version": "0.14.0",
   "apiContractVersion": "20260715_010",
-  "financeSchemaVersion": "20260715_006_semantic_preference_memory_v2",
+  "financeSchemaVersion": "20260715_007_multi_tenant_registration",
   "sync": {
     "preferredMode": "legacy_state_v1",
     "availableModes": ["legacy_state_v1"],
@@ -45,6 +45,15 @@
     "databaseScale": 2
   },
   "features": {
+    "registration": {
+      "available": true,
+      "reason": null,
+      "codeEndpoint": "/api/auth/registration-code",
+      "registerEndpoint": "/api/auth/register",
+      "phoneVerification": "sms_webhook",
+      "createsIsolatedOrganizationAndAccountBook": true,
+      "sessionCookie": "http_only_secure_same_site_strict"
+    },
     "importAnalysis": {
       "available": true,
       "reason": null,
@@ -75,11 +84,17 @@
     },
     "classificationPreferenceMemory": {
       "available": true,
+      "normalizationVersion": "semantic-preference-v2",
       "listEndpoint": "/api/v2/classification-preferences",
       "revokeEndpoint": "/api/v2/classification-preferences/:observationId/revoke",
       "pagination": "cursor",
       "scope": "account_book",
+      "companyScoped": true,
       "source": "explicit_authenticated_human_decisions",
+      "reasonCodes": ["counterparty_alias", "expense_nature", "employee_compensation", "capital_transaction", "evidence_mismatch", "company_scope", "other"],
+      "learningStates": ["shadow", "provisional", "active"],
+      "similarity": "complete_link_semantic",
+      "provisionalMinimumConsistentObservations": 2,
       "minimumConsistentObservations": 3,
       "minimumConsistency": 0.8,
       "lifecycleStates": ["active", "revoked", "invalidated"],
@@ -87,8 +102,7 @@
       "idempotencyHeader": "Idempotency-Key",
       "concurrencyControl": "expectedVersion",
       "modelCanAccept": false,
-      "writesBusinessRecords": false,
-      "learningState": "shadow"
+      "writesBusinessRecords": false
     },
     "workflowTasks": { "available": false },
     "aiClassification": {

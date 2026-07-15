@@ -12,10 +12,10 @@ struct RootView: View {
                 LoginView()
             case .signedIn:
                 MainTabView()
+                    .id(session.sessionScopeID)
             }
         }
         .task { await session.start() }
         .animation(.snappy, value: session.phase)
     }
 }
-

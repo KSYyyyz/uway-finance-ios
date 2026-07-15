@@ -16,6 +16,47 @@ struct CapabilityAvailability: Codable, Equatable, Sendable {
     }
 }
 
+struct RegistrationCapability: Codable, Equatable, Sendable {
+    let available: Bool
+    let reason: String?
+    let codeEndpoint: String?
+    let registerEndpoint: String?
+    let phoneVerification: String?
+    let createsIsolatedOrganizationAndAccountBook: Bool?
+    let sessionCookie: String?
+
+    var safeForClientUse: Bool {
+        available
+            && codeEndpoint == "/api/auth/registration-code"
+            && registerEndpoint == "/api/auth/register"
+            && phoneVerification == "sms_webhook"
+            && createsIsolatedOrganizationAndAccountBook == true
+            && sessionCookie == "http_only_secure_same_site_strict"
+    }
+
+    var statusDisplay: String {
+        if safeForClientUse { return "手机验证注册可用" }
+        if reason == "sms_provider_not_configured" { return "短信服务未配置" }
+        return "注册暂不可用"
+    }
+
+    var unavailableMessage: String {
+        reason == "sms_provider_not_configured"
+            ? "服务器尚未配置短信验证码服务，当前不能注册新账号。"
+            : "服务器暂未开放安全注册能力。"
+    }
+
+    static let unavailableFallback = RegistrationCapability(
+        available: false,
+        reason: "capabilities_unavailable",
+        codeEndpoint: nil,
+        registerEndpoint: nil,
+        phoneVerification: nil,
+        createsIsolatedOrganizationAndAccountBook: nil,
+        sessionCookie: nil
+    )
+}
+
 struct UnifiedDashboardMetricsCapability: Codable, Equatable, Sendable {
     let available: Bool
     let endpoint: String?
@@ -79,6 +120,12 @@ struct ClassificationPreferenceMemoryCapability: Codable, Equatable, Sendable {
     let modelCanAccept: Bool
     let writesBusinessRecords: Bool
     let learningState: ClassificationPreferenceLearningState?
+    let normalizationVersion: String?
+    let companyScoped: Bool?
+    let reasonCodes: [String]?
+    let learningStates: [ClassificationPreferenceLearningState]?
+    let similarity: String?
+    let provisionalMinimumConsistentObservations: Int?
 
     var safeForClientUse: Bool {
         available
@@ -97,10 +144,18 @@ struct ClassificationPreferenceMemoryCapability: Codable, Equatable, Sendable {
             && writesBusinessRecords == false
     }
 
-    var semanticV2SafeForClientUse: Bool { safeForClientUse && learningState != nil }
+    var semanticV2SafeForClientUse: Bool {
+        safeForClientUse
+            && normalizationVersion == "semantic-preference-v2"
+            && companyScoped == true
+            && Set(learningStates ?? []) == Set(ClassificationPreferenceLearningState.allCases)
+            && similarity == "complete_link_semantic"
+            && provisionalMinimumConsistentObservations == 2
+    }
 
     var statusDisplay: String {
         guard safeForClientUse else { return "未开放" }
+        if semanticV2SafeForClientUse { return "账套级语义偏好 v2 可用" }
         guard let learningState else { return "账套级安全可用（兼容模式）" }
         return "账套级安全可用 · \(learningState.label)"
     }
@@ -265,6 +320,7 @@ struct ImportAnalysisCapability: Codable, Equatable, Sendable {
 }
 
 struct FeatureCapabilitiesResponse: Codable, Equatable, Sendable {
+    let registration: RegistrationCapability?
     let importAnalysis: ImportAnalysisCapability
     let unifiedDashboardMetrics: UnifiedDashboardMetricsCapability
     let classificationReview: ClassificationReviewCapability?
@@ -303,6 +359,7 @@ struct ServerCapabilities: Equatable, Sendable {
     let financeResources: FinanceResourceCapability
     let importHarnessStatuses: Set<String>
     let importAnalysis: ImportAnalysisCapability
+    let registration: RegistrationCapability
     let unifiedDashboardMetrics: Bool
     let dashboardMetrics: UnifiedDashboardMetricsCapability
     let classificationReview: ClassificationReviewCapability?
@@ -335,6 +392,7 @@ struct ServerCapabilities: Equatable, Sendable {
             financeResources: response.sync.financeResources,
             importHarnessStatuses: Set(response.features.importAnalysis.decisions),
             importAnalysis: response.features.importAnalysis,
+            registration: response.features.registration ?? .unavailableFallback,
             unifiedDashboardMetrics: response.features.unifiedDashboardMetrics.available,
             dashboardMetrics: response.features.unifiedDashboardMetrics,
             classificationReview: response.features.classificationReview,
@@ -367,6 +425,7 @@ struct ServerCapabilities: Equatable, Sendable {
             financeResources: .unavailable,
             importHarnessStatuses: ["accepted", "review", "rejected"],
             importAnalysis: .unavailableFallback,
+            registration: .unavailableFallback,
             unifiedDashboardMetrics: false,
             dashboardMetrics: UnifiedDashboardMetricsCapability(
                 available: false,
@@ -417,6 +476,7 @@ struct BackendContract: Equatable, Sendable {
     static let classificationPreferenceMemorySchema = "20260715_004_account_book_preference_memory"
     static let immutableRecordEvidenceSchema = "20260715_005_immutable_record_evidence"
     static let semanticPreferenceMemoryV2Schema = "20260715_006_semantic_preference_memory_v2"
+    static let multiTenantRegistrationSchema = "20260715_007_multi_tenant_registration"
 
     static func isFinanceDomainV2Schema(_ value: String?) -> Bool {
         value == financeDomainV2Schema
@@ -424,6 +484,7 @@ struct BackendContract: Equatable, Sendable {
             || value == classificationPreferenceMemorySchema
             || value == immutableRecordEvidenceSchema
             || value == semanticPreferenceMemoryV2Schema
+            || value == multiTenantRegistrationSchema
     }
 
     let serverVersion: String

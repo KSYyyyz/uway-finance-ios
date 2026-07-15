@@ -103,7 +103,7 @@ struct BusinessRecordEvidenceView: View {
         }
         .quickLookPreview($previewURL)
         .onChange(of: previewURL) { oldValue, newValue in
-            if newValue == nil, let oldValue { try? FileManager.default.removeItem(at: oldValue) }
+            if newValue == nil { EvidencePreviewFileManager.remove(oldValue) }
         }
         .sensoryFeedback(.success, trigger: store.successTrigger)
         .onDisappear { removePreviewFile() }
@@ -181,13 +181,7 @@ struct BusinessRecordEvidenceView: View {
         do {
             let content = try await store.loadContent(evidence)
             removePreviewFile()
-            let safeName = content.fileName
-                .replacingOccurrences(of: "/", with: "_")
-                .replacingOccurrences(of: "\\", with: "_")
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("uway-evidence-\(content.evidenceId)-\(safeName)")
-            try content.data.write(to: url, options: [.atomic])
-            previewURL = url
+            previewURL = try EvidencePreviewFileManager.write(content)
         } catch {
             store.message = error.localizedDescription
         }
@@ -195,7 +189,7 @@ struct BusinessRecordEvidenceView: View {
 
     private func removePreviewFile() {
         guard let previewURL else { return }
-        try? FileManager.default.removeItem(at: previewURL)
+        EvidencePreviewFileManager.remove(previewURL)
         self.previewURL = nil
     }
 }

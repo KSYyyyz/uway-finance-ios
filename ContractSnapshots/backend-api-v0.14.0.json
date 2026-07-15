@@ -4,7 +4,7 @@
   "backendBaselineCommit": null,
   "backendBaselineStatus": "pending-mainline-freeze",
   "apiContractVersion": "20260715_010",
-  "financeSchemaVersion": "20260715_006_semantic_preference_memory_v2",
+  "financeSchemaVersion": "20260715_007_multi_tenant_registration",
   "syncMode": "legacy_state_v1",
   "money": {
     "legacyStateEncoding": "json_number",
@@ -69,11 +69,17 @@
     },
     "classificationPreferenceMemory": {
       "available": true,
+      "normalizationVersion": "semantic-preference-v2",
       "listEndpoint": "/api/v2/classification-preferences",
       "revokeEndpoint": "/api/v2/classification-preferences/:observationId/revoke",
       "pagination": "cursor",
       "scope": "account_book",
+      "companyScoped": true,
       "source": "explicit_authenticated_human_decisions",
+      "reasonCodes": ["counterparty_alias", "expense_nature", "employee_compensation", "capital_transaction", "evidence_mismatch", "company_scope", "other"],
+      "learningStates": ["shadow", "provisional", "active"],
+      "similarity": "complete_link_semantic",
+      "provisionalMinimumConsistentObservations": 2,
       "minimumConsistentObservations": 3,
       "minimumConsistency": 0.8,
       "lifecycleStates": ["active", "revoked", "invalidated"],
@@ -81,8 +87,16 @@
       "idempotencyHeader": "Idempotency-Key",
       "concurrencyControl": "expectedVersion",
       "modelCanAccept": false,
-      "writesBusinessRecords": false,
-      "learningState": "shadow"
+      "writesBusinessRecords": false
+    },
+    "registration": {
+      "availability": "runtime",
+      "reasonWhenUnavailable": "sms_provider_not_configured",
+      "codeEndpoint": "/api/auth/registration-code",
+      "registerEndpoint": "/api/auth/register",
+      "phoneVerification": "sms_webhook",
+      "createsIsolatedOrganizationAndAccountBook": true,
+      "sessionCookie": "http_only_secure_same_site_strict"
     },
     "documentUpload": {
       "available": true,
@@ -115,6 +129,8 @@
     { "method": "get", "path": "/api/health", "swift": "method: .get, path: \"/api/health\"" },
     { "method": "get", "path": "/api/capabilities", "swift": "method: .get, path: \"/api/capabilities\"" },
     { "method": "post", "path": "/api/auth/login", "swift": "method: .post, path: \"/api/auth/login\"" },
+    { "method": "post", "path": "/api/auth/registration-code", "swift": "method: .post, path: \"/api/auth/registration-code\"" },
+    { "method": "post", "path": "/api/auth/register", "swift": "method: .post, path: \"/api/auth/register\"" },
     { "method": "get", "path": "/api/auth/me", "swift": "method: .get, path: \"/api/auth/me\"" },
     { "method": "post", "path": "/api/auth/logout", "swift": "method: .post, path: \"/api/auth/logout\"" },
     { "method": "get", "path": "/api/state", "swift": "method: .get, path: \"/api/state\"" },

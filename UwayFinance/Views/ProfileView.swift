@@ -46,6 +46,7 @@ struct ProfileView: View {
                         value: contract.capabilities.financeResources.statusDisplay
                     )
                     LabeledContent("导入分析", value: contract.capabilities.importAnalysis.statusDisplay)
+                    LabeledContent("手机号注册", value: contract.capabilities.registration.statusDisplay)
                     LabeledContent(
                         "分类偏好记忆",
                         value: contract.capabilities.classificationPreferenceMemory?.statusDisplay ?? "服务端未公布"

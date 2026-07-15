@@ -7,7 +7,8 @@ const workspace = path.resolve(root, '..', '..')
 const expectedMarketingVersion = '0.14.0'
 const expectedBackendVersion = '0.14.0'
 const expectedAPIContractVersion = '20260715_010'
-const expectedFinanceSchemaVersion = '20260715_006_semantic_preference_memory_v2'
+const expectedFinanceSchemaVersion = '20260715_007_multi_tenant_registration'
+const expectedBuildVersion = '10'
 const expectedBackendBaselineCommit = null
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
 const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.14.0.json')
@@ -26,6 +27,7 @@ const requiredFiles = [
   'UwayFinance/Networking/ClassificationReviewAPI.swift',
   'UwayFinance/Networking/ClassificationPreferenceAPI.swift',
   'UwayFinance/Networking/BusinessRecordEvidenceAPI.swift',
+  'UwayFinance/Models/RegistrationModels.swift',
   'UwayFinance/Models/BackendContract.swift',
   'UwayFinance/Models/FinanceResourceModels.swift',
   'UwayFinance/Models/CutoverReadinessModels.swift',
@@ -41,6 +43,7 @@ const requiredFiles = [
   'UwayFinance/State/ClassificationPreferenceStore.swift',
   'UwayFinance/State/BusinessRecordEvidenceStore.swift',
   'UwayFinance/State/BusinessRecordEvidenceCoverageStore.swift',
+  'UwayFinance/State/EvidencePreviewFileManager.swift',
   'UwayFinance/Views/RecordImportView.swift',
   'UwayFinance/Views/LedgerView.swift',
   'UwayFinance/Views/ClassificationReviewView.swift',
@@ -66,6 +69,8 @@ const requiredFiles = [
   'UwayFinanceTests/BusinessRecordEvidenceAPITests.swift',
   'UwayFinanceTests/BusinessRecordEvidenceStoreTests.swift',
   'UwayFinanceTests/BusinessRecordEvidenceCoverageStoreTests.swift',
+  'UwayFinanceTests/RegistrationAPITests.swift',
+  'UwayFinanceTests/EvidencePreviewFileManagerTests.swift',
   'UwayFinanceTests/RecordDeepLinkTests.swift',
   'UwayFinanceTests/LegacyStateConditionalWriteAPITests.swift',
   'UwayFinanceTests/RecordImportPipelineTests.swift',
@@ -121,6 +126,9 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/capabilities-semantic-preference-memory-v0.14.0.json',
   'UwayFinanceTests/Fixtures/business-record-evidence-list-v0.14.0.json',
   'UwayFinanceTests/Fixtures/business-record-evidence-coverage-v0.14.0.json',
+  'UwayFinanceTests/Fixtures/registration-code-success-v0.14.0.json',
+  'UwayFinanceTests/Fixtures/registration-success-v0.14.0.json',
+  'UwayFinanceTests/Fixtures/registration-errors-v0.14.0.json',
   'Docs/PERSONALIZATION_CONTRACT_REQUIREMENTS.md',
   'CHANGELOG.md',
 ]
@@ -197,6 +205,9 @@ const fixtures = [
   'capabilities-semantic-preference-memory-v0.14.0.json',
   'business-record-evidence-list-v0.14.0.json',
   'business-record-evidence-coverage-v0.14.0.json',
+  'registration-code-success-v0.14.0.json',
+  'registration-success-v0.14.0.json',
+  'registration-errors-v0.14.0.json',
 ]
 for (const fixture of fixtures) {
   JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', fixture), 'utf8'))
@@ -313,8 +324,22 @@ if (preferenceMemorySnapshot?.available !== true
     || preferenceMemorySnapshot?.concurrencyControl !== 'expectedVersion'
     || preferenceMemorySnapshot?.modelCanAccept !== false
     || preferenceMemorySnapshot?.writesBusinessRecords !== false
-    || !['shadow', 'provisional', 'active'].includes(preferenceMemorySnapshot?.learningState)) {
+    || preferenceMemorySnapshot?.normalizationVersion !== 'semantic-preference-v2'
+    || preferenceMemorySnapshot?.companyScoped !== true
+    || preferenceMemorySnapshot?.learningStates?.join(',') !== 'shadow,provisional,active'
+    || preferenceMemorySnapshot?.similarity !== 'complete_link_semantic'
+    || preferenceMemorySnapshot?.provisionalMinimumConsistentObservations !== 2) {
   throw new Error('classification preference-memory snapshot safety boundary mismatch')
+}
+const registrationSnapshot = contractSnapshot.capabilities?.registration
+if (registrationSnapshot?.availability !== 'runtime'
+    || registrationSnapshot?.reasonWhenUnavailable !== 'sms_provider_not_configured'
+    || registrationSnapshot?.codeEndpoint !== '/api/auth/registration-code'
+    || registrationSnapshot?.registerEndpoint !== '/api/auth/register'
+    || registrationSnapshot?.phoneVerification !== 'sms_webhook'
+    || registrationSnapshot?.createsIsolatedOrganizationAndAccountBook !== true
+    || registrationSnapshot?.sessionCookie !== 'http_only_secure_same_site_strict') {
+  throw new Error('registration snapshot must preserve server-gated SMS and tenant isolation boundaries')
 }
 const evidenceSnapshot = contractSnapshot.capabilities?.documentUpload
 if (evidenceSnapshot?.available !== true
@@ -374,6 +399,16 @@ const disabledCapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, '
 if (disabledCapabilitiesFixture.features?.importAnalysis?.available !== false
     || disabledCapabilitiesFixture.features?.importAnalysis?.reason !== 'provider_not_configured') {
   throw new Error('unconfigured import-analysis fixture must expose provider_not_configured')
+}
+const registrationCapability = capabilitiesFixture.features?.registration
+if (registrationCapability?.available !== true
+    || registrationCapability?.reason !== null
+    || registrationCapability?.codeEndpoint !== '/api/auth/registration-code'
+    || registrationCapability?.registerEndpoint !== '/api/auth/register'
+    || registrationCapability?.phoneVerification !== 'sms_webhook'
+    || registrationCapability?.createsIsolatedOrganizationAndAccountBook !== true
+    || registrationCapability?.sessionCookie !== 'http_only_secure_same_site_strict') {
+  throw new Error('current registration capability fixture is unsafe or incomplete')
 }
 if (capabilitiesFixture.sync?.financeResources?.available !== true
     || capabilitiesFixture.sync?.financeResources?.cutoverState !== 'shadow'
@@ -547,8 +582,35 @@ if (preferenceCapability?.available !== true
     || preferenceCapability?.concurrencyControl !== 'expectedVersion'
     || preferenceCapability?.modelCanAccept !== false
     || preferenceCapability?.writesBusinessRecords !== false
-    || !['shadow', 'provisional', 'active'].includes(preferenceCapability?.learningState)) {
+    || preferenceCapability?.normalizationVersion !== 'semantic-preference-v2'
+    || preferenceCapability?.companyScoped !== true
+    || preferenceCapability?.learningStates?.join(',') !== 'shadow,provisional,active'
+    || preferenceCapability?.similarity !== 'complete_link_semantic'
+    || preferenceCapability?.provisionalMinimumConsistentObservations !== 2) {
   throw new Error('classification preference-memory capability fixture is unsafe or incomplete')
+}
+const registrationCodeFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-code-success-v0.14.0.json'), 'utf8'))
+const registrationSuccessFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-success-v0.14.0.json'), 'utf8'))
+const registrationErrorFixtures = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-errors-v0.14.0.json'), 'utf8'))
+const expectedRegistrationErrors = [
+  [400, 'INVALID_PHONE'],
+  [400, 'INVALID_REGISTRATION_INPUT'],
+  [400, 'WEAK_PASSWORD'],
+  [400, 'INVALID_REGISTRATION_CODE'],
+  [429, 'REGISTRATION_CODE_RATE_LIMITED'],
+  [409, 'REGISTRATION_IDENTITY_CONFLICT'],
+  [503, 'SMS_PROVIDER_UNAVAILABLE'],
+  [503, 'SMS_DELIVERY_FAILED'],
+]
+if (registrationCodeFixture.ok !== true
+    || registrationCodeFixture.expiresInSeconds !== 300
+    || registrationCodeFixture.resendAfterSeconds !== 60
+    || !registrationCodeFixture.challengeId
+    || !registrationSuccessFixture.user?.id
+    || !registrationSuccessFixture.organizationId
+    || !registrationSuccessFixture.accountBookId
+    || JSON.stringify(registrationErrorFixtures.map(({ status, code }) => [status, code])) !== JSON.stringify(expectedRegistrationErrors)) {
+  throw new Error('registration success/error fixtures do not match the frozen contract')
 }
 const activePreferences = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'classification-preferences-active-v0.12.0.json'), 'utf8'))
 const revokedPreferences = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'classification-preferences-revoked-v0.12.0.json'), 'utf8'))
@@ -672,6 +734,9 @@ const project = fs.readFileSync(path.join(root, 'project.yml'), 'utf8')
 if (!project.includes(`MARKETING_VERSION: ${expectedMarketingVersion}`)) {
   throw new Error(`project MARKETING_VERSION must be ${expectedMarketingVersion}`)
 }
+if (!project.includes(`CURRENT_PROJECT_VERSION: ${expectedBuildVersion}`)) {
+  throw new Error(`project CURRENT_PROJECT_VERSION must be ${expectedBuildVersion}`)
+}
 if (!project.includes('INFOPLIST_FILE: UwayFinance/Resources/Info.plist')) {
   throw new Error('project must reference the complete checked-in Info.plist without regenerating it')
 }
@@ -752,7 +817,7 @@ for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amo
 }
 
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
-for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningState', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', '"accepted", "review", "rejected"']) {
+for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningStates', 'semantic-preference-v2', 'complete_link_semantic', 'RegistrationCapability', 'sms_webhook', 'http_only_secure_same_site_strict', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
 }
 for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
@@ -857,7 +922,7 @@ for (const marker of ['case versionConflict', 'case stateVersionConflict', 'STAT
   if (!httpTransport.includes(marker)) throw new Error(`V2 transport marker missing: ${marker}`)
 }
 const financeAPI = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'FinanceAPI.swift'), 'utf8')
-for (const marker of ['ifMatch revision: StateRevision', 'headers: ["If-Match": revision.ifMatchHeaderValue]', 'StateRevision(updatedAt: updatedAt)']) {
+for (const marker of ['requestRegistrationCode', 'register(_ request: RegistrationRequest)', 'serializedAuthenticationRequest', 'ifMatch revision: StateRevision', 'headers: ["If-Match": revision.ifMatchHeaderValue]', 'StateRevision(updatedAt: updatedAt)']) {
   if (!financeAPI.includes(marker)) throw new Error(`legacy state conditional-write API marker missing: ${marker}`)
 }
 if (financeAPI.includes('ISO8601DateFormatter().string(from: Date())')) {
@@ -869,6 +934,16 @@ if (appSession.includes('FinanceResourceAPI') || appSession.includes('CutoverRea
 }
 for (const marker of ['stateRevision', 'unsavedSnapshot', 'conflictingServerRevision', 'catch APIError.stateVersionConflict', 'resolveStateConflictAndRetry', '其他设备已更新，需要核对']) {
   if (!appSession.includes(marker)) throw new Error(`AppSession conflict preservation marker missing: ${marker}`)
+}
+for (const marker of ['sessionGeneration', 'sessionScopeID', 'onSessionScopeCleared', 'registrationCapability', 'requestRegistrationCode', 'beginSessionTransition']) {
+  if (!appSession.includes(marker)) throw new Error(`AppSession account-isolation marker missing: ${marker}`)
+}
+const loginView = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'LoginView.swift'), 'utf8')
+for (const marker of ['requestRegistrationCode', 'session.register', 'TimelineView', 'expiresInSeconds', 'resendAfterSeconds', 'textContentType(.oneTimeCode)', 'textContentType(.newPassword)', 'RegistrationErrorMessage.localized']) {
+  if (!loginView.includes(marker)) throw new Error(`registration UI marker missing: ${marker}`)
+}
+for (const forbidden of ['UserDefaults', 'Keychain', 'URLQueryItem(name: "password"', 'URLQueryItem(name: "code"']) {
+  if (loginView.includes(forbidden)) throw new Error(`registration secret persistence/URL marker forbidden: ${forbidden}`)
 }
 
 const serverPath = path.join(workspace, 'server', 'index.ts')
@@ -884,6 +959,7 @@ const classificationReviewPath = path.join(workspace, 'server', 'classification-
 const classificationAnalysisPath = path.join(workspace, 'server', 'classification-analysis.ts')
 const classificationPreferencesPath = path.join(workspace, 'server', 'classification-preferences.ts')
 const businessRecordEvidencePath = path.join(workspace, 'server', 'business-record-evidence.ts')
+const registrationPath = path.join(workspace, 'server', 'registration.ts')
 const apiContractDocumentPath = path.join(workspace, 'API-V2-CONTRACT.md')
 const mainPackagePath = path.join(workspace, 'package.json')
 const hasMainPackage = fs.existsSync(mainPackagePath)
@@ -910,7 +986,7 @@ if (validateMainline && hasMainPackage && hasMainContractDocument) {
   }
 }
 const hasLocalBackend = validateMainline && process.env.UWAY_SKIP_LOCAL_BACKEND !== '1'
-  && [serverPath, healthPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, classificationReviewPath, classificationAnalysisPath, classificationPreferencesPath, businessRecordEvidencePath, apiContractDocumentPath].every(fs.existsSync)
+  && [serverPath, healthPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, classificationReviewPath, classificationAnalysisPath, classificationPreferencesPath, businessRecordEvidencePath, registrationPath, apiContractDocumentPath].every(fs.existsSync)
 if (hasLocalBackend) {
   const server = fs.readFileSync(serverPath, 'utf8')
   for (const { method, path: endpoint } of currentContracts) {
@@ -932,8 +1008,9 @@ if (hasLocalBackend) {
   if (!health.includes('financeSchemaVersion: FINANCE_SCHEMA_VERSION')) {
     throw new Error('local health response must expose financeSchemaVersion')
   }
-  if (!server.includes('createServerCapabilities({ importAnalysisAvailable: importClassifier !== null })')) {
-    throw new Error('local capabilities endpoint must derive import availability from configured classifier state')
+  if (!server.includes('importAnalysisAvailable: importClassifier !== null')
+      || !server.includes('registrationAvailable: smsProvider !== null && Boolean(config.UWAY_PHONE_CODE_PEPPER)')) {
+    throw new Error('local capabilities endpoint must derive import and registration availability from configured provider state')
   }
   const capabilities = fs.readFileSync(capabilitiesPath, 'utf8')
   for (const marker of [
@@ -982,6 +1059,11 @@ if (hasLocalBackend) {
     'aiMayWriteBusinessRecords: false',
     'aiMayPostJournalVouchers: false',
     "reason: options.importAnalysisAvailable ? null : 'provider_not_configured'",
+    "codeEndpoint: '/api/auth/registration-code'",
+    "registerEndpoint: '/api/auth/register'",
+    "phoneVerification: 'sms_webhook'",
+    'createsIsolatedOrganizationAndAccountBook: true',
+    "sessionCookie: 'http_only_secure_same_site_strict'",
   ]) {
     if (!capabilities.includes(marker)) throw new Error(`local capabilities marker missing: ${marker}`)
   }
@@ -1049,6 +1131,20 @@ if (hasLocalBackend) {
     'account_book_id',
   ]) {
     if (!businessRecordEvidence.includes(marker)) throw new Error(`local business record evidence marker missing: ${marker}`)
+  }
+  const registration = fs.readFileSync(registrationPath, 'utf8')
+  for (const marker of [
+    'registrationCodeRequestSchema',
+    'registrationSchema',
+    'REGISTRATION_CODE_RATE_LIMITED',
+    'REGISTRATION_IDENTITY_CONFLICT',
+    'SMS_PROVIDER_UNAVAILABLE',
+    'SMS_DELIVERY_FAILED',
+    'syncLegacyStateToFinanceV2',
+    'INSERT INTO app_state',
+    'INSERT INTO sessions',
+  ]) {
+    if (!registration.includes(marker)) throw new Error(`local registration safety marker missing: ${marker}`)
   }
 }
 

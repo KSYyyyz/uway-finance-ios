@@ -17,6 +17,7 @@ final class AppSession: ObservableObject {
     @Published private(set) var syncState: SyncState = .idle
     @Published private(set) var serverState: ServerState = .checking
     @Published private(set) var stateRevision: StateRevision = .empty
+    @Published private(set) var sessionScopeID = UUID()
     @Published var alertMessage: String?
 
     private let api: any FinanceAPI
@@ -25,15 +26,27 @@ final class AppSession: ObservableObject {
     private var pendingSave: Task<Void, Never>?
     private var unsavedSnapshot: AppStatePayload?
     private var conflictingServerRevision: StateRevision?
+    private var sessionGeneration: UInt64 = 0
+    private let onSessionScopeCleared: @MainActor () -> Void
 
     var importAnalysisCapability: ImportAnalysisCapability {
         guard case .available(let contract) = serverState else { return .serviceUnavailable }
         return contract.capabilities.importAnalysis
     }
 
-    init(api: any FinanceAPI, saveDelay: Duration = .milliseconds(650)) {
+    var registrationCapability: RegistrationCapability {
+        guard case .available(let contract) = serverState else { return .unavailableFallback }
+        return contract.capabilities.registration
+    }
+
+    init(
+        api: any FinanceAPI,
+        saveDelay: Duration = .milliseconds(650),
+        onSessionScopeCleared: @escaping @MainActor () -> Void = {}
+    ) {
         self.api = api
         self.saveDelay = saveDelay
+        self.onSessionScopeCleared = onSessionScopeCleared
     }
 
     func start() async {
@@ -67,22 +80,42 @@ final class AppSession: ObservableObject {
     }
 
     func login(username: String, password: String) async throws {
-        user = try await api.login(username: username, password: password)
-        alertMessage = nil
-        phase = .signedIn
-        try await refresh()
+        let generation = beginSessionTransition()
+        do {
+            let authenticatedUser = try await api.login(username: username, password: password)
+            try await establishAuthenticatedSession(user: authenticatedUser, generation: generation)
+        } catch {
+            if generation == sessionGeneration { phase = .signedOut }
+            throw error
+        }
+    }
+
+    func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse {
+        guard registrationCapability.safeForClientUse else {
+            throw APIError.unavailable(registrationCapability.unavailableMessage)
+        }
+        return try await api.requestRegistrationCode(phone: phone)
+    }
+
+    func register(_ request: RegistrationRequest) async throws {
+        guard registrationCapability.safeForClientUse else {
+            throw APIError.unavailable(registrationCapability.unavailableMessage)
+        }
+        let generation = beginSessionTransition()
+        do {
+            let response = try await api.register(request)
+            try await establishAuthenticatedSession(user: response.user, generation: generation)
+        } catch {
+            if generation == sessionGeneration { phase = .signedOut }
+            throw error
+        }
     }
 
     func logout() async {
-        pendingSave?.cancel()
-        try? await api.logout()
-        state = .empty
-        unsavedSnapshot = nil
-        stateRevision = .empty
-        conflictingServerRevision = nil
-        user = nil
-        syncState = .idle
+        let generation = beginSessionTransition()
         phase = .signedOut
+        try? await api.logout()
+        guard generation == sessionGeneration else { return }
     }
 
     func refresh() async throws {
@@ -90,17 +123,22 @@ final class AppSession: ObservableObject {
             await recoverSync()
             return
         }
+        let generation = sessionGeneration
+        let expectedUserID = user?.id
         syncState = .syncing
         do {
             let envelope = try await api.fetchState()
+            guard generation == sessionGeneration, expectedUserID == user?.id else { return }
             state = envelope.data
             stateRevision = StateRevision(updatedAt: envelope.updatedAt)
             conflictingServerRevision = nil
             syncState = .synced(Date())
         } catch APIError.unauthorized {
+            guard generation == sessionGeneration, expectedUserID == user?.id else { return }
             handleUnauthorized()
             throw APIError.unauthorized
         } catch {
+            guard generation == sessionGeneration, expectedUserID == user?.id else { return }
             markServerUnavailableIfNeeded(error)
             syncState = .failed(error.localizedDescription)
             throw error
@@ -176,16 +214,21 @@ final class AppSession: ObservableObject {
 
     func resolveStateConflictAndRetry() async {
         guard conflictingServerRevision != nil, unsavedSnapshot != nil else { return }
+        let generation = sessionGeneration
+        let expectedUserID = user?.id
         syncState = .syncing
         do {
             let envelope = try await api.fetchState()
+            guard generation == sessionGeneration, expectedUserID == user?.id else { return }
             stateRevision = StateRevision(updatedAt: envelope.updatedAt)
             conflictingServerRevision = nil
             guard let latestLocalSnapshot = unsavedSnapshot else { return }
             await save(latestLocalSnapshot)
         } catch APIError.unauthorized {
+            guard generation == sessionGeneration, expectedUserID == user?.id else { return }
             handleUnauthorized()
         } catch {
+            guard generation == sessionGeneration, expectedUserID == user?.id else { return }
             markServerUnavailableIfNeeded(error)
             syncState = .conflict("其他设备已更新，需要核对；暂时无法取得最新版本")
         }
@@ -213,13 +256,14 @@ final class AppSession: ObservableObject {
     }
 
     private func restoreSession() async {
+        let generation = beginSessionTransition()
         do {
-            user = try await api.currentUser()
-            phase = .signedIn
-            try await refresh()
+            let restoredUser = try await api.currentUser()
+            try await establishAuthenticatedSession(user: restoredUser, generation: generation)
         } catch APIError.unauthorized {
-            phase = .signedOut
+            if generation == sessionGeneration { handleUnauthorized() }
         } catch {
+            guard generation == sessionGeneration else { return }
             markServerUnavailableIfNeeded(error)
             alertMessage = error.localizedDescription
             phase = .signedOut
@@ -227,36 +271,70 @@ final class AppSession: ObservableObject {
     }
 
     private func save(_ snapshot: AppStatePayload) async {
+        let generation = sessionGeneration
+        let expectedUserID = user?.id
         syncState = .syncing
         let revision = stateRevision
         do {
             let savedRevision = try await api.saveState(snapshot, ifMatch: revision)
+            guard generation == sessionGeneration, expectedUserID == user?.id else { return }
             stateRevision = savedRevision
             conflictingServerRevision = nil
             if unsavedSnapshot == snapshot { unsavedSnapshot = nil }
             syncState = unsavedSnapshot == nil ? .synced(Date()) : .syncing
         } catch APIError.unauthorized {
+            guard generation == sessionGeneration, expectedUserID == user?.id else { return }
             handleUnauthorized()
         } catch APIError.stateVersionConflict(let currentUpdatedAt) {
+            guard generation == sessionGeneration, expectedUserID == user?.id else { return }
             pendingSave?.cancel()
             conflictingServerRevision = StateRevision(updatedAt: currentUpdatedAt)
             unsavedSnapshot = unsavedSnapshot ?? snapshot
             syncState = .conflict("其他设备已更新，需要核对")
         } catch {
+            guard generation == sessionGeneration, expectedUserID == user?.id else { return }
             markServerUnavailableIfNeeded(error)
             syncState = .failed(error.localizedDescription)
         }
     }
 
     private func handleUnauthorized() {
+        _ = beginSessionTransition()
+        phase = .signedOut
+        syncState = .failed("登录已失效")
+    }
+
+    private func establishAuthenticatedSession(user authenticatedUser: SessionUser, generation: UInt64) async throws {
+        guard generation == sessionGeneration else {
+            throw APIError.unavailable("登录请求已被新的账号切换替代")
+        }
+        let envelope = try await api.fetchState()
+        guard generation == sessionGeneration else {
+            throw APIError.unavailable("登录请求已被新的账号切换替代")
+        }
+        user = authenticatedUser
+        state = envelope.data
+        stateRevision = StateRevision(updatedAt: envelope.updatedAt)
+        conflictingServerRevision = nil
+        unsavedSnapshot = nil
+        syncState = .synced(Date())
+        alertMessage = nil
+        phase = .signedIn
+    }
+
+    @discardableResult
+    private func beginSessionTransition() -> UInt64 {
+        sessionGeneration &+= 1
         pendingSave?.cancel()
         state = .empty
         unsavedSnapshot = nil
         stateRevision = .empty
         conflictingServerRevision = nil
         user = nil
-        phase = .signedOut
-        syncState = .failed("登录已失效")
+        syncState = .idle
+        sessionScopeID = UUID()
+        onSessionScopeCleared()
+        return sessionGeneration
     }
 
     private func markServerUnavailableIfNeeded(_ error: Error) {

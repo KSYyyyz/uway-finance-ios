@@ -19,6 +19,8 @@ protocol FinanceAPI: Sendable {
     func health() async throws -> HealthResponse
     func capabilities() async throws -> ServerCapabilitiesResponse
     func login(username: String, password: String) async throws -> SessionUser
+    func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse
+    func register(_ request: RegistrationRequest) async throws -> RegistrationResponse
     func currentUser() async throws -> SessionUser
     func logout() async throws
     func fetchState() async throws -> StateEnvelope
@@ -28,6 +30,7 @@ protocol FinanceAPI: Sendable {
 
 actor LiveFinanceAPI: FinanceAPI {
     private let transport: HTTPTransport
+    private var authenticationTail: Task<Void, Never>?
 
     init(transport: HTTPTransport) { self.transport = transport }
 
@@ -41,11 +44,21 @@ actor LiveFinanceAPI: FinanceAPI {
 
     func login(username: String, password: String) async throws -> SessionUser {
         struct LoginRequest: Codable { let username: String; let password: String }
-        let envelope: SessionEnvelope = try await transport.send(
-            .login,
-            body: LoginRequest(username: username, password: password)
-        )
+        let request = LoginRequest(username: username, password: password)
+        let envelope: SessionEnvelope = try await serializedAuthenticationRequest {
+            try await self.transport.send(.login, body: request)
+        }
         return envelope.user
+    }
+
+    func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse {
+        try await transport.send(.registrationCode, body: RegistrationCodeRequest(phone: phone))
+    }
+
+    func register(_ request: RegistrationRequest) async throws -> RegistrationResponse {
+        try await serializedAuthenticationRequest {
+            try await self.transport.send(.register, body: request)
+        }
     }
 
     func currentUser() async throws -> SessionUser {
@@ -54,7 +67,9 @@ actor LiveFinanceAPI: FinanceAPI {
     }
 
     func logout() async throws {
-        let _: OKResponse = try await transport.send(.logout)
+        let _: OKResponse = try await serializedAuthenticationRequest {
+            try await self.transport.send(.logout)
+        }
     }
 
     func fetchState() async throws -> StateEnvelope {
@@ -75,5 +90,17 @@ actor LiveFinanceAPI: FinanceAPI {
 
     func audit(_ event: AuditEventRequest) async throws {
         let _: OKResponse = try await transport.send(.auditEvent, body: event)
+    }
+
+    private func serializedAuthenticationRequest<Value: Sendable>(
+        _ operation: @escaping @Sendable () async throws -> Value
+    ) async throws -> Value {
+        let previous = authenticationTail
+        let request = Task<Value, Error> {
+            if let previous { await previous.value }
+            return try await operation()
+        }
+        authenticationTail = Task { _ = try? await request.value }
+        return try await request.value
     }
 }

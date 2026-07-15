@@ -1,10 +1,10 @@
 # UwayFinance iOS API contract
 
-The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.14.0.json` is the checked-in iOS 0.14.0 baseline used by Windows and macOS CI; it targets backend app 0.14.0, API contract `20260715_010` and schema `20260715_006_semantic_preference_memory_v2`. No v0.14 mainline commit was supplied, so `backendBaselineCommit` remains null and full-workspace validation intentionally fails until the root checkout publishes the same frozen matrix.
+The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.14.0.json` is the checked-in iOS 0.14.0 baseline used by Windows and macOS CI; it targets backend app 0.14.0, API contract `20260715_010` and schema `20260715_007_multi_tenant_registration`. The root checkout contains the delegated registration contract but its mainline changes are not yet committed, so `backendBaselineCommit` remains null; full-workspace validation cross-checks the actual root files instead of claiming a frozen commit.
 
 ## Classification-review capability handshake
 
-`GET /api/health` returns the database/migration-ready response including `status`, `version` and `financeSchemaVersion: "20260715_006_semantic_preference_memory_v2"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260715_010`. The server also exposes `GET /api/live` for process liveness and `GET /api/ready` for database/migration readiness; iOS intentionally continues using compatibility `/api/health`.
+`GET /api/health` returns the database/migration-ready response including `status`, `version` and `financeSchemaVersion: "20260715_007_multi_tenant_registration"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260715_010`. The server also exposes `GET /api/live` for process liveness and `GET /api/ready` for database/migration readiness; iOS intentionally continues using compatibility `/api/health`.
 
 The capabilities response is the machine-readable source of truth. `financeResources.available=true` with `cutoverState=shadow` means the context and business-record slice can be compiled and contract-tested, not that the active app should cut over. Because `preferredMode` and `availableModes` still contain only `legacy_state_v1`, `AppSession` continues exclusively through `/api/state`. If capabilities are missing or invalid, old 0.8/0.9 fallback remains available.
 
@@ -17,6 +17,8 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 | GET | `/api/health` | `FinanceAPI.health()` |
 | GET | `/api/capabilities` | `FinanceAPI.capabilities()` |
 | POST | `/api/auth/login` | `FinanceAPI.login(...)` |
+| POST | `/api/auth/registration-code` | `FinanceAPI.requestRegistrationCode(...)` |
+| POST | `/api/auth/register` | `FinanceAPI.register(...)` |
 | GET | `/api/auth/me` | `FinanceAPI.currentUser()` |
 | POST | `/api/auth/logout` | `FinanceAPI.logout()` |
 | GET | `/api/state` | `FinanceAPI.fetchState()` |
@@ -38,6 +40,16 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 | GET | `/api/v2/business-record-evidence/:evidenceId/content` | `BusinessRecordEvidenceAPI.content(...)` — verified immutable bytes |
 | POST | `/api/v2/business-record-evidence/:evidenceId/revoke` | `BusinessRecordEvidenceAPI.revoke(...)` — reason + version + idempotency |
 | POST | `/api/audit-events` | `FinanceAPI.audit(...)` |
+
+## Multi-tenant registration and session isolation
+
+Registration is capability-gated. iOS enables it only when `features.registration` publishes `available=true`, the exact two endpoints, `phoneVerification=sms_webhook`, `createsIsolatedOrganizationAndAccountBook=true` and `sessionCookie=http_only_secure_same_site_strict`. Missing or unavailable capabilities disable the flow with an explanation; the client never fabricates a verification code or falls back to an insecure local registration path.
+
+The code request body is `{phone}` and its `202` response supplies the challenge TTL and resend interval. The registration body is `{username,password,phone,challengeId,code}` and its `201` response supplies the authenticated user plus the new organization/account-book IDs. Password and code remain transient and are sent only in a JSON body over HTTPS; they are absent from URLs, logs, `UserDefaults` and plaintext Keychain storage. The server owns code validity, rate limiting and SMS delivery.
+
+The client recognizes all frozen errors without erasing the form: `INVALID_PHONE`, `INVALID_REGISTRATION_INPUT`, `WEAK_PASSWORD`, `INVALID_REGISTRATION_CODE`, `REGISTRATION_CODE_RATE_LIMITED`, `REGISTRATION_IDENTITY_CONFLICT`, `SMS_PROVIDER_UNAVAILABLE` and `SMS_DELIVERY_FAILED`. Server TTL expiry clears the local challenge/code and requires a fresh SMS request.
+
+Each login/register/logout starts a new session generation. Responses may update UI/state only while their generation and expected user remain current, and live authentication requests are serialized so an older slow cookie response cannot land after a newer identity request. Account switch, logout or `401` clears `/api/state`, revision, unsaved/conflict snapshots, all account-book coverage/V2 view caches and temporary preview files before another identity can render. No cache key is shared across authenticated users even when an account-book ID string happens to match.
 
 `PUT /api/state` remains the compatibility bridge and now provides whole-state optimistic concurrency. Capabilities advertise `conflictControl=optional_if_match`, `versionSource=updatedAt`, `etagHeader=ETag` and `conditionalWriteHeader=If-Match`. Older clients may temporarily omit the header, but iOS 0.14.0 never does.
 
