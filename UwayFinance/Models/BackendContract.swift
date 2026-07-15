@@ -49,6 +49,42 @@ struct ClassificationReviewCapability: Codable, Equatable, Sendable {
     let rawBusinessRecordsChanged: Bool
 }
 
+struct ClassificationPreferenceMemoryCapability: Codable, Equatable, Sendable {
+    let available: Bool
+    let listEndpoint: String
+    let revokeEndpoint: String
+    let pagination: String
+    let scope: String
+    let source: String
+    let minimumConsistentObservations: Int
+    let minimumConsistency: Double
+    let lifecycleStates: [String]
+    let effect: String
+    let idempotencyHeader: String
+    let concurrencyControl: String
+    let modelCanAccept: Bool
+    let writesBusinessRecords: Bool
+
+    var safeForClientUse: Bool {
+        available
+            && listEndpoint == "/api/v2/classification-preferences"
+            && revokeEndpoint == "/api/v2/classification-preferences/:observationId/revoke"
+            && pagination == "cursor"
+            && scope == "account_book"
+            && source == "explicit_authenticated_human_decisions"
+            && minimumConsistentObservations == 3
+            && minimumConsistency == 0.8
+            && Set(lifecycleStates) == Set(["active", "revoked", "invalidated"])
+            && effect == "closed_candidate_reordering_only"
+            && idempotencyHeader == "Idempotency-Key"
+            && concurrencyControl == "expectedVersion"
+            && modelCanAccept == false
+            && writesBusinessRecords == false
+    }
+
+    var statusDisplay: String { safeForClientUse ? "账套级安全可用" : "未开放" }
+}
+
 struct LegacyStateCapability: Codable, Equatable, Sendable {
     let readable: Bool
     let writable: Bool
@@ -159,6 +195,7 @@ struct FeatureCapabilitiesResponse: Codable, Equatable, Sendable {
     let importAnalysis: ImportAnalysisCapability
     let unifiedDashboardMetrics: UnifiedDashboardMetricsCapability
     let classificationReview: ClassificationReviewCapability?
+    let classificationPreferenceMemory: ClassificationPreferenceMemoryCapability?
     let workflowTasks: CapabilityAvailability
     let aiClassification: AIClassificationCapability
     let documentUpload: CapabilityAvailability
@@ -196,6 +233,7 @@ struct ServerCapabilities: Equatable, Sendable {
     let unifiedDashboardMetrics: Bool
     let dashboardMetrics: UnifiedDashboardMetricsCapability
     let classificationReview: ClassificationReviewCapability?
+    let classificationPreferenceMemory: ClassificationPreferenceMemoryCapability?
     let workflowTasks: Bool
     let aiClassification: Bool
     let aiClassificationCapability: AIClassificationCapability
@@ -226,6 +264,7 @@ struct ServerCapabilities: Equatable, Sendable {
             unifiedDashboardMetrics: response.features.unifiedDashboardMetrics.available,
             dashboardMetrics: response.features.unifiedDashboardMetrics,
             classificationReview: response.features.classificationReview,
+            classificationPreferenceMemory: response.features.classificationPreferenceMemory,
             workflowTasks: response.features.workflowTasks.available,
             aiClassification: response.features.aiClassification.available,
             aiClassificationCapability: response.features.aiClassification,
@@ -263,6 +302,7 @@ struct ServerCapabilities: Equatable, Sendable {
                 classificationStates: nil
             ),
             classificationReview: nil,
+            classificationPreferenceMemory: nil,
             workflowTasks: false,
             aiClassification: false,
             aiClassificationCapability: AIClassificationCapability(
@@ -295,12 +335,15 @@ struct ServerCapabilities: Equatable, Sendable {
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260714_007"
+    static let apiContractVersion = "20260715_008"
     static let financeDomainV2Schema = "20260714_002_finance_resource_api"
     static let classificationReviewSchema = "20260714_003_classification_review"
+    static let classificationPreferenceMemorySchema = "20260715_004_account_book_preference_memory"
 
     static func isFinanceDomainV2Schema(_ value: String?) -> Bool {
-        value == financeDomainV2Schema || value == classificationReviewSchema
+        value == financeDomainV2Schema
+            || value == classificationReviewSchema
+            || value == classificationPreferenceMemorySchema
     }
 
     let serverVersion: String

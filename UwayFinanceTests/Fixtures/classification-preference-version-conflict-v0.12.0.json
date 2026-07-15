@@ -1,0 +1,5 @@
+{
+  "error": "分类学习记录已被其他窗口更新，请刷新后重试",
+  "code": "CLASSIFICATION_PREFERENCE_VERSION_CONFLICT",
+  "details": { "expectedVersion": 1, "currentVersion": 2 }
+}

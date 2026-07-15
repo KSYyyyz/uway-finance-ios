@@ -1,0 +1,122 @@
+{
+  "version": "0.12.0",
+  "backendAppVersion": "0.12.0",
+  "apiContractVersion": "20260715_008",
+  "financeSchemaVersion": "20260715_004_account_book_preference_memory",
+  "syncMode": "legacy_state_v1",
+  "money": {
+    "legacyStateEncoding": "json_number",
+    "financeV2Encoding": "decimal_string",
+    "databasePrecision": 18,
+    "databaseScale": 2
+  },
+  "capabilities": {
+    "financeDomainV2Mirror": true,
+    "legacyState": {
+      "readable": true,
+      "writable": true,
+      "conflictControl": "optional_if_match",
+      "versionSource": "updatedAt",
+      "etagHeader": "ETag",
+      "conditionalWriteHeader": "If-Match"
+    },
+    "financeResources": {
+      "available": true,
+      "cutoverState": "shadow",
+      "contextEndpoint": "/api/v2/context",
+      "cutoverReadiness": {
+        "available": true,
+        "endpoint": "/api/v2/cutover-readiness",
+        "pagination": "cursor",
+        "requiresZeroDifferences": true,
+        "requiresZeroShadowOnlyRecords": true,
+        "clientWritesEnabled": false
+      },
+      "businessRecords": {
+        "list": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "pagination": "cursor",
+        "moneyEncoding": "decimal_string",
+        "idempotencyHeader": "Idempotency-Key",
+        "concurrencyControl": "expectedVersion"
+      }
+    },
+    "unifiedDashboardMetrics": {
+      "available": true,
+      "endpoint": "/api/v2/dashboard-metrics",
+      "moneyEncoding": "decimal_string",
+      "source": "finance_v2_shadow_read_model",
+      "rawRecordsMerged": false,
+      "classificationStates": ["accepted", "review", "unclassified"]
+    },
+    "classificationReview": {
+      "available": true,
+      "listEndpoint": "/api/v2/classification-reviews",
+      "analyzeEndpoint": "/api/v2/classification-reviews/:recordId/analyze",
+      "decisionEndpoint": "/api/v2/classification-reviews/:recordId/decision",
+      "pagination": "cursor",
+      "defaultPageSize": 10,
+      "decisions": ["confirm", "correct", "reject"],
+      "idempotencyHeader": "Idempotency-Key",
+      "concurrencyControl": ["expectedRecordVersion", "expectedClassificationVersion"],
+      "modelCanAccept": false,
+      "deterministicRuleMayAccept": true,
+      "rawBusinessRecordsChanged": false
+    },
+    "classificationPreferenceMemory": {
+      "available": true,
+      "listEndpoint": "/api/v2/classification-preferences",
+      "revokeEndpoint": "/api/v2/classification-preferences/:observationId/revoke",
+      "pagination": "cursor",
+      "scope": "account_book",
+      "source": "explicit_authenticated_human_decisions",
+      "minimumConsistentObservations": 3,
+      "minimumConsistency": 0.8,
+      "lifecycleStates": ["active", "revoked", "invalidated"],
+      "effect": "closed_candidate_reordering_only",
+      "idempotencyHeader": "Idempotency-Key",
+      "concurrencyControl": "expectedVersion",
+      "modelCanAccept": false,
+      "writesBusinessRecords": false
+    },
+    "aiClassification": {
+      "available": "runtime",
+      "contract": "closed_set_existing_operating_item_v1",
+      "deterministicGroupingAvailable": true,
+      "modelCanAccept": false,
+      "writesBusinessRecords": false
+    },
+    "importAnalysis": {
+      "availability": "runtime",
+      "reasonWhenUnavailable": "provider_not_configured"
+    }
+  },
+  "endpoints": [
+    { "method": "get", "path": "/api/health", "swift": "method: .get, path: \"/api/health\"" },
+    { "method": "get", "path": "/api/capabilities", "swift": "method: .get, path: \"/api/capabilities\"" },
+    { "method": "post", "path": "/api/auth/login", "swift": "method: .post, path: \"/api/auth/login\"" },
+    { "method": "get", "path": "/api/auth/me", "swift": "method: .get, path: \"/api/auth/me\"" },
+    { "method": "post", "path": "/api/auth/logout", "swift": "method: .post, path: \"/api/auth/logout\"" },
+    { "method": "get", "path": "/api/state", "swift": "method: .get, path: \"/api/state\"" },
+    { "method": "put", "path": "/api/state", "swift": "method: .put, path: \"/api/state\"" },
+    { "method": "get", "path": "/api/v2/context", "swift": "\"/api/v2/context\"" },
+    { "method": "get", "path": "/api/v2/business-records", "swift": "path(\"/api/v2/business-records\"" },
+    { "method": "post", "path": "/api/v2/business-records", "swift": "method: .post, path: \"/api/v2/business-records\"" },
+    { "method": "patch", "path": "/api/v2/business-records/:recordId", "swift": "method: .patch, path: \"/api/v2/business-records/\\(encoded)\"" },
+    { "method": "get", "path": "/api/v2/cutover-readiness", "swift": "path(\"/api/v2/cutover-readiness\"" },
+    { "method": "get", "path": "/api/v2/dashboard-metrics", "swift": "path(\"/api/v2/dashboard-metrics\"" },
+    { "method": "get", "path": "/api/v2/classification-reviews", "swift": "path(\"/api/v2/classification-reviews\"" },
+    { "method": "post", "path": "/api/v2/classification-reviews/:recordId/analyze", "swift": "suffix: \"analyze\"" },
+    { "method": "post", "path": "/api/v2/classification-reviews/:recordId/decision", "swift": "suffix: \"decision\"" },
+    { "method": "get", "path": "/api/v2/classification-preferences", "swift": "path(\"/api/v2/classification-preferences\"" },
+    { "method": "post", "path": "/api/v2/classification-preferences/:observationId/revoke", "swift": "path: \"/api/v2/classification-preferences/\\(encoded)/revoke\"" },
+    { "method": "post", "path": "/api/audit-events", "swift": "method: .post, path: \"/api/audit-events\"" },
+    { "method": "post", "path": "/api/import-analysis", "swift": "method: .post, path: \"/api/import-analysis\"" },
+    { "method": "post", "path": "/api/import-analysis/:analysisId/decision", "swift": "method: .post, path: \"/api/import-analysis/\\(encoded)/decision\"" }
+  ],
+  "importRequestFields": ["source:", "record:", "companyOwnership:", "evidenceText:", "rowPath:"],
+  "ledgerProvenanceFields": ["importAnalysisId", "sourceFingerprint", "analysisDecision"],
+  "decisionStatuses": ["accepted", "review", "rejected"]
+}

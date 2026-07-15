@@ -1,0 +1,17 @@
+{
+  "observation": {
+    "id": "701", "accountBookId": "11", "recordId": "102", "direction": "expense",
+    "features": {
+      "merchantTokens": ["openai"], "serviceTokens": ["codex_openai"], "itemTokens": [],
+      "direction": "expense", "eventTime": "2026-07-02T00:00:00.000Z"
+    },
+    "decision": {
+      "action": "confirm", "taxonomyCode": "software_cloud",
+      "groupKey": "expense:software_cloud:codex_openai",
+      "previousTaxonomyCode": null, "previousGroupKey": null
+    },
+    "lifecycle": { "state": "revoked", "reason": "这次判断不应继续参与分类", "changedAt": "2026-07-15T10:00:00.000Z" },
+    "version": 2, "decidedAt": "2026-07-15T08:00:00.000Z", "lastUsedAt": "2026-07-15T09:00:00.000Z"
+  },
+  "safety": { "recomputedFromActiveEvents": true, "modelCanAccept": false, "writesBusinessRecords": false }
+}

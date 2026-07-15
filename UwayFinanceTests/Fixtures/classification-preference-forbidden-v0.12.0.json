@@ -1,0 +1,4 @@
+{
+  "error": "当前角色无权查看账套分类学习记录",
+  "code": "CLASSIFICATION_PREFERENCE_FORBIDDEN"
+}

@@ -1,10 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.12.0 - 2026-07-15
 
 - Hide visual scroll indicators across every SwiftUI scrolling container without changing pull-to-refresh, keyboard focus or accessibility scrolling.
 - Deep-link workbench risk, pending and classification-review records to the matching ledger detail/edit flow by stable `recordId`; preserve filters and review drafts, and distinguish missing, forbidden and deleted states.
-- Document the field inventory needed for a future personalization-learning contract without adding speculative API models or endpoints.
+- Negotiate API contract `20260715_008`, finance schema `20260715_004_account_book_preference_memory` and the optional account-book preference-memory capability while retaining all historical fixtures.
+- Add an account-book-scoped preference list and auditable revoke flow using opaque cursors, required reasons, stable idempotency keys and expected-version concurrency.
+- Preserve revoke drafts, filters and pagination on 409; clear every observation, cursor, draft and pending command when the account book changes.
+- Keep preference effects limited to closed-candidate reordering. AI cannot accept, write `BusinessRecord`, post vouchers or learn from anything other than authenticated human decisions.
 
 ## 0.11.0 - 2026-07-14
 

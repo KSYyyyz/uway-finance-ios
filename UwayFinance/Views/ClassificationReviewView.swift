@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor
 struct ClassificationReviewView: View {
     @EnvironmentObject private var session: AppSession
+    @Environment(\.classificationPreferenceAPI) private var classificationPreferenceAPI
     @StateObject private var store: ClassificationReviewStore
     @State private var recordRoute: RecordDeepLinkRoute?
     @State private var deepLinkFailure: RecordDeepLinkFailure?
@@ -24,6 +25,11 @@ struct ClassificationReviewView: View {
             && ai.modelCanAccept == false
             && ai.writesBusinessRecords == false
             && contract.capabilities.safety.aiMayWriteBusinessRecords == false
+    }
+
+    private var preferenceMemoryAvailable: Bool {
+        guard case .available(let contract) = session.serverState else { return false }
+        return contract.capabilities.classificationPreferenceMemory?.safeForClientUse == true
     }
 
     var body: some View {
@@ -79,6 +85,29 @@ struct ClassificationReviewView: View {
                 }
             }
             .pickerStyle(.segmented)
+
+            if preferenceMemoryAvailable, let accountBook = store.currentAccountBook {
+                NavigationLink {
+                    ClassificationPreferenceView(api: classificationPreferenceAPI, accountBook: accountBook)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "brain.head.profile")
+                            .foregroundStyle(AppTheme.brand)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("账套分类学习记录").font(.subheadline.weight(.semibold))
+                            Text("查看人工决定形成的记忆，并可审计地撤销")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                    }
+                    .padding(12)
+                    .background(AppTheme.elevatedSurface, in: RoundedRectangle(cornerRadius: AppTheme.compactRadius))
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("只打开当前账套的分类学习记录")
+            }
 
             if let message = store.message {
                 Label(message, systemImage: "info.circle")

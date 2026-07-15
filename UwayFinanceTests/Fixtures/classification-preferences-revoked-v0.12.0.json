@@ -1,0 +1,26 @@
+{
+  "accountBook": {
+    "id": "11", "name": "默认账套", "baseCurrency": "CNY",
+    "organization": { "id": "7", "name": "有为科技" },
+    "role": "finance",
+    "permissions": { "readBusinessRecords": true, "writeBusinessRecords": true }
+  },
+  "items": [
+    {
+      "id": "699", "accountBookId": "11", "recordId": "101", "direction": "expense",
+      "features": {
+        "merchantTokens": [], "serviceTokens": [], "itemTokens": ["历史服务"],
+        "direction": "expense", "eventTime": "2026-07-01T00:00:00.000Z"
+      },
+      "decision": {
+        "action": "confirm", "taxonomyCode": "professional_services",
+        "groupKey": "expense:professional_services:item:old",
+        "previousTaxonomyCode": null, "previousGroupKey": null
+      },
+      "lifecycle": { "state": "revoked", "reason": "当时判断有误", "changedAt": "2026-07-15T10:00:00.000Z" },
+      "version": 2, "decidedAt": "2026-07-14T08:00:00.000Z", "lastUsedAt": null
+    }
+  ],
+  "page": { "limit": 10, "nextCursor": null },
+  "safety": { "accountBookScoped": true, "modelCanAccept": false, "writesBusinessRecords": false }
+}

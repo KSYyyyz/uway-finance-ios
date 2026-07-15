@@ -34,4 +34,18 @@ final class EndpointContractTests: XCTestCase {
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any])
         XCTAssertEqual(Set(object.keys), Set(["decision", "reason"]))
     }
+
+    func testClassificationPreferenceEndpointsKeepAccountBookScopeAndRevokePath() {
+        let list = APIEndpoint.classificationPreferences(ClassificationPreferenceQuery(
+            accountBookId: "11", state: .active, limit: 10, cursor: "opaque+/next="
+        ))
+        XCTAssertEqual(list.method, .get)
+        XCTAssertTrue(list.path.hasPrefix("/api/v2/classification-preferences?"))
+        XCTAssertTrue(list.path.contains("accountBookId=11"))
+        XCTAssertTrue(list.path.contains("state=active"))
+        XCTAssertEqual(
+            APIEndpoint.revokeClassificationPreference(observationId: "701/unsafe").path,
+            "/api/v2/classification-preferences/701%2Funsafe/revoke"
+        )
+    }
 }

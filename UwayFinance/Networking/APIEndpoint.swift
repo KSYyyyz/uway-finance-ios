@@ -73,6 +73,22 @@ struct APIEndpoint: Hashable {
         APIEndpoint(method: .post, path: classificationPath(recordId: recordId, suffix: "decision"))
     }
 
+    static func classificationPreferences(_ query: ClassificationPreferenceQuery) -> APIEndpoint {
+        var items = [
+            URLQueryItem(name: "accountBookId", value: query.accountBookId),
+            URLQueryItem(name: "state", value: query.state.rawValue),
+            URLQueryItem(name: "limit", value: String(query.limit)),
+        ]
+        if let value = query.cursor { items.append(URLQueryItem(name: "cursor", value: value)) }
+        return APIEndpoint(method: .get, path: path("/api/v2/classification-preferences", queryItems: items))
+    }
+
+    static func revokeClassificationPreference(observationId: String) -> APIEndpoint {
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
+        let encoded = observationId.addingPercentEncoding(withAllowedCharacters: allowed) ?? observationId
+        return APIEndpoint(method: .post, path: "/api/v2/classification-preferences/\(encoded)/revoke")
+    }
+
     static func updateBusinessRecord(recordId: String) -> APIEndpoint {
         let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
         let encoded = recordId.addingPercentEncoding(withAllowedCharacters: allowed) ?? recordId

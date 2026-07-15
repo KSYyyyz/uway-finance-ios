@@ -4,16 +4,16 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
-const expectedMarketingVersion = '0.11.0'
-const expectedBackendVersion = '0.11.0'
-const expectedAPIContractVersion = '20260714_007'
-const expectedFinanceSchemaVersion = '20260714_003_classification_review'
+const expectedMarketingVersion = '0.12.0'
+const expectedBackendVersion = '0.12.0'
+const expectedAPIContractVersion = '20260715_008'
+const expectedFinanceSchemaVersion = '20260715_004_account_book_preference_memory'
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
-const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.11.0.json')
+const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.12.0.json')
 
 const requiredFiles = [
   'project.yml',
-  'ContractSnapshots/backend-api-v0.11.0.json',
+  'ContractSnapshots/backend-api-v0.12.0.json',
   'UwayFinance/App/UwayFinanceApp.swift',
   'UwayFinance/Networking/APIEndpoint.swift',
   'UwayFinance/Networking/FinanceAPI.swift',
@@ -23,19 +23,23 @@ const requiredFiles = [
   'UwayFinance/Networking/CutoverReadinessAPI.swift',
   'UwayFinance/Networking/DashboardMetricsAPI.swift',
   'UwayFinance/Networking/ClassificationReviewAPI.swift',
+  'UwayFinance/Networking/ClassificationPreferenceAPI.swift',
   'UwayFinance/Models/BackendContract.swift',
   'UwayFinance/Models/FinanceResourceModels.swift',
   'UwayFinance/Models/CutoverReadinessModels.swift',
   'UwayFinance/Models/DashboardMetricsModels.swift',
   'UwayFinance/Models/ClassificationReviewModels.swift',
+  'UwayFinance/Models/ClassificationPreferenceModels.swift',
   'UwayFinance/Models/RecordDeepLink.swift',
   'UwayFinance/Models/MoneyAmount.swift',
   'UwayFinance/Models/RecordImportPipeline.swift',
   'UwayFinance/State/RecordImportSession.swift',
   'UwayFinance/State/ClassificationReviewStore.swift',
+  'UwayFinance/State/ClassificationPreferenceStore.swift',
   'UwayFinance/Views/RecordImportView.swift',
   'UwayFinance/Views/LedgerView.swift',
   'UwayFinance/Views/ClassificationReviewView.swift',
+  'UwayFinance/Views/ClassificationPreferenceView.swift',
   'UwayFinance/Views/RecordDetailView.swift',
   'UwayFinance/Resources/Info.plist',
   'UwayFinance/Resources/Assets.xcassets/Contents.json',
@@ -51,6 +55,8 @@ const requiredFiles = [
   'UwayFinanceTests/DashboardMetricsAPITests.swift',
   'UwayFinanceTests/ClassificationReviewAPITests.swift',
   'UwayFinanceTests/ClassificationReviewStoreTests.swift',
+  'UwayFinanceTests/ClassificationPreferenceAPITests.swift',
+  'UwayFinanceTests/ClassificationPreferenceStoreTests.swift',
   'UwayFinanceTests/RecordDeepLinkTests.swift',
   'UwayFinanceTests/LegacyStateConditionalWriteAPITests.swift',
   'UwayFinanceTests/RecordImportPipelineTests.swift',
@@ -85,6 +91,14 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/state-save-v0.11.0.json',
   'UwayFinanceTests/Fixtures/state-version-conflict-v0.11.0.json',
   'UwayFinanceTests/Fixtures/state-record-deeplink-v0.11.0.json',
+  'UwayFinanceTests/Fixtures/health-preference-memory-v0.12.0.json',
+  'UwayFinanceTests/Fixtures/capabilities-preference-memory-v0.12.0.json',
+  'UwayFinanceTests/Fixtures/classification-preferences-active-v0.12.0.json',
+  'UwayFinanceTests/Fixtures/classification-preferences-revoked-v0.12.0.json',
+  'UwayFinanceTests/Fixtures/classification-preference-revoke-v0.12.0.json',
+  'UwayFinanceTests/Fixtures/classification-preference-version-conflict-v0.12.0.json',
+  'UwayFinanceTests/Fixtures/classification-preference-forbidden-v0.12.0.json',
+  'UwayFinanceTests/Fixtures/classification-preference-invalid-cursor-v0.12.0.json',
   'Docs/PERSONALIZATION_CONTRACT_REQUIREMENTS.md',
   'CHANGELOG.md',
 ]
@@ -140,6 +154,14 @@ const fixtures = [
   'state-save-v0.11.0.json',
   'state-version-conflict-v0.11.0.json',
   'state-record-deeplink-v0.11.0.json',
+  'health-preference-memory-v0.12.0.json',
+  'capabilities-preference-memory-v0.12.0.json',
+  'classification-preferences-active-v0.12.0.json',
+  'classification-preferences-revoked-v0.12.0.json',
+  'classification-preference-revoke-v0.12.0.json',
+  'classification-preference-version-conflict-v0.12.0.json',
+  'classification-preference-forbidden-v0.12.0.json',
+  'classification-preference-invalid-cursor-v0.12.0.json',
 ]
 for (const fixture of fixtures) {
   JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', fixture), 'utf8'))
@@ -222,6 +244,7 @@ if (metricsSnapshot?.available !== true
   throw new Error('dashboard metrics snapshot must remain governed, read-only and deterministic')
 }
 const classificationSnapshot = contractSnapshot.capabilities?.classificationReview
+const preferenceMemorySnapshot = contractSnapshot.capabilities?.classificationPreferenceMemory
 const classificationAISnapshot = contractSnapshot.capabilities?.aiClassification
 if (classificationSnapshot?.available !== true
     || classificationSnapshot?.listEndpoint !== '/api/v2/classification-reviews'
@@ -240,6 +263,22 @@ if (classificationSnapshot?.available !== true
     || classificationAISnapshot?.writesBusinessRecords !== false) {
   throw new Error('classification review snapshot safety boundary mismatch')
 }
+if (preferenceMemorySnapshot?.available !== true
+    || preferenceMemorySnapshot?.listEndpoint !== '/api/v2/classification-preferences'
+    || preferenceMemorySnapshot?.revokeEndpoint !== '/api/v2/classification-preferences/:observationId/revoke'
+    || preferenceMemorySnapshot?.pagination !== 'cursor'
+    || preferenceMemorySnapshot?.scope !== 'account_book'
+    || preferenceMemorySnapshot?.source !== 'explicit_authenticated_human_decisions'
+    || preferenceMemorySnapshot?.minimumConsistentObservations !== 3
+    || preferenceMemorySnapshot?.minimumConsistency !== 0.8
+    || preferenceMemorySnapshot?.lifecycleStates?.join(',') !== 'active,revoked,invalidated'
+    || preferenceMemorySnapshot?.effect !== 'closed_candidate_reordering_only'
+    || preferenceMemorySnapshot?.idempotencyHeader !== 'Idempotency-Key'
+    || preferenceMemorySnapshot?.concurrencyControl !== 'expectedVersion'
+    || preferenceMemorySnapshot?.modelCanAccept !== false
+    || preferenceMemorySnapshot?.writesBusinessRecords !== false) {
+  throw new Error('classification preference-memory snapshot safety boundary mismatch')
+}
 if (contractSnapshot.capabilities?.importAnalysis?.availability !== 'runtime'
     || contractSnapshot.capabilities?.importAnalysis?.reasonWhenUnavailable !== 'provider_not_configured') {
   throw new Error('import-analysis capability must remain runtime-negotiated')
@@ -254,11 +293,11 @@ if (contractSnapshot.money?.legacyStateEncoding !== 'json_number'
   throw new Error('backend contract snapshot money boundary mismatch')
 }
 
-const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-classification-review-v0.11.0.json'), 'utf8'))
-const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-classification-review-v0.11.0.json'), 'utf8'))
+const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-preference-memory-v0.12.0.json'), 'utf8'))
+const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-preference-memory-v0.12.0.json'), 'utf8'))
 if (healthFixture.version !== expectedBackendVersion
     || healthFixture.financeSchemaVersion !== expectedFinanceSchemaVersion) {
-  throw new Error('classification-review health fixture version/schema mismatch')
+  throw new Error('preference-memory health fixture version/schema mismatch')
 }
 if (capabilitiesFixture.version !== expectedBackendVersion
     || capabilitiesFixture.apiContractVersion !== expectedAPIContractVersion
@@ -287,7 +326,7 @@ if (capabilitiesFixture.sync?.financeResources?.available !== true
     || capabilitiesFixture.sync?.financeResources?.cutoverState !== 'shadow'
     || capabilitiesFixture.sync?.financeResources?.cutoverReadiness?.clientWritesEnabled !== false
     || capabilitiesFixture.sync?.financeResources?.businessRecords?.moneyEncoding !== 'decimal_string') {
-  throw new Error('current 0.11.0 capabilities fixture must preserve read-only readiness and the shadow resource slice')
+  throw new Error('current 0.12.0 capabilities fixture must preserve read-only readiness and the shadow resource slice')
 }
 const oldCapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.0.json'), 'utf8'))
 if ('cutoverReadiness' in (oldCapabilitiesFixture.sync?.financeResources ?? {})) {
@@ -361,6 +400,14 @@ if (historicalHealthFixture.version !== '0.10.2'
     || historicalCapabilitiesFixture.apiContractVersion !== '20260714_004') {
   throw new Error('dedicated 0.10.2 backward-compat fixtures must remain historical and immutable')
 }
+const historicalReviewHealthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-classification-review-v0.11.0.json'), 'utf8'))
+const historicalReviewCapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-classification-review-v0.11.0.json'), 'utf8'))
+if (historicalReviewHealthFixture.version !== '0.11.0'
+    || historicalReviewCapabilitiesFixture.version !== '0.11.0'
+    || historicalReviewCapabilitiesFixture.apiContractVersion !== '20260714_007'
+    || historicalReviewCapabilitiesFixture.features?.classificationPreferenceMemory !== undefined) {
+  throw new Error('dedicated 0.11.0 backward-compat fixtures must remain historical and omit preference memory')
+}
 const reviewCapability = capabilitiesFixture.features?.classificationReview
 if (reviewCapability?.available !== true
     || reviewCapability?.defaultPageSize !== 10
@@ -412,6 +459,48 @@ const classificationErrorCodes = [
 for (const [name, code] of classificationErrorCodes) {
   const value = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', name), 'utf8'))
   if (value.code !== code) throw new Error(`classification error fixture mismatch: ${name}`)
+}
+const preferenceCapability = capabilitiesFixture.features?.classificationPreferenceMemory
+if (preferenceCapability?.available !== true
+    || preferenceCapability?.listEndpoint !== '/api/v2/classification-preferences'
+    || preferenceCapability?.revokeEndpoint !== '/api/v2/classification-preferences/:observationId/revoke'
+    || preferenceCapability?.pagination !== 'cursor'
+    || preferenceCapability?.scope !== 'account_book'
+    || preferenceCapability?.source !== 'explicit_authenticated_human_decisions'
+    || preferenceCapability?.minimumConsistentObservations !== 3
+    || preferenceCapability?.minimumConsistency !== 0.8
+    || preferenceCapability?.lifecycleStates?.join(',') !== 'active,revoked,invalidated'
+    || preferenceCapability?.effect !== 'closed_candidate_reordering_only'
+    || preferenceCapability?.idempotencyHeader !== 'Idempotency-Key'
+    || preferenceCapability?.concurrencyControl !== 'expectedVersion'
+    || preferenceCapability?.modelCanAccept !== false
+    || preferenceCapability?.writesBusinessRecords !== false) {
+  throw new Error('classification preference-memory capability fixture is unsafe or incomplete')
+}
+const activePreferences = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'classification-preferences-active-v0.12.0.json'), 'utf8'))
+const revokedPreferences = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'classification-preferences-revoked-v0.12.0.json'), 'utf8'))
+const revokePreference = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'classification-preference-revoke-v0.12.0.json'), 'utf8'))
+if (activePreferences.accountBook?.id !== '11'
+    || activePreferences.items?.some((item) => item.accountBookId !== activePreferences.accountBook.id)
+    || activePreferences.page?.limit !== 10
+    || typeof activePreferences.page?.nextCursor !== 'string'
+    || activePreferences.safety?.accountBookScoped !== true
+    || activePreferences.safety?.modelCanAccept !== false
+    || activePreferences.safety?.writesBusinessRecords !== false
+    || revokedPreferences.items?.[0]?.lifecycle?.state !== 'revoked'
+    || revokePreference.observation?.lifecycle?.state !== 'revoked'
+    || revokePreference.safety?.recomputedFromActiveEvents !== true
+    || revokePreference.safety?.modelCanAccept !== false
+    || revokePreference.safety?.writesBusinessRecords !== false) {
+  throw new Error('classification preference fixtures must preserve account-book scope, lifecycle and non-writing safety')
+}
+for (const [name, code] of [
+  ['classification-preference-version-conflict-v0.12.0.json', 'CLASSIFICATION_PREFERENCE_VERSION_CONFLICT'],
+  ['classification-preference-forbidden-v0.12.0.json', 'CLASSIFICATION_PREFERENCE_FORBIDDEN'],
+  ['classification-preference-invalid-cursor-v0.12.0.json', 'INVALID_CLASSIFICATION_PREFERENCE_CURSOR'],
+]) {
+  const value = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', name), 'utf8'))
+  if (value.code !== code) throw new Error(`classification preference error fixture mismatch: ${name}`)
 }
 const emptyStateFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'state-empty-v0.11.0.json'), 'utf8'))
 const stateSaveFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'state-save-v0.11.0.json'), 'utf8'))
@@ -478,7 +567,7 @@ for (const marker of ['<string>https</string>', '<string>115.29.239.217</string>
 }
 
 const profile = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'ProfileView.swift'), 'utf8')
-for (const marker of ['Bundle.main', 'CFBundleShortVersionString', 'value: appVersion', 'contract.capabilities.importAnalysis.statusDisplay']) {
+for (const marker of ['Bundle.main', 'CFBundleShortVersionString', 'value: appVersion', 'contract.capabilities.importAnalysis.statusDisplay', 'classificationPreferenceMemory?.statusDisplay']) {
   if (!profile.includes(marker)) throw new Error(`Profile bundle version marker missing: ${marker}`)
 }
 if (profile.includes(`value: "${expectedMarketingVersion}"`)) {
@@ -533,7 +622,7 @@ for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amo
 }
 
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
-for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', '"accepted", "review", "rejected"']) {
+for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
 }
 for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
@@ -597,6 +686,22 @@ const classificationView = fs.readFileSync(path.join(root, 'UwayFinance', 'Views
 for (const marker of ['closed_set_existing_operating_item_v1', 'modelCanAccept == false', 'writesBusinessRecords == false', '每页最多 10 条']) {
   if (!classificationView.includes(marker)) throw new Error(`classification workbench safety marker missing: ${marker}`)
 }
+const preferenceModels = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'ClassificationPreferenceModels.swift'), 'utf8')
+for (const marker of ['ClassificationPreferenceObservation', 'accountBookId', 'expectedVersion', 'ClassificationPreferenceRevokeCommand', 'IdempotencyKey', 'case active', 'case revoked', 'case invalidated']) {
+  if (!preferenceModels.includes(marker)) throw new Error(`classification preference model marker missing: ${marker}`)
+}
+const preferenceAPI = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'ClassificationPreferenceAPI.swift'), 'utf8')
+for (const marker of ['protocol ClassificationPreferenceAPI', '.classificationPreferences(query)', '.revokeClassificationPreference', 'Idempotency-Key', 'command.idempotencyKey.rawValue']) {
+  if (!preferenceAPI.includes(marker)) throw new Error(`classification preference API marker missing: ${marker}`)
+}
+const preferenceStore = fs.readFileSync(path.join(root, 'UwayFinance', 'State', 'ClassificationPreferenceStore.swift'), 'utf8')
+for (const marker of ['limit: 10', 'cursorStack', 'pendingRevokes', 'CLASSIFICATION_PREFERENCE_VERSION_CONFLICT', '当前筛选和分页', 'clearAccountScopedState', 'accountBookScoped', 'writesBusinessRecords == false']) {
+  if (!preferenceStore.includes(marker)) throw new Error(`classification preference isolation/retry marker missing: ${marker}`)
+}
+const preferenceView = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'ClassificationPreferenceView.swift'), 'utf8')
+for (const marker of ['账套级分类记忆', '每页最多 10 条', '撤销这条学习记录', 'TextEditor', 'appScrollIndicatorsHidden']) {
+  if (!preferenceView.includes(marker)) throw new Error(`classification preference UI marker missing: ${marker}`)
+}
 const httpTransport = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'HTTPTransport.swift'), 'utf8')
 for (const marker of ['case versionConflict', 'case stateVersionConflict', 'STATE_VERSION_CONFLICT', 'currentUpdatedAt', 'headers: [String: String]']) {
   if (!httpTransport.includes(marker)) throw new Error(`V2 transport marker missing: ${marker}`)
@@ -609,7 +714,7 @@ if (financeAPI.includes('ISO8601DateFormatter().string(from: Date())')) {
   throw new Error('conditional state revision must never be invented client-side')
 }
 const appSession = fs.readFileSync(path.join(root, 'UwayFinance', 'State', 'AppSession.swift'), 'utf8')
-if (appSession.includes('FinanceResourceAPI') || appSession.includes('CutoverReadinessAPI') || appSession.includes('DashboardMetricsAPI') || appSession.includes('ClassificationReviewAPI') || appSession.includes('/api/v2')) {
+if (appSession.includes('FinanceResourceAPI') || appSession.includes('CutoverReadinessAPI') || appSession.includes('DashboardMetricsAPI') || appSession.includes('ClassificationReviewAPI') || appSession.includes('ClassificationPreferenceAPI') || appSession.includes('/api/v2')) {
   throw new Error('shadow V2 clients must not become the AppSession data source')
 }
 for (const marker of ['stateRevision', 'unsavedSnapshot', 'conflictingServerRevision', 'catch APIError.stateVersionConflict', 'resolveStateConflictAndRetry', '其他设备已更新，需要核对']) {
@@ -627,6 +732,7 @@ const financeCutoverPath = path.join(workspace, 'server', 'finance-cutover.ts')
 const dashboardMetricsPath = path.join(workspace, 'server', 'dashboard-metrics.ts')
 const classificationReviewPath = path.join(workspace, 'server', 'classification-review.ts')
 const classificationAnalysisPath = path.join(workspace, 'server', 'classification-analysis.ts')
+const classificationPreferencesPath = path.join(workspace, 'server', 'classification-preferences.ts')
 const apiContractDocumentPath = path.join(workspace, 'API-V2-CONTRACT.md')
 const mainPackagePath = path.join(workspace, 'package.json')
 const hasMainPackage = fs.existsSync(mainPackagePath)
@@ -652,7 +758,7 @@ if (hasMainPackage && hasMainContractDocument) {
   }
 }
 const hasLocalBackend = process.env.UWAY_SKIP_LOCAL_BACKEND !== '1'
-  && [serverPath, healthPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, classificationReviewPath, classificationAnalysisPath, apiContractDocumentPath].every(fs.existsSync)
+  && [serverPath, healthPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, classificationReviewPath, classificationAnalysisPath, classificationPreferencesPath, apiContractDocumentPath].every(fs.existsSync)
 if (hasLocalBackend) {
   const server = fs.readFileSync(serverPath, 'utf8')
   for (const { method, path: endpoint } of currentContracts) {
@@ -700,6 +806,14 @@ if (hasLocalBackend) {
     "pagination: 'cursor'",
     "idempotencyHeader: 'Idempotency-Key'",
     "concurrencyControl: 'expectedVersion'",
+    "listEndpoint: '/api/v2/classification-preferences'",
+    "revokeEndpoint: '/api/v2/classification-preferences/:observationId/revoke'",
+    "scope: 'account_book'",
+    "source: 'explicit_authenticated_human_decisions'",
+    'minimumConsistentObservations: 3',
+    'minimumConsistency: 0.8',
+    "lifecycleStates: ['active', 'revoked', 'invalidated']",
+    "effect: 'closed_candidate_reordering_only'",
     "legacyStateEncoding: 'json_number'",
     "financeV2Encoding: 'decimal_string'",
     'databasePrecision: 18',
@@ -741,6 +855,23 @@ if (hasLocalBackend) {
   const classificationAnalysisRoute = `${server}\n${classificationAnalysis}`
   for (const marker of ['CLASSIFICATION_AI_UNAVAILABLE', 'Idempotency-Key', 'expectedRecordVersion', 'expectedClassificationVersion', 'writesBusinessRecord: false', 'modelCanAccept: false', 'modelWritesBusinessRecords: false']) {
     if (!classificationAnalysisRoute.includes(marker)) throw new Error(`local classification analysis marker missing: ${marker}`)
+  }
+  const classificationPreferences = fs.readFileSync(classificationPreferencesPath, 'utf8')
+  for (const marker of [
+    "state: z.enum(['active', 'revoked', 'invalidated', 'all'])",
+    'accountBookId: accountBookIdSchema',
+    'expectedVersion: z.number().int().positive()',
+    'reason: z.string().trim().min(2).max(500)',
+    'CLASSIFICATION_PREFERENCE_FORBIDDEN',
+    'INVALID_CLASSIFICATION_PREFERENCE_CURSOR',
+    'CLASSIFICATION_PREFERENCE_VERSION_CONFLICT',
+    'CLASSIFICATION_PREFERENCE_NOT_ACTIVE',
+    'accountBookScoped: true',
+    'recomputedFromActiveEvents: true',
+    'modelCanAccept: false',
+    'writesBusinessRecords: false',
+  ]) {
+    if (!classificationPreferences.includes(marker)) throw new Error(`local classification preference marker missing: ${marker}`)
   }
 }
 

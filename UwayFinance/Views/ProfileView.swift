@@ -46,6 +46,10 @@ struct ProfileView: View {
                         value: contract.capabilities.financeResources.statusDisplay
                     )
                     LabeledContent("导入分析", value: contract.capabilities.importAnalysis.statusDisplay)
+                    LabeledContent(
+                        "分类偏好记忆",
+                        value: contract.capabilities.classificationPreferenceMemory?.statusDisplay ?? "服务端未公布"
+                    )
                 }
                 LabeledContent("OCR与附件", value: "等待后端")
                 Button("检查服务与同步", systemImage: "arrow.clockwise") {

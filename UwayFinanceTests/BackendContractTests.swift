@@ -16,6 +16,7 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.importAnalysis.reason, "capabilities_unavailable")
         XCTAssertFalse(contract.capabilities.documentUpload)
         XCTAssertFalse(contract.capabilities.ocr)
+        XCTAssertNil(contract.capabilities.classificationPreferenceMemory)
     }
 
     func testCapabilitiesV090NegotiatesOnlyPublishedLegacyMode() throws {
@@ -143,6 +144,39 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.aiClassificationCapability.contract, "closed_set_existing_operating_item_v1")
         XCTAssertFalse(contract.capabilities.aiClassificationCapability.modelCanAccept ?? true)
         XCTAssertFalse(contract.capabilities.aiClassificationCapability.writesBusinessRecords ?? true)
+        XCTAssertNil(contract.capabilities.classificationPreferenceMemory)
+    }
+
+    func testPreferenceMemoryCapabilityNegotiatesCurrentAccountBookSafetyWithoutChangingSyncMode() throws {
+        let health = try JSONDecoder().decode(
+            HealthResponse.self,
+            from: fixture(named: "health-preference-memory-v0.12.0")
+        )
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-preference-memory-v0.12.0")
+        )
+        let contract = BackendContract(health: health, negotiated: response)
+
+        XCTAssertEqual(contract.serverVersion, "0.12.0")
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260715_008")
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.classificationPreferenceMemorySchema)
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])
+        let memory = try XCTUnwrap(contract.capabilities.classificationPreferenceMemory)
+        XCTAssertTrue(memory.safeForClientUse)
+        XCTAssertEqual(memory.scope, "account_book")
+        XCTAssertEqual(memory.source, "explicit_authenticated_human_decisions")
+        XCTAssertEqual(memory.minimumConsistentObservations, 3)
+        XCTAssertEqual(memory.minimumConsistency, 0.8)
+        XCTAssertEqual(Set(memory.lifecycleStates), Set(["active", "revoked", "invalidated"]))
+        XCTAssertEqual(memory.effect, "closed_candidate_reordering_only")
+        XCTAssertEqual(memory.idempotencyHeader, "Idempotency-Key")
+        XCTAssertEqual(memory.concurrencyControl, "expectedVersion")
+        XCTAssertFalse(memory.modelCanAccept)
+        XCTAssertFalse(memory.writesBusinessRecords)
+        XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
+        XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
     }
 
     func testCapabilitiesV090ReportsUnconfiguredImportProvider() throws {

@@ -11,6 +11,7 @@ struct ClassificationReviewDraft: Equatable, Sendable {
 @MainActor
 final class ClassificationReviewStore: ObservableObject {
     @Published private(set) var items: [ClassificationReviewItem] = []
+    @Published private(set) var currentAccountBook: FinanceAccountBookAccess?
     @Published private(set) var taxonomy: [ClassificationTaxonomyItem] = []
     @Published private(set) var nextCursor: String?
     @Published private(set) var canGoBack = false
@@ -212,6 +213,7 @@ final class ClassificationReviewStore: ObservableObject {
                 period: period
             ))
             accountBookId = response.accountBook.id
+            currentAccountBook = response.accountBook
             canReadBusinessRecords = response.accountBook.permissions.readBusinessRecords
             canWriteBusinessRecords = response.accountBook.permissions.writeBusinessRecords
             items = response.items
@@ -224,6 +226,7 @@ final class ClassificationReviewStore: ObservableObject {
         } catch APIError.server(let status, _, let serverMessage) where status == 403 {
             items = []
             nextCursor = nil
+            currentAccountBook = nil
             canReadBusinessRecords = false
             canWriteBusinessRecords = false
             message = serverMessage

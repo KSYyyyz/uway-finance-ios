@@ -1,10 +1,10 @@
 # UwayFinance iOS API contract
 
-The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.11.0.json` is the checked-in iOS 0.11.0 baseline used by Windows and macOS CI; it targets backend app 0.11.0 and the frozen API contract `20260714_007`. The full workspace validator also cross-checks it against local backend sources when they are present.
+The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.12.0.json` is the checked-in iOS 0.12.0 baseline used by Windows and macOS CI; it targets backend app 0.12.0 and the frozen API contract `20260715_008`. The full workspace validator also cross-checks it against local backend sources when they are present.
 
 ## Classification-review capability handshake
 
-`GET /api/health` returns the database/migration-ready response including `status`, `version` and `financeSchemaVersion: "20260714_003_classification_review"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260714_007`. The server also exposes `GET /api/live` for process liveness and `GET /api/ready` for database/migration readiness; iOS intentionally continues using compatibility `/api/health`.
+`GET /api/health` returns the database/migration-ready response including `status`, `version` and `financeSchemaVersion: "20260715_004_account_book_preference_memory"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260715_008`. The server also exposes `GET /api/live` for process liveness and `GET /api/ready` for database/migration readiness; iOS intentionally continues using compatibility `/api/health`.
 
 The capabilities response is the machine-readable source of truth. `financeResources.available=true` with `cutoverState=shadow` means the context and business-record slice can be compiled and contract-tested, not that the active app should cut over. Because `preferredMode` and `availableModes` still contain only `legacy_state_v1`, `AppSession` continues exclusively through `/api/state`. If capabilities are missing or invalid, old 0.8/0.9 fallback remains available.
 
@@ -30,9 +30,11 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 | GET | `/api/v2/classification-reviews` | `ClassificationReviewAPI.list(...)` — max 10, opaque cursor |
 | POST | `/api/v2/classification-reviews/:recordId/analyze` | `ClassificationReviewAPI.analyze(...)` — idempotent AI suggestion |
 | POST | `/api/v2/classification-reviews/:recordId/decision` | `ClassificationReviewAPI.decide(...)` — authenticated human decision |
+| GET | `/api/v2/classification-preferences` | `ClassificationPreferenceAPI.list(...)` — account-book scoped |
+| POST | `/api/v2/classification-preferences/:observationId/revoke` | `ClassificationPreferenceAPI.revoke(...)` — reason + idempotency + expected version |
 | POST | `/api/audit-events` | `FinanceAPI.audit(...)` |
 
-`PUT /api/state` remains the compatibility bridge and now provides whole-state optimistic concurrency. Capabilities advertise `conflictControl=optional_if_match`, `versionSource=updatedAt`, `etagHeader=ETag` and `conditionalWriteHeader=If-Match`. Older clients may temporarily omit the header, but iOS 0.11.0 never does.
+`PUT /api/state` remains the compatibility bridge and now provides whole-state optimistic concurrency. Capabilities advertise `conflictControl=optional_if_match`, `versionSource=updatedAt`, `etagHeader=ETag` and `conditionalWriteHeader=If-Match`. Older clients may temporarily omit the header, but iOS 0.12.0 never does.
 
 `GET /api/state` still returns `{ data, updatedAt }` and the same revision as a quoted `ETag`. iOS stores `updatedAt` as its current `StateRevision`; a missing value for an empty ledger maps to revision `0`. Every write sends `If-Match: "<revision>"`, including `If-Match: "0"` on the first empty-ledger write. A successful save must return a new `updatedAt`; the client never invents a revision locally.
 
@@ -55,6 +57,16 @@ List and analysis amounts are decimal strings decoded through `V2DecimalAmount` 
 Analyze and decision commands retain one stable request body and idempotency key across network, timeout and 503 retries. Decisions carry both expected versions. On `VERSION_CONFLICT`, `CLASSIFICATION_VERSION_CONFLICT` or source change, the store reloads current server versions but keeps the user's local reason, taxonomy and normalized-name draft. A 503 disables only the AI suggestion path; manual review remains available. A 403 becomes a read-only unavailable state.
 
 This workflow is not an `AppSession` data source. `AppSession` still reads and writes only `/api/state`; neither suggestions nor decisions replace locally unsynchronized state or mutate the raw `BusinessRecord` facts.
+
+## Account-book classification preference memory
+
+`features.classificationPreferenceMemory` is optional so 0.11.0 and older capability responses remain decodable. iOS enables the native entry only when the server publishes the exact account-book scope, authenticated-human-decision source, three-observation / 0.8 consistency thresholds, active/revoked/invalidated lifecycle, closed-candidate-reordering-only effect, `Idempotency-Key`, `expectedVersion`, `modelCanAccept=false` and `writesBusinessRecords=false`.
+
+`GET /api/v2/classification-preferences` always includes the selected `accountBookId`, lifecycle state, maximum 10-row UI page and an opaque cursor. The response must repeat the same account book on the envelope and every observation, and must declare `accountBookScoped=true`, `modelCanAccept=false` and `writesBusinessRecords=false`. Any account-book mismatch clears cached observations, cursors, revoke drafts and pending commands rather than displaying cross-book data.
+
+`POST /api/v2/classification-preferences/:observationId/revoke` sends exactly `accountBookId`, `expectedVersion` and a required reason with a stable idempotency key. Network retries reuse the same key and body. `409 CLASSIFICATION_PREFERENCE_VERSION_CONFLICT` and `CLASSIFICATION_PREFERENCE_NOT_ACTIVE` refresh only the current preference page while retaining the reason draft, selected lifecycle filter and opaque previous-page stack; the user must inspect the new version and explicitly retry. A successful response must declare recomputation from active immutable events and preserve both non-writing safety flags.
+
+Preference observations are not an `AppSession` data source, are never cached across account books, and cannot write raw operating facts, vouchers or arbitrary taxonomy values. Their only permitted effect is server-side reordering of an already closed candidate set based on explicit authenticated and audited human decisions.
 
 ## Connected mainline import-analysis boundary
 

@@ -7,17 +7,20 @@ final class AppContainer: ObservableObject {
     let importAnalysisAPI: any ImportAnalysisAPI
     let documentAPI: any DocumentAPI
     let classificationReviewAPI: any ClassificationReviewAPI
+    let classificationPreferenceAPI: any ClassificationPreferenceAPI
 
     init(
         financeAPI: any FinanceAPI,
         importAnalysisAPI: any ImportAnalysisAPI,
         documentAPI: any DocumentAPI,
-        classificationReviewAPI: any ClassificationReviewAPI
+        classificationReviewAPI: any ClassificationReviewAPI,
+        classificationPreferenceAPI: any ClassificationPreferenceAPI
     ) {
         self.session = AppSession(api: financeAPI)
         self.importAnalysisAPI = importAnalysisAPI
         self.documentAPI = documentAPI
         self.classificationReviewAPI = classificationReviewAPI
+        self.classificationPreferenceAPI = classificationPreferenceAPI
     }
 
     static func live(bundle: Bundle = .main) -> AppContainer {
@@ -27,7 +30,8 @@ final class AppContainer: ObservableObject {
             financeAPI: LiveFinanceAPI(transport: transport),
             importAnalysisAPI: LiveImportAnalysisAPI(transport: transport),
             documentAPI: ReservedDocumentAPI(),
-            classificationReviewAPI: LiveClassificationReviewAPI(transport: transport)
+            classificationReviewAPI: LiveClassificationReviewAPI(transport: transport),
+            classificationPreferenceAPI: LiveClassificationPreferenceAPI(transport: transport)
         )
     }
 }

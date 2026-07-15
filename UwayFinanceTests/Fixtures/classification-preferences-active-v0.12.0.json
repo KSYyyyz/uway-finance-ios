@@ -1,0 +1,40 @@
+{
+  "accountBook": {
+    "id": "11", "name": "默认账套", "baseCurrency": "CNY",
+    "organization": { "id": "7", "name": "有为科技" },
+    "role": "finance",
+    "permissions": { "readBusinessRecords": true, "writeBusinessRecords": true }
+  },
+  "items": [
+    {
+      "id": "701", "accountBookId": "11", "recordId": "102", "direction": "expense",
+      "features": {
+        "merchantTokens": ["openai"], "serviceTokens": ["codex_openai"], "itemTokens": [],
+        "direction": "expense", "eventTime": "2026-07-02T00:00:00.000Z"
+      },
+      "decision": {
+        "action": "confirm", "taxonomyCode": "software_cloud",
+        "groupKey": "expense:software_cloud:codex_openai",
+        "previousTaxonomyCode": null, "previousGroupKey": null
+      },
+      "lifecycle": { "state": "active", "reason": null, "changedAt": null },
+      "version": 1, "decidedAt": "2026-07-15T08:00:00.000Z", "lastUsedAt": "2026-07-15T09:00:00.000Z"
+    },
+    {
+      "id": "700", "accountBookId": "11", "recordId": "103", "direction": "expense",
+      "features": {
+        "merchantTokens": ["专业服务商"], "serviceTokens": [], "itemTokens": ["技术服务"],
+        "direction": "expense", "eventTime": "2026-07-03T00:00:00.000Z"
+      },
+      "decision": {
+        "action": "correct", "taxonomyCode": "professional_services",
+        "groupKey": "expense:professional_services:item:1234",
+        "previousTaxonomyCode": "software_cloud", "previousGroupKey": "expense:software_cloud:item:1234"
+      },
+      "lifecycle": { "state": "active", "reason": null, "changedAt": null },
+      "version": 3, "decidedAt": "2026-07-15T08:10:00.000Z", "lastUsedAt": null
+    }
+  ],
+  "page": { "limit": 10, "nextCursor": "opaque+/preference=" },
+  "safety": { "accountBookScoped": true, "modelCanAccept": false, "writesBusinessRecords": false }
+}
