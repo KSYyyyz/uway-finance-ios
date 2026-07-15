@@ -1,0 +1,4 @@
+{
+  "error": "当前角色无权上传或撤销账目证据",
+  "code": "EVIDENCE_WRITE_FORBIDDEN"
+}

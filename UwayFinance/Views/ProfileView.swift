@@ -50,8 +50,12 @@ struct ProfileView: View {
                         "分类偏好记忆",
                         value: contract.capabilities.classificationPreferenceMemory?.statusDisplay ?? "服务端未公布"
                     )
+                    LabeledContent(
+                        "不可变票据附件",
+                        value: contract.capabilities.documentUploadCapability.statusDisplay
+                    )
                 }
-                LabeledContent("OCR与附件", value: "等待后端")
+                LabeledContent("OCR识别", value: "等待后端")
                 Button("检查服务与同步", systemImage: "arrow.clockwise") {
                     Task {
                         await session.checkServer()

@@ -1,0 +1,123 @@
+{
+  "version": "0.13.0",
+  "apiContractVersion": "20260715_009",
+  "financeSchemaVersion": "20260715_005_immutable_record_evidence",
+  "sync": {
+    "preferredMode": "legacy_state_v1",
+    "availableModes": ["legacy_state_v1"],
+    "legacyState": {
+      "readable": true,
+      "writable": true,
+      "conflictControl": "optional_if_match",
+      "versionSource": "updatedAt",
+      "etagHeader": "ETag",
+      "conditionalWriteHeader": "If-Match"
+    },
+    "financeResources": {
+      "available": true,
+      "reason": null,
+      "cutoverState": "shadow",
+      "contextEndpoint": "/api/v2/context",
+      "cutoverReadiness": {
+        "available": true,
+        "endpoint": "/api/v2/cutover-readiness",
+        "pagination": "cursor",
+        "requiresZeroDifferences": true,
+        "requiresZeroShadowOnlyRecords": true,
+        "clientWritesEnabled": false
+      },
+      "businessRecords": {
+        "list": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "pagination": "cursor",
+        "moneyEncoding": "decimal_string",
+        "idempotencyHeader": "Idempotency-Key",
+        "concurrencyControl": "expectedVersion"
+      }
+    }
+  },
+  "money": {
+    "legacyStateEncoding": "json_number",
+    "financeV2Encoding": "decimal_string",
+    "databasePrecision": 18,
+    "databaseScale": 2
+  },
+  "features": {
+    "importAnalysis": {
+      "available": true,
+      "reason": null,
+      "contract": "import_harness_v1",
+      "decisions": ["accepted", "review", "rejected"]
+    },
+    "unifiedDashboardMetrics": {
+      "available": true,
+      "endpoint": "/api/v2/dashboard-metrics",
+      "moneyEncoding": "decimal_string",
+      "source": "finance_v2_shadow_read_model",
+      "rawRecordsMerged": false,
+      "classificationStates": ["accepted", "review", "unclassified"]
+    },
+    "classificationReview": {
+      "available": true,
+      "listEndpoint": "/api/v2/classification-reviews",
+      "analyzeEndpoint": "/api/v2/classification-reviews/:recordId/analyze",
+      "decisionEndpoint": "/api/v2/classification-reviews/:recordId/decision",
+      "pagination": "cursor",
+      "defaultPageSize": 10,
+      "decisions": ["confirm", "correct", "reject"],
+      "idempotencyHeader": "Idempotency-Key",
+      "concurrencyControl": ["expectedRecordVersion", "expectedClassificationVersion"],
+      "modelCanAccept": false,
+      "deterministicRuleMayAccept": true,
+      "rawBusinessRecordsChanged": false
+    },
+    "classificationPreferenceMemory": {
+      "available": true,
+      "listEndpoint": "/api/v2/classification-preferences",
+      "revokeEndpoint": "/api/v2/classification-preferences/:observationId/revoke",
+      "pagination": "cursor",
+      "scope": "account_book",
+      "source": "explicit_authenticated_human_decisions",
+      "minimumConsistentObservations": 3,
+      "minimumConsistency": 0.8,
+      "lifecycleStates": ["active", "revoked", "invalidated"],
+      "effect": "closed_candidate_reordering_only",
+      "idempotencyHeader": "Idempotency-Key",
+      "concurrencyControl": "expectedVersion",
+      "modelCanAccept": false,
+      "writesBusinessRecords": false
+    },
+    "workflowTasks": { "available": false },
+    "aiClassification": {
+      "available": true,
+      "reason": null,
+      "contract": "closed_set_existing_operating_item_v1",
+      "deterministicGroupingAvailable": true,
+      "modelCanAccept": false,
+      "writesBusinessRecords": false
+    },
+    "documentUpload": {
+      "available": true,
+      "listEndpoint": "/api/v2/business-record-evidence",
+      "coverageEndpoint": "/api/v2/business-record-evidence-coverage",
+      "uploadEndpoint": "/api/v2/business-record-evidence",
+      "contentEndpoint": "/api/v2/business-record-evidence/:evidenceId/content",
+      "revokeEndpoint": "/api/v2/business-record-evidence/:evidenceId/revoke",
+      "acceptedMediaTypes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"],
+      "maxBytes": 10000000,
+      "contentImmutability": "database_trigger_and_sha256",
+      "lifecycle": ["active", "revoked"],
+      "deletion": false,
+      "accountBookScoped": true,
+      "idempotencyHeader": "Idempotency-Key"
+    },
+    "ocr": { "available": false }
+  },
+  "safety": {
+    "aiMayWriteBusinessRecords": false,
+    "aiMayPostJournalVouchers": false,
+    "acceptedImportRequiresHarnessOrHumanDecision": true
+  }
+}

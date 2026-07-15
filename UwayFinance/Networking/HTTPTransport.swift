@@ -40,6 +40,16 @@ private struct ErrorDetails: Decodable {
     let currentUpdatedAt: String?
 }
 
+struct HTTPPayloadResponse: Equatable, Sendable {
+    let data: Data
+    let statusCode: Int
+    let headers: [String: String]
+
+    func header(_ name: String) -> String? {
+        headers.first { $0.key.caseInsensitiveCompare(name) == .orderedSame }?.value
+    }
+}
+
 actor HTTPTransport {
     let baseURL: URL
     private let session: URLSession
@@ -81,20 +91,21 @@ actor HTTPTransport {
         return try await send(endpoint, encodedBody: data, headers: headers)
     }
 
-    private func send<Response: Decodable>(
+    func sendRaw(
         _ endpoint: APIEndpoint,
-        encodedBody: Data?,
-        headers: [String: String]
-    ) async throws -> Response {
+        body: Data? = nil,
+        contentType: String? = nil,
+        headers: [String: String] = [:]
+    ) async throws -> HTTPPayloadResponse {
         guard let url = URL(string: endpoint.path, relativeTo: baseURL)?.absoluteURL else {
             throw APIError.invalidResponse
         }
 
         var request = URLRequest(url: url)
         request.httpMethod = endpoint.method.rawValue
-        request.httpBody = encodedBody
+        request.httpBody = body
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if encodedBody != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+        if let contentType { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
         for (field, value) in headers { request.setValue(value, forHTTPHeaderField: field) }
 
         let data: Data
@@ -105,26 +116,47 @@ actor HTTPTransport {
         guard let http = response as? HTTPURLResponse else { throw APIError.invalidResponse }
         if http.statusCode == 401 { throw APIError.unauthorized }
         guard (200..<300).contains(http.statusCode) else {
-            let envelope = try? decoder.decode(ErrorEnvelope.self, from: data)
-            if http.statusCode == 409,
-               envelope?.code == "VERSION_CONFLICT",
-               let expectedVersion = envelope?.details?.expectedVersion {
-                throw APIError.versionConflict(
-                    expectedVersion: expectedVersion,
-                    currentVersion: envelope?.details?.currentVersion
-                )
-            }
-            if http.statusCode == 409, envelope?.code == "STATE_VERSION_CONFLICT" {
-                throw APIError.stateVersionConflict(currentUpdatedAt: envelope?.details?.currentUpdatedAt)
-            }
-            throw APIError.server(
-                status: http.statusCode,
-                code: envelope?.code,
-                message: envelope?.error ?? envelope?.message ?? "服务器暂时无法处理请求"
+            try throwServerError(statusCode: http.statusCode, data: data)
+        }
+        let responseHeaders = http.allHeaderFields.reduce(into: [String: String]()) { result, item in
+            result[String(describing: item.key)] = String(describing: item.value)
+        }
+        return HTTPPayloadResponse(data: data, statusCode: http.statusCode, headers: responseHeaders)
+    }
+
+    private func send<Response: Decodable>(
+        _ endpoint: APIEndpoint,
+        encodedBody: Data?,
+        headers: [String: String]
+    ) async throws -> Response {
+        let payload = try await sendRaw(
+            endpoint,
+            body: encodedBody,
+            contentType: encodedBody == nil ? nil : "application/json",
+            headers: headers
+        )
+
+        do { return try decoder.decode(Response.self, from: payload.data) }
+        catch { throw APIError.decoding(error.localizedDescription) }
+    }
+
+    private func throwServerError(statusCode: Int, data: Data) throws -> Never {
+        let envelope = try? decoder.decode(ErrorEnvelope.self, from: data)
+        if statusCode == 409,
+           envelope?.code == "VERSION_CONFLICT",
+           let expectedVersion = envelope?.details?.expectedVersion {
+            throw APIError.versionConflict(
+                expectedVersion: expectedVersion,
+                currentVersion: envelope?.details?.currentVersion
             )
         }
-
-        do { return try decoder.decode(Response.self, from: data) }
-        catch { throw APIError.decoding(error.localizedDescription) }
+        if statusCode == 409, envelope?.code == "STATE_VERSION_CONFLICT" {
+            throw APIError.stateVersionConflict(currentUpdatedAt: envelope?.details?.currentUpdatedAt)
+        }
+        throw APIError.server(
+            status: statusCode,
+            code: envelope?.code,
+            message: envelope?.error ?? envelope?.message ?? "服务器暂时无法处理请求"
+        )
     }
 }

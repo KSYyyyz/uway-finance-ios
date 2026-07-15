@@ -12,9 +12,9 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
         guard case .available(let contract) = session.serverState else {
-            return XCTFail("0.12.0 server should be available")
+            return XCTFail("0.13.0 server should be available")
         }
-        XCTAssertEqual(contract.serverVersion, "0.12.0")
+        XCTAssertEqual(contract.serverVersion, "0.13.0")
         XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
         XCTAssertEqual(contract.capabilities.source, .server)
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
@@ -22,7 +22,8 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(contract.capabilities.classificationReview?.available, true)
         XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.safeForClientUse, true)
-        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.classificationPreferenceMemorySchema)
+        XCTAssertTrue(contract.capabilities.documentUploadCapability.safeForClientUse)
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.immutableRecordEvidenceSchema)
         XCTAssertEqual(session.state.records.count, 1)
         XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-14T00:00:00.000Z"))
         let fetchStateCallCount = await api.fetchStateCallCount()
@@ -91,6 +92,29 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260714_007")
         XCTAssertTrue(contract.capabilities.classificationReview?.available == true)
         XCTAssertNil(contract.capabilities.classificationPreferenceMemory)
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+    }
+
+    func testBackendV012SessionRemainsCompatibleWithoutImmutableEvidenceCapability() async {
+        let api = FinanceAPISpy(
+            healthResponse: HealthResponse(
+                status: "ok",
+                version: "0.12.0",
+                financeSchemaVersion: BackendContract.classificationPreferenceMemorySchema
+            ),
+            capabilitiesFixtureName: "capabilities-preference-memory-v0.12.0"
+        )
+        let session = AppSession(api: api, saveDelay: .zero)
+
+        await session.start()
+
+        guard case .available(let contract) = session.serverState else {
+            return XCTFail("historical 0.12.0 backend must remain usable")
+        }
+        XCTAssertEqual(contract.serverVersion, "0.12.0")
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260715_008")
+        XCTAssertTrue(contract.capabilities.classificationPreferenceMemory?.safeForClientUse == true)
+        XCTAssertFalse(contract.capabilities.documentUploadCapability.safeForClientUse)
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
     }
 
@@ -362,9 +386,9 @@ private actor FinanceAPISpy: FinanceAPI {
 
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
-        version: "0.12.0",
-        financeSchemaVersion: BackendContract.classificationPreferenceMemorySchema
-    ), capabilitiesFixtureName: String = "capabilities-preference-memory-v0.12.0",
+        version: "0.13.0",
+        financeSchemaVersion: BackendContract.immutableRecordEvidenceSchema
+    ), capabilitiesFixtureName: String = "capabilities-immutable-evidence-v0.13.0",
        fetchEnvelopes: [StateEnvelope] = [StateEnvelope(
         data: makeSessionState(description: "待重试事项"),
         updatedAt: "2026-07-14T00:00:00.000Z"

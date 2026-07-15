@@ -1,0 +1,22 @@
+{
+  "evidence": {
+    "id": "801",
+    "recordExternalId": "R-EVIDENCE",
+    "evidenceType": "invoice",
+    "fileName": "7月发票.png",
+    "mediaType": "image/png",
+    "byteSize": 16,
+    "sha256": "02a3e298f1533f62558c58e4c70edcab9af5a50d62d925fd5390942020fb0fb8",
+    "note": "原始发票照片",
+    "status": "revoked",
+    "version": 2,
+    "createdAt": "2026-07-15T02:00:00.000Z",
+    "revokedAt": "2026-07-15T04:00:00.000Z",
+    "revokeReason": "原件对应的账期错误",
+    "uploadedByUserId": "1",
+    "revokedByUserId": "2",
+    "contentUrl": "/api/v2/business-record-evidence/801/content"
+  },
+  "contentDeleted": false,
+  "contentImmutable": true
+}

@@ -15,6 +15,7 @@ final class BackendContractTests: XCTestCase {
         XCTAssertFalse(contract.capabilities.importAnalysis.available)
         XCTAssertEqual(contract.capabilities.importAnalysis.reason, "capabilities_unavailable")
         XCTAssertFalse(contract.capabilities.documentUpload)
+        XCTAssertFalse(contract.capabilities.documentUploadCapability.safeForClientUse)
         XCTAssertFalse(contract.capabilities.ocr)
         XCTAssertNil(contract.capabilities.classificationPreferenceMemory)
     }
@@ -175,6 +176,37 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(memory.concurrencyControl, "expectedVersion")
         XCTAssertFalse(memory.modelCanAccept)
         XCTAssertFalse(memory.writesBusinessRecords)
+        XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
+        XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
+        XCTAssertFalse(contract.capabilities.documentUploadCapability.safeForClientUse)
+    }
+
+    func testImmutableEvidenceCapabilityNegotiatesExactCurrentSafetyWithoutChangingSyncMode() throws {
+        let health = try JSONDecoder().decode(
+            HealthResponse.self,
+            from: fixture(named: "health-immutable-evidence-v0.13.0")
+        )
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-immutable-evidence-v0.13.0")
+        )
+        let contract = BackendContract(health: health, negotiated: response)
+
+        XCTAssertEqual(contract.serverVersion, "0.13.0")
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260715_009")
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.immutableRecordEvidenceSchema)
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        XCTAssertEqual(response.sync.availableModes, ["legacy_state_v1"])
+        let evidence = contract.capabilities.documentUploadCapability
+        XCTAssertTrue(evidence.safeForClientUse)
+        XCTAssertEqual(evidence.listEndpoint, "/api/v2/business-record-evidence")
+        XCTAssertEqual(evidence.coverageEndpoint, "/api/v2/business-record-evidence-coverage")
+        XCTAssertEqual(evidence.maxBytes, 10_000_000)
+        XCTAssertEqual(evidence.contentImmutability, "database_trigger_and_sha256")
+        XCTAssertEqual(Set(evidence.lifecycle ?? []), Set(["active", "revoked"]))
+        XCTAssertEqual(evidence.deletion, false)
+        XCTAssertEqual(evidence.accountBookScoped, true)
+        XCTAssertEqual(evidence.idempotencyHeader, "Idempotency-Key")
         XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
         XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
     }

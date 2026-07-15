@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RecordDetailView: View {
     @EnvironmentObject private var session: AppSession
+    @Environment(\.businessRecordEvidenceAPI) private var businessRecordEvidenceAPI
     let route: RecordDeepLinkRoute
 
     @State private var wasPreviouslyResolved = false
@@ -19,6 +20,13 @@ struct RecordDetailView: View {
                         amountCard(record)
                         factsCard(record)
                         statusCard(record)
+                        if let capability = evidenceCapability {
+                            BusinessRecordEvidenceView(
+                                api: businessRecordEvidenceAPI,
+                                recordExternalId: record.id,
+                                maximumBytes: capability.maxBytes ?? 10_000_000
+                            )
+                        }
                     }
                     .padding()
                 }
@@ -51,6 +59,12 @@ struct RecordDetailView: View {
         .sheet(item: $editRecord) { record in
             RecordEditView(record: record)
         }
+    }
+
+    private var evidenceCapability: DocumentUploadCapability? {
+        guard case .available(let contract) = session.serverState,
+              contract.capabilities.documentUploadCapability.safeForClientUse else { return nil }
+        return contract.capabilities.documentUploadCapability
     }
 
     private func amountCard(_ record: BusinessRecord) -> some View {

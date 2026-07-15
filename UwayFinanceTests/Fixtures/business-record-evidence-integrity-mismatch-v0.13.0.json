@@ -1,0 +1,4 @@
+{
+  "error": "票据原件完整性校验失败，已阻止返回，请联系管理员核查",
+  "code": "EVIDENCE_INTEGRITY_MISMATCH"
+}

@@ -1,10 +1,10 @@
 # UwayFinance iOS API contract
 
-The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.12.0.json` is the checked-in iOS 0.12.0 baseline used by Windows and macOS CI; it targets backend app 0.12.0 and the frozen API contract `20260715_008`. The full workspace validator also cross-checks it against local backend sources when they are present.
+The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.13.0.json` is the checked-in iOS 0.13.0 baseline used by Windows and macOS CI; it targets backend app 0.13.0, frozen mainline commit `7bd702c` and API contract `20260715_009`. The full workspace validator also cross-checks it against local backend sources when they are present.
 
 ## Classification-review capability handshake
 
-`GET /api/health` returns the database/migration-ready response including `status`, `version` and `financeSchemaVersion: "20260715_004_account_book_preference_memory"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260715_008`. The server also exposes `GET /api/live` for process liveness and `GET /api/ready` for database/migration readiness; iOS intentionally continues using compatibility `/api/health`.
+`GET /api/health` returns the database/migration-ready response including `status`, `version` and `financeSchemaVersion: "20260715_005_immutable_record_evidence"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260715_009`. The server also exposes `GET /api/live` for process liveness and `GET /api/ready` for database/migration readiness; iOS intentionally continues using compatibility `/api/health`.
 
 The capabilities response is the machine-readable source of truth. `financeResources.available=true` with `cutoverState=shadow` means the context and business-record slice can be compiled and contract-tested, not that the active app should cut over. Because `preferredMode` and `availableModes` still contain only `legacy_state_v1`, `AppSession` continues exclusively through `/api/state`. If capabilities are missing or invalid, old 0.8/0.9 fallback remains available.
 
@@ -32,9 +32,14 @@ The app uses the existing Fastify session cookie through `URLSession` and `HTTPC
 | POST | `/api/v2/classification-reviews/:recordId/decision` | `ClassificationReviewAPI.decide(...)` — authenticated human decision |
 | GET | `/api/v2/classification-preferences` | `ClassificationPreferenceAPI.list(...)` — account-book scoped |
 | POST | `/api/v2/classification-preferences/:observationId/revoke` | `ClassificationPreferenceAPI.revoke(...)` — reason + idempotency + expected version |
+| GET | `/api/v2/business-record-evidence` | `BusinessRecordEvidenceAPI.list(...)` — record/account-book scoped |
+| GET | `/api/v2/business-record-evidence-coverage` | `BusinessRecordEvidenceAPI.coverage(...)` — account-book coverage map |
+| POST | `/api/v2/business-record-evidence` | `BusinessRecordEvidenceAPI.upload(...)` — multipart + idempotency |
+| GET | `/api/v2/business-record-evidence/:evidenceId/content` | `BusinessRecordEvidenceAPI.content(...)` — verified immutable bytes |
+| POST | `/api/v2/business-record-evidence/:evidenceId/revoke` | `BusinessRecordEvidenceAPI.revoke(...)` — reason + version + idempotency |
 | POST | `/api/audit-events` | `FinanceAPI.audit(...)` |
 
-`PUT /api/state` remains the compatibility bridge and now provides whole-state optimistic concurrency. Capabilities advertise `conflictControl=optional_if_match`, `versionSource=updatedAt`, `etagHeader=ETag` and `conditionalWriteHeader=If-Match`. Older clients may temporarily omit the header, but iOS 0.12.0 never does.
+`PUT /api/state` remains the compatibility bridge and now provides whole-state optimistic concurrency. Capabilities advertise `conflictControl=optional_if_match`, `versionSource=updatedAt`, `etagHeader=ETag` and `conditionalWriteHeader=If-Match`. Older clients may temporarily omit the header, but iOS 0.13.0 never does.
 
 `GET /api/state` still returns `{ data, updatedAt }` and the same revision as a quoted `ETag`. iOS stores `updatedAt` as its current `StateRevision`; a missing value for an empty ledger maps to revision `0`. Every write sends `If-Match: "<revision>"`, including `If-Match: "0"` on the first empty-ledger write. A successful save must return a new `updatedAt`; the client never invents a revision locally.
 
@@ -68,6 +73,20 @@ This workflow is not an `AppSession` data source. `AppSession` still reads and w
 
 Preference observations are not an `AppSession` data source, are never cached across account books, and cannot write raw operating facts, vouchers or arbitrary taxonomy values. Their only permitted effect is server-side reordering of an already closed candidate set based on explicit authenticated and audited human decisions.
 
+## Immutable business-record evidence
+
+`features.documentUpload` remains backward compatible with historical `{available:false}` values, but iOS exposes the native flow only when the server publishes the exact five endpoints, six accepted media types, `maxBytes=10000000`, `contentImmutability=database_trigger_and_sha256`, lifecycle `active/revoked`, `deletion=false`, `accountBookScoped=true` and `Idempotency-Key`.
+
+Before reading evidence, the store resolves `/api/v2/context`; every list, coverage, upload and revoke request then carries the selected `accountBookId`. List requests also carry `recordExternalId` and `includeRevoked`. A record or account-book change clears cached evidence, selected bytes, form values, revoke reasons and pending idempotency commands. A response containing another record ID fails closed.
+
+Multipart upload writes `accountBookId`, `recordExternalId`, `evidenceType` and `note` before the `file` part. The command owns one stable boundary, body and `Idempotency-Key`; transport retries reuse them only while file, type and note are unchanged. A different logical upload creates a new key. PhotosPicker and the document picker feed the same content-signature validator, and unsupported or over-10MB content remains local with a visible error.
+
+Content viewing uses the authenticated byte endpoint and verifies returned length and SHA-256 against list metadata plus ETag when present before writing a temporary Quick Look file. `EVIDENCE_INTEGRITY_MISMATCH` fails closed. The temporary preview is removed when the view closes.
+
+Revocation sends `accountBookId`, `expectedVersion`, a 3–1000 character reason and a stable idempotency key. Network retry preserves the same command. `409 EVIDENCE_VERSION_CONFLICT` reloads server state without clearing the reason or current `includeRevoked` filter; the user must inspect the new version and explicitly retry. Success is accepted only with `contentDeleted=false` and `contentImmutable=true`.
+
+Evidence remains separate from `AppSession` and `/api/state`. Neither a file, its metadata nor future OCR may accept an import, mutate a raw `BusinessRecord`, post a voucher or revoke evidence through AI authority.
+
 ## Connected mainline import-analysis boundary
 
 | Method | Path | Swift boundary |
@@ -91,9 +110,9 @@ The decision response keeps the Harness status vocabulary: an accepted human dec
 - `accepted` rows are the only rows appended to `/api/state`. `review` requires an authenticated decision and reason; `rejected` and failed rows remain outside the ledger.
 - Imported records persist `importAnalysisId`, `sourceFingerprint` and either `harness_accepted` or `human_accepted`. The client sends one `record_csv_import` audit event for the committed batch.
 
-## Reserved document and OCR boundary
+## Reserved OCR boundary
 
-`DocumentAPI` reserves a three-step workflow:
+The legacy `DocumentAPI` now reserves only a future OCR workflow. It is not used for the live v0.13 evidence endpoints:
 
 1. Create/upload a document with an idempotency key.
 2. Start an OCR job by document ID.
@@ -106,8 +125,8 @@ Proposed paths are centralized in `FutureAPIEndpoint`:
 - `POST /api/documents/:documentId/ocr`
 - `GET /api/ocr-jobs/:jobId`
 
-Until Fastify implements them, `ReservedDocumentAPI` returns a visible “waiting for backend” error and does not drop user data.
+Until Fastify freezes OCR endpoints, `ReservedDocumentAPI` returns a visible “waiting for backend” error and does not drop user data. No native UI presents these proposed routes as working.
 
 ## Contracts required for the next backend migration
 
-Before cutover, mainline still needs zero-difference readiness in real operating data plus contracts for business-record deletion, periods, bank transactions, vouchers, reconciliation/workflow actions, documents and AI evidence/feedback. The current slice defines cursor pagination, decimal-string money, stable IDs, idempotency keys and `expectedVersion`; future UI must add conflict refresh/retry and role-error states before a V2 mode can enter `availableModes`. Existing screens continue to depend on `FinanceAPI`, while the shadow clients stay isolated behind `FinanceResourceAPI` and `CutoverReadinessAPI`.
+Before cutover, mainline still needs zero-difference readiness in real operating data plus contracts for business-record deletion, periods, bank transactions, vouchers, reconciliation/workflow actions, OCR and reviewed AI extraction. Existing screens continue to depend on `FinanceAPI`; evidence is a separate governed resource, while shadow clients stay isolated from `AppSession`.

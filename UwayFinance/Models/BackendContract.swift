@@ -85,6 +85,58 @@ struct ClassificationPreferenceMemoryCapability: Codable, Equatable, Sendable {
     var statusDisplay: String { safeForClientUse ? "账套级安全可用" : "未开放" }
 }
 
+struct DocumentUploadCapability: Codable, Equatable, Sendable {
+    let available: Bool
+    let listEndpoint: String?
+    let coverageEndpoint: String?
+    let uploadEndpoint: String?
+    let contentEndpoint: String?
+    let revokeEndpoint: String?
+    let acceptedMediaTypes: [String]?
+    let maxBytes: Int?
+    let contentImmutability: String?
+    let lifecycle: [String]?
+    let deletion: Bool?
+    let accountBookScoped: Bool?
+    let idempotencyHeader: String?
+
+    var safeForClientUse: Bool {
+        available
+            && listEndpoint == "/api/v2/business-record-evidence"
+            && coverageEndpoint == "/api/v2/business-record-evidence-coverage"
+            && uploadEndpoint == "/api/v2/business-record-evidence"
+            && contentEndpoint == "/api/v2/business-record-evidence/:evidenceId/content"
+            && revokeEndpoint == "/api/v2/business-record-evidence/:evidenceId/revoke"
+            && Set(acceptedMediaTypes ?? []) == Set([
+                "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf",
+            ])
+            && maxBytes == 10_000_000
+            && contentImmutability == "database_trigger_and_sha256"
+            && Set(lifecycle ?? []) == Set(["active", "revoked"])
+            && deletion == false
+            && accountBookScoped == true
+            && idempotencyHeader == "Idempotency-Key"
+    }
+
+    var statusDisplay: String { safeForClientUse ? "不可变原件可用" : "未开放" }
+
+    static let unavailableFallback = DocumentUploadCapability(
+        available: false,
+        listEndpoint: nil,
+        coverageEndpoint: nil,
+        uploadEndpoint: nil,
+        contentEndpoint: nil,
+        revokeEndpoint: nil,
+        acceptedMediaTypes: nil,
+        maxBytes: nil,
+        contentImmutability: nil,
+        lifecycle: nil,
+        deletion: nil,
+        accountBookScoped: nil,
+        idempotencyHeader: nil
+    )
+}
+
 struct LegacyStateCapability: Codable, Equatable, Sendable {
     let readable: Bool
     let writable: Bool
@@ -198,7 +250,7 @@ struct FeatureCapabilitiesResponse: Codable, Equatable, Sendable {
     let classificationPreferenceMemory: ClassificationPreferenceMemoryCapability?
     let workflowTasks: CapabilityAvailability
     let aiClassification: AIClassificationCapability
-    let documentUpload: CapabilityAvailability
+    let documentUpload: DocumentUploadCapability
     let ocr: CapabilityAvailability
 }
 
@@ -239,6 +291,7 @@ struct ServerCapabilities: Equatable, Sendable {
     let aiClassificationCapability: AIClassificationCapability
     let deterministicGroupingAvailable: Bool
     let documentUpload: Bool
+    let documentUploadCapability: DocumentUploadCapability
     let ocr: Bool
     let money: MoneyCapabilitiesResponse
     let safety: SafetyCapabilitiesResponse
@@ -270,6 +323,7 @@ struct ServerCapabilities: Equatable, Sendable {
             aiClassificationCapability: response.features.aiClassification,
             deterministicGroupingAvailable: response.features.aiClassification.deterministicGroupingAvailable ?? false,
             documentUpload: response.features.documentUpload.available,
+            documentUploadCapability: response.features.documentUpload,
             ocr: response.features.ocr.available,
             money: response.money,
             safety: response.safety,
@@ -315,6 +369,7 @@ struct ServerCapabilities: Equatable, Sendable {
             ),
             deterministicGroupingAvailable: false,
             documentUpload: false,
+            documentUploadCapability: .unavailableFallback,
             ocr: false,
             money: MoneyCapabilitiesResponse(
                 legacyStateEncoding: "json_number",
@@ -335,15 +390,17 @@ struct ServerCapabilities: Equatable, Sendable {
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260715_008"
+    static let apiContractVersion = "20260715_009"
     static let financeDomainV2Schema = "20260714_002_finance_resource_api"
     static let classificationReviewSchema = "20260714_003_classification_review"
     static let classificationPreferenceMemorySchema = "20260715_004_account_book_preference_memory"
+    static let immutableRecordEvidenceSchema = "20260715_005_immutable_record_evidence"
 
     static func isFinanceDomainV2Schema(_ value: String?) -> Bool {
         value == financeDomainV2Schema
             || value == classificationReviewSchema
             || value == classificationPreferenceMemorySchema
+            || value == immutableRecordEvidenceSchema
     }
 
     let serverVersion: String

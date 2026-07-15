@@ -6,6 +6,7 @@ final class AppContainer: ObservableObject {
     let session: AppSession
     let importAnalysisAPI: any ImportAnalysisAPI
     let documentAPI: any DocumentAPI
+    let businessRecordEvidenceAPI: any BusinessRecordEvidenceAPI
     let classificationReviewAPI: any ClassificationReviewAPI
     let classificationPreferenceAPI: any ClassificationPreferenceAPI
 
@@ -13,12 +14,14 @@ final class AppContainer: ObservableObject {
         financeAPI: any FinanceAPI,
         importAnalysisAPI: any ImportAnalysisAPI,
         documentAPI: any DocumentAPI,
+        businessRecordEvidenceAPI: any BusinessRecordEvidenceAPI,
         classificationReviewAPI: any ClassificationReviewAPI,
         classificationPreferenceAPI: any ClassificationPreferenceAPI
     ) {
         self.session = AppSession(api: financeAPI)
         self.importAnalysisAPI = importAnalysisAPI
         self.documentAPI = documentAPI
+        self.businessRecordEvidenceAPI = businessRecordEvidenceAPI
         self.classificationReviewAPI = classificationReviewAPI
         self.classificationPreferenceAPI = classificationPreferenceAPI
     }
@@ -30,6 +33,7 @@ final class AppContainer: ObservableObject {
             financeAPI: LiveFinanceAPI(transport: transport),
             importAnalysisAPI: LiveImportAnalysisAPI(transport: transport),
             documentAPI: ReservedDocumentAPI(),
+            businessRecordEvidenceAPI: LiveBusinessRecordEvidenceAPI(transport: transport),
             classificationReviewAPI: LiveClassificationReviewAPI(transport: transport),
             classificationPreferenceAPI: LiveClassificationPreferenceAPI(transport: transport)
         )

@@ -1,0 +1,14 @@
+{
+  "records": {
+    "R-EVIDENCE": {
+      "activeEvidenceCount": 1,
+      "invoiceEvidenceCount": 1,
+      "paymentEvidenceCount": 0
+    },
+    "R-OTHER": {
+      "activeEvidenceCount": 2,
+      "invoiceEvidenceCount": 0,
+      "paymentEvidenceCount": 1
+    }
+  }
+}

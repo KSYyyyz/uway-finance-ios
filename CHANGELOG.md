@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.0 - 2026-07-15
+
+- Align the native client with backend app `0.13.0`, API `20260715_009`, schema `20260715_005_immutable_record_evidence` and frozen mainline commit `7bd702c`, while retaining v0.12.0 and earlier fixtures unchanged.
+- Negotiate the exact immutable-evidence capability and fail closed unless all list, coverage, multipart upload, content, revoke, media, size, lifecycle, deletion, account-book and idempotency fields match.
+- Add account-book-resolved evidence coverage/listing to every record detail, native PhotosPicker/file import, verified Quick Look originals and reasoned mark-revoked flow.
+- Preserve selected bytes, type, note, revoke reason and logical idempotency command across network/409 failures; clear all evidence state on record or account-book changes.
+- Verify content length, SHA-256 and ETag before preview. Revocation never deletes bytes, and attachment presence never authorizes AI acceptance, `BusinessRecord` mutation or voucher posting.
+
 ## 0.12.0 - 2026-07-15
 
 - Hide visual scroll indicators across every SwiftUI scrolling container without changing pull-to-refresh, keyboard focus or accessibility scrolling.

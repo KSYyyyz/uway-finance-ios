@@ -89,6 +89,43 @@ struct APIEndpoint: Hashable {
         return APIEndpoint(method: .post, path: "/api/v2/classification-preferences/\(encoded)/revoke")
     }
 
+    static func businessRecordEvidence(_ query: BusinessRecordEvidenceListQuery) -> APIEndpoint {
+        APIEndpoint(method: .get, path: path(
+            "/api/v2/business-record-evidence",
+            queryItems: [
+                URLQueryItem(name: "recordExternalId", value: query.recordExternalId),
+                URLQueryItem(name: "includeRevoked", value: query.includeRevoked ? "true" : "false"),
+                URLQueryItem(name: "accountBookId", value: query.accountBookId),
+            ]
+        ))
+    }
+
+    static func businessRecordEvidenceCoverage(accountBookId: String) -> APIEndpoint {
+        APIEndpoint(method: .get, path: path(
+            "/api/v2/business-record-evidence-coverage",
+            queryItems: [URLQueryItem(name: "accountBookId", value: accountBookId)]
+        ))
+    }
+
+    static let uploadBusinessRecordEvidence = APIEndpoint(
+        method: .post,
+        path: "/api/v2/business-record-evidence"
+    )
+
+    static func businessRecordEvidenceContent(evidenceId: String) -> APIEndpoint {
+        APIEndpoint(
+            method: .get,
+            path: "/api/v2/business-record-evidence/\(encodedPathComponent(evidenceId))/content"
+        )
+    }
+
+    static func revokeBusinessRecordEvidence(evidenceId: String) -> APIEndpoint {
+        APIEndpoint(
+            method: .post,
+            path: "/api/v2/business-record-evidence/\(encodedPathComponent(evidenceId))/revoke"
+        )
+    }
+
     static func updateBusinessRecord(recordId: String) -> APIEndpoint {
         let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
         let encoded = recordId.addingPercentEncoding(withAllowedCharacters: allowed) ?? recordId
@@ -113,6 +150,11 @@ struct APIEndpoint: Hashable {
         let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
         let encoded = recordId.addingPercentEncoding(withAllowedCharacters: allowed) ?? recordId
         return "/api/v2/classification-reviews/\(encoded)/\(suffix)"
+    }
+
+    private static func encodedPathComponent(_ value: String) -> String {
+        let allowed = CharacterSet.urlPathAllowed.subtracting(CharacterSet(charactersIn: "/"))
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
     }
 }
 
