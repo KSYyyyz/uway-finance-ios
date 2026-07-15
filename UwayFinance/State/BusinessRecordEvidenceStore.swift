@@ -115,7 +115,7 @@ final class BusinessRecordEvidenceStore: ObservableObject {
                   response.contentImmutable else {
                 throw APIError.decoding("上传响应未确认不可变原件边界")
             }
-            selectedFile = nil
+            self.selectedFile = nil
             uploadNote = ""
             selectedType = .invoice
             pendingUpload = nil
