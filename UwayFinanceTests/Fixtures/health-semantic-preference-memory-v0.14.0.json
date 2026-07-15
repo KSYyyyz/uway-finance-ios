@@ -1,5 +1,5 @@
 {
   "status": "ok",
   "version": "0.14.0",
-  "financeSchemaVersion": "20260715_007_multi_tenant_registration"
+  "financeSchemaVersion": "20260715_008_account_book_import_analysis"
 }

@@ -22,15 +22,28 @@ final class ContractDecodingTests: XCTestCase {
         XCTAssertEqual(result.validatedEvidenceRefs, ["row-1-description"])
     }
 
-    func testMainlineImportAnalysisRequestDecodes() throws {
-        let data = try fixture(named: "import-analysis-request")
+    func testCurrentAccountBookImportAnalysisRequestDecodes() throws {
+        let data = try fixture(named: "import-analysis-request-account-book-v0.14.0")
         let request = try JSONDecoder().decode(ImportAnalysisRequest.self, from: data)
+        XCTAssertEqual(request.accountBookId, "11")
         XCTAssertEqual(request.analysisId, "analysis-001")
         XCTAssertEqual(request.record.direction, .expense)
         XCTAssertEqual(request.record.amount, 2_480)
         XCTAssertEqual(request.record.description, "云服务器费用")
         XCTAssertTrue(request.companyOwnership.verified)
         XCTAssertEqual(request.sourceFingerprint, "fixture-fingerprint-001")
+    }
+
+    func testHistoricalImportRequestWithoutAccountBookFailsClosed() throws {
+        let data = try fixture(named: "import-analysis-request")
+        XCTAssertThrowsError(try JSONDecoder().decode(ImportAnalysisRequest.self, from: data))
+    }
+
+    func testCurrentDecisionRequestCarriesAccountBookScope() throws {
+        let data = try fixture(named: "import-decision-request-account-book-v0.14.0")
+        let request = try JSONDecoder().decode(ImportReviewDecision.self, from: data)
+        XCTAssertEqual(request.accountBookId, "11")
+        XCTAssertEqual(request.decision, "accept")
     }
 
     func testMainlineDecisionResponseDecodesServerReviewer() throws {

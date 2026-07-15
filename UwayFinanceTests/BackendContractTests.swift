@@ -225,8 +225,8 @@ final class BackendContractTests: XCTestCase {
         let contract = BackendContract(health: health, negotiated: response)
 
         XCTAssertEqual(contract.serverVersion, "0.14.0")
-        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260715_010")
-        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.multiTenantRegistrationSchema)
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260715_011")
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.accountBookImportAnalysisSchema)
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         let memory = try XCTUnwrap(contract.capabilities.classificationPreferenceMemory)
         XCTAssertNil(memory.learningState)
@@ -240,6 +240,9 @@ final class BackendContractTests: XCTestCase {
         XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
         XCTAssertEqual(contract.capabilities.registration.phoneVerification, "sms_webhook")
         XCTAssertEqual(contract.capabilities.registration.createsIsolatedOrganizationAndAccountBook, true)
+        XCTAssertTrue(contract.capabilities.importAnalysis.safeForAccountBookUse)
+        XCTAssertEqual(contract.capabilities.importAnalysis.scope, "account_book")
+        XCTAssertEqual(contract.capabilities.importAnalysis.idempotencyKey, "analysisId")
         XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
         XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
     }
@@ -255,6 +258,19 @@ final class BackendContractTests: XCTestCase {
         XCTAssertFalse(contract.capabilities.importAnalysis.available)
         XCTAssertEqual(contract.capabilities.importAnalysis.reason, "provider_not_configured")
         XCTAssertEqual(contract.capabilities.importAnalysis.statusDisplay, "未配置模型服务")
+    }
+
+    func testHistoricalImportCapabilityWithoutAccountBookFieldsFailsClosed() throws {
+        let health = try JSONDecoder().decode(HealthResponse.self, from: fixture(named: "health-v0.10.2"))
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-v0.10.2")
+        )
+        let capability = BackendContract(health: health, negotiated: response).capabilities.importAnalysis
+
+        XCTAssertTrue(capability.available)
+        XCTAssertFalse(capability.safeForAccountBookUse)
+        XCTAssertEqual(capability.statusDisplay, "契约不兼容")
     }
 
     func testNegotiatedFeaturesAndSafetyRemainUnavailableAndReadOnly() throws {

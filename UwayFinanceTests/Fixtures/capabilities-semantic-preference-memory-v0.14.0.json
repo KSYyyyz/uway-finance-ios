@@ -1,7 +1,7 @@
 {
   "version": "0.14.0",
-  "apiContractVersion": "20260715_010",
-  "financeSchemaVersion": "20260715_007_multi_tenant_registration",
+  "apiContractVersion": "20260715_011",
+  "financeSchemaVersion": "20260715_008_account_book_import_analysis",
   "sync": {
     "preferredMode": "legacy_state_v1",
     "availableModes": ["legacy_state_v1"],
@@ -58,6 +58,12 @@
       "available": true,
       "reason": null,
       "contract": "import_harness_v1",
+      "analysisEndpoint": "/api/import-analysis",
+      "decisionEndpoint": "/api/import-analysis/:analysisId/decision",
+      "scope": "account_book",
+      "sharedWithinAccountBook": true,
+      "idempotencyKey": "analysisId",
+      "idempotencyReplayHeader": "Idempotency-Replayed",
       "decisions": ["accepted", "review", "rejected"]
     },
     "unifiedDashboardMetrics": {

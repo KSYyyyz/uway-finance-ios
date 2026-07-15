@@ -3,8 +3,8 @@
   "backendAppVersion": "0.14.0",
   "backendBaselineCommit": null,
   "backendBaselineStatus": "pending-mainline-freeze",
-  "apiContractVersion": "20260715_010",
-  "financeSchemaVersion": "20260715_007_multi_tenant_registration",
+  "apiContractVersion": "20260715_011",
+  "financeSchemaVersion": "20260715_008_account_book_import_analysis",
   "syncMode": "legacy_state_v1",
   "money": {
     "legacyStateEncoding": "json_number",
@@ -122,7 +122,13 @@
     },
     "importAnalysis": {
       "availability": "runtime",
-      "reasonWhenUnavailable": "provider_not_configured"
+      "reasonWhenUnavailable": "provider_not_configured",
+      "analysisEndpoint": "/api/import-analysis",
+      "decisionEndpoint": "/api/import-analysis/:analysisId/decision",
+      "scope": "account_book",
+      "sharedWithinAccountBook": true,
+      "idempotencyKey": "analysisId",
+      "idempotencyReplayHeader": "Idempotency-Replayed"
     }
   },
   "endpoints": [
@@ -155,7 +161,7 @@
     { "method": "post", "path": "/api/import-analysis", "swift": "method: .post, path: \"/api/import-analysis\"" },
     { "method": "post", "path": "/api/import-analysis/:analysisId/decision", "swift": "method: .post, path: \"/api/import-analysis/\\(encoded)/decision\"" }
   ],
-  "importRequestFields": ["source:", "record:", "companyOwnership:", "evidenceText:", "rowPath:"],
+  "importRequestFields": ["accountBookId:", "source:", "record:", "companyOwnership:", "evidenceText:", "rowPath:"],
   "ledgerProvenanceFields": ["importAnalysisId", "sourceFingerprint", "analysisDecision"],
   "decisionStatuses": ["accepted", "review", "rejected"]
 }

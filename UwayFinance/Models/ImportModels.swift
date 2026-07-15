@@ -28,6 +28,7 @@ struct CompanyOwnershipEvidence: Codable, Hashable {
 /// Exact request accepted by `server/mainlineImportAnalysisSchema`.
 /// Candidate accounts, locked facts and thresholds are deliberately generated server-side.
 struct ImportAnalysisRequest: Codable, Hashable {
+    let accountBookId: String
     let analysisId: String
     let batchId: String
     let rowId: String
@@ -66,6 +67,7 @@ struct HarnessResult: Codable, Hashable {
 }
 
 struct ImportReviewDecision: Codable, Hashable {
+    let accountBookId: String
     let decision: String
     let reason: String
 }

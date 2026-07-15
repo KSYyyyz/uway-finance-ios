@@ -48,6 +48,7 @@ final class RecordImportPipelineTests: XCTestCase {
         let candidate = try XCTUnwrap(preview.eligible.first)
         let request = ImportAnalysisRequestFactory.make(
             candidate: candidate,
+            accountBookId: "11",
             batchId: "batch-test",
             fileName: "records.csv",
             fileFingerprint: ImportAnalysisRequestFactory.fileFingerprint(Data("file".utf8)),
@@ -55,6 +56,7 @@ final class RecordImportPipelineTests: XCTestCase {
         )
 
         XCTAssertEqual(request.batchId, "batch-test")
+        XCTAssertEqual(request.accountBookId, "11")
         XCTAssertEqual(request.rowId, "row-2")
         XCTAssertEqual(request.source.rowPath, "row[2]")
         XCTAssertEqual(request.record.amount, 2480)

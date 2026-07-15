@@ -25,7 +25,7 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.semanticV2SafeForClientUse, true)
         XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
         XCTAssertTrue(contract.capabilities.documentUploadCapability.safeForClientUse)
-        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.multiTenantRegistrationSchema)
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.accountBookImportAnalysisSchema)
         XCTAssertEqual(session.state.records.count, 1)
         XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-14T00:00:00.000Z"))
         let fetchStateCallCount = await api.fetchStateCallCount()
@@ -147,6 +147,85 @@ final class AppSessionTests: XCTestCase {
         let analyzeCallCount = await importAPI.analyzeCallCount()
         XCTAssertEqual(analyzeCallCount, 0)
         XCTAssertEqual(importSession.message, "服务器尚未配置 DeepSeek 分析服务，暂时不能进行 AI 核验。")
+    }
+
+    func testImportRetryReusesIdenticalAccountBookScopedCanonicalRequest() async throws {
+        let session = AppSession(api: FinanceAPISpy(), saveDelay: .zero)
+        await session.start()
+        let importSession = RecordImportSession()
+        let url = try makeImportCSV()
+        defer { try? FileManager.default.removeItem(at: url) }
+        await importSession.load(url: url, existing: [])
+        let importAPI = ImportAnalysisAPISpy(
+            analyzeOutcomes: [
+                .failure(.server(status: 409, code: "IMPORT_ANALYSIS_ID_REUSED", message: "request hash conflict")),
+                .success(makeHarnessResult(status: "review")),
+            ]
+        )
+
+        await importSession.analyze(using: importAPI, session: session)
+        XCTAssertNotNil(importSession.preview)
+        XCTAssertEqual(importSession.failures.count, 1)
+        await importSession.analyze(using: importAPI, session: session)
+
+        let requests = await importAPI.capturedAnalyzeRequests()
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests[0], requests[1])
+        XCTAssertEqual(requests[0].accountBookId, "11")
+        XCTAssertEqual(importSession.reviewCount, 1)
+    }
+
+    func testImportAccountBookSwitchClearsPriorReplayIdentity() async throws {
+        let session = AppSession(api: FinanceAPISpy(), saveDelay: .zero)
+        await session.start()
+        let importSession = RecordImportSession()
+        let url = try makeImportCSV()
+        defer { try? FileManager.default.removeItem(at: url) }
+        await importSession.load(url: url, existing: [])
+        let importAPI = ImportAnalysisAPISpy(analyzeOutcomes: [
+            .success(makeHarnessResult(status: "review")),
+            .success(makeHarnessResult(status: "review")),
+        ])
+
+        await importSession.analyze(using: importAPI, session: session)
+        await importAPI.setAccountBookID("12")
+        await importSession.analyze(using: importAPI, session: session)
+
+        let requests = await importAPI.capturedAnalyzeRequests()
+        XCTAssertEqual(requests.map(\.accountBookId), ["11", "12"])
+        XCTAssertNotEqual(requests[0].analysisId, requests[1].analysisId)
+    }
+
+    func testDecisionConflictKeepsReviewResultForUnsubmittedDraft() async throws {
+        let session = AppSession(api: FinanceAPISpy(), saveDelay: .zero)
+        await session.start()
+        let importSession = RecordImportSession()
+        let url = try makeImportCSV()
+        defer { try? FileManager.default.removeItem(at: url) }
+        await importSession.load(url: url, existing: [])
+        let importAPI = ImportAnalysisAPISpy(
+            analyzeOutcomes: [.success(makeHarnessResult(status: "review"))],
+            decisionError: .server(status: 409, code: "IMPORT_ANALYSIS_DECISION_CONFLICT", message: "decision conflict")
+        )
+        await importSession.analyze(using: importAPI, session: session)
+        let candidateID = try XCTUnwrap(importSession.preview?.eligible.first?.id)
+
+        do {
+            try await importSession.decide(
+                candidateID: candidateID,
+                decision: .reject,
+                reason: "归属核对不一致",
+                using: importAPI,
+                session: session
+            )
+            XCTFail("conflicting decision must fail closed")
+        } catch APIError.server(let status, let code, _) {
+            XCTAssertEqual(status, 409)
+            XCTAssertEqual(code, "IMPORT_ANALYSIS_DECISION_CONFLICT")
+        }
+        XCTAssertEqual(importSession.analyses[candidateID]?.status, "review")
+        let capturedDecisions = await importAPI.capturedDecisions()
+        XCTAssertEqual(capturedDecisions.first?.accountBookId, "11")
     }
 
     func testUnauthorizedRefreshReturnsToLogin() async {
@@ -418,6 +497,33 @@ final class AppSessionTests: XCTestCase {
     }
 }
 
+private func makeImportCSV() throws -> URL {
+    let csv = "日期,收支方向,金额,交易对方,事项说明,是否公司账目\n2026-07-14,支出,2480,示例云服务商,云服务器费用,是"
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("uway-import-\(UUID().uuidString).csv")
+    try Data(csv.utf8).write(to: url)
+    return url
+}
+
+private func makeHarnessResult(status: String) -> HarnessResult {
+    HarnessResult(
+        analysisId: "analysis-server",
+        status: status,
+        classification: HarnessClassification(
+            decision: status,
+            accountCode: nil,
+            businessType: nil,
+            evidenceRefs: [],
+            reasonCode: nil,
+            needsReview: status == "review"
+        ),
+        confidence: 0.8,
+        validatedEvidenceRefs: [],
+        issues: [],
+        sourceFingerprint: "sha256:server",
+        resolution: nil
+    )
+}
+
 @MainActor
 private final class SessionClearRecorder {
     private(set) var count = 0
@@ -466,7 +572,7 @@ private actor FinanceAPISpy: FinanceAPI {
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
         version: "0.14.0",
-        financeSchemaVersion: BackendContract.multiTenantRegistrationSchema
+        financeSchemaVersion: BackendContract.accountBookImportAnalysisSchema
     ), capabilitiesFixtureName: String = "capabilities-semantic-preference-memory-v0.14.0",
        fetchEnvelopes: [StateEnvelope] = [StateEnvelope(
         data: makeSessionState(description: "待重试事项"),
@@ -551,17 +657,66 @@ private actor FinanceAPISpy: FinanceAPI {
 }
 
 private actor ImportAnalysisAPISpy: ImportAnalysisAPI {
+    enum AnalyzeOutcome {
+        case success(HarnessResult)
+        case failure(APIError)
+    }
+
     private var analyzeCalls = 0
+    private var accountBookID: String
+    private var outcomes: [AnalyzeOutcome]
+    private let decisionError: APIError?
+    private var requests: [ImportAnalysisRequest] = []
+    private var decisions: [ImportReviewDecision] = []
+
+    init(
+        accountBookID: String = "11",
+        analyzeOutcomes: [AnalyzeOutcome] = [],
+        decisionError: APIError? = nil
+    ) {
+        self.accountBookID = accountBookID
+        self.outcomes = analyzeOutcomes
+        self.decisionError = decisionError
+    }
 
     func analyzeCallCount() -> Int { analyzeCalls }
+    func capturedAnalyzeRequests() -> [ImportAnalysisRequest] { requests }
+    func capturedDecisions() -> [ImportReviewDecision] { decisions }
+    func setAccountBookID(_ value: String) { accountBookID = value }
+
+    func accountBookContext() async throws -> FinanceContextResponse {
+        let organization = FinanceResourceOrganization(id: "7", name: "测试组织")
+        let access = FinanceAccountBookAccess(
+            id: accountBookID,
+            name: "账套 \(accountBookID)",
+            baseCurrency: "CNY",
+            organization: organization,
+            role: "finance_admin",
+            permissions: FinanceResourcePermissions(readBusinessRecords: true, writeBusinessRecords: true)
+        )
+        return FinanceContextResponse(selectedAccountBook: access, accountBooks: [access])
+    }
 
     func analyze(_ request: ImportAnalysisRequest) async throws -> HarnessResult {
         analyzeCalls += 1
-        throw APIError.unavailable("test should not reach transport")
+        requests.append(request)
+        guard !outcomes.isEmpty else { throw APIError.unavailable("test should not reach transport") }
+        let outcome = outcomes.removeFirst()
+        switch outcome {
+        case .success(let result): return result
+        case .failure(let error): throw error
+        }
     }
 
     func decide(analysisId: String, decision: ImportReviewDecision) async throws -> ImportReviewDecisionResponse {
-        throw APIError.unavailable("test should not reach transport")
+        decisions.append(decision)
+        if let decisionError { throw decisionError }
+        return ImportReviewDecisionResponse(
+            analysisId: analysisId,
+            status: decision.decision == "accept" ? "accepted" : "rejected",
+            sourceFingerprint: "sha256:server",
+            resolution: ImportReviewResolution(decision: decision.decision, reviewer: "finance-admin")
+        )
     }
 }
 

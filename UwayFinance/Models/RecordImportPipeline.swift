@@ -331,6 +331,7 @@ enum ImportAnalysisRequestFactory {
 
     static func make(
         candidate: RecordImportCandidate,
+        accountBookId: String,
         batchId: String,
         fileName: String,
         fileFingerprint: String,
@@ -346,6 +347,7 @@ enum ImportAnalysisRequestFactory {
         let ownershipFingerprint = digest(Data("\(sourceFingerprint)|\(candidate.companyEvidence)".utf8))
 
         return ImportAnalysisRequest(
+            accountBookId: accountBookId,
             analysisId: "analysis-\(UUID().uuidString.lowercased())",
             batchId: batchId,
             rowId: "row-\(candidate.rowNumber)",

@@ -2,7 +2,8 @@
 
 ## 0.14.0 - 2026-07-16
 
-- Target backend app `0.14.0`, API `20260715_010` and schema `20260715_007_multi_tenant_registration` in build 10 without rewriting any historical fixture. The root registration contract is present but uncommitted, so the snapshot truthfully keeps a null baseline commit and the validator cross-checks current root code fail-closed.
+- Target backend app `0.14.0`, API `20260715_011` and schema `20260715_008_account_book_import_analysis` in build 11 without rewriting any historical fixture.
+- Scope import analysis and decisions to the authenticated account book, reuse identical canonical requests on retry, and preserve local previews/review drafts on 409 conflicts.
 - Add capability-gated SMS registration with login/register switching, server-driven challenge TTL/resend countdown, password confirmation, Chinese server-error mapping and VoiceOver/keyboard semantics. Passwords and codes remain transient JSON-body values and are never logged, persisted or put in URLs; no fake-code fallback exists.
 - Serialize live authentication requests and add a monotonic session generation so a slow user-A response cannot overwrite user B. Account switch, `401` and logout clear legacy state/revision/conflict drafts, account-book caches, view-local stores and temporary evidence previews.
 - Decode semantic preference-memory `learningState` (`shadow`, `provisional`, `active`) while keeping v0.12/v0.13 responses compatible and preserving `modelCanAccept=false` / `writesBusinessRecords=false`. Existing preference list/revoke UI is unchanged.

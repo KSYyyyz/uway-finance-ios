@@ -284,23 +284,54 @@ struct ImportAnalysisCapability: Codable, Equatable, Sendable {
     let reason: String?
     let contract: String
     let decisions: [String]
+    let analysisEndpoint: String?
+    let decisionEndpoint: String?
+    let scope: String?
+    let sharedWithinAccountBook: Bool?
+    let idempotencyKey: String?
+    let idempotencyReplayHeader: String?
 
     static let unavailableFallback = ImportAnalysisCapability(
         available: false,
         reason: "capabilities_unavailable",
         contract: "import_harness_v1",
-        decisions: ["accepted", "review", "rejected"]
+        decisions: ["accepted", "review", "rejected"],
+        analysisEndpoint: nil,
+        decisionEndpoint: nil,
+        scope: nil,
+        sharedWithinAccountBook: nil,
+        idempotencyKey: nil,
+        idempotencyReplayHeader: nil
     )
 
     static let serviceUnavailable = ImportAnalysisCapability(
         available: false,
         reason: "service_unavailable",
         contract: "import_harness_v1",
-        decisions: ["accepted", "review", "rejected"]
+        decisions: ["accepted", "review", "rejected"],
+        analysisEndpoint: nil,
+        decisionEndpoint: nil,
+        scope: nil,
+        sharedWithinAccountBook: nil,
+        idempotencyKey: nil,
+        idempotencyReplayHeader: nil
     )
 
+    var safeForAccountBookUse: Bool {
+        available
+            && contract == "import_harness_v1"
+            && Set(decisions) == Set(["accepted", "review", "rejected"])
+            && analysisEndpoint == "/api/import-analysis"
+            && decisionEndpoint == "/api/import-analysis/:analysisId/decision"
+            && scope == "account_book"
+            && sharedWithinAccountBook == true
+            && idempotencyKey == "analysisId"
+            && idempotencyReplayHeader == "Idempotency-Replayed"
+    }
+
     var statusDisplay: String {
-        if available { return "可用" }
+        if safeForAccountBookUse { return "可用" }
+        if available { return "契约不兼容" }
         switch reason {
         case "provider_not_configured": return "未配置模型服务"
         case "capabilities_unavailable": return "能力信息不可用"
@@ -310,6 +341,9 @@ struct ImportAnalysisCapability: Codable, Equatable, Sendable {
     }
 
     var unavailableMessage: String {
+        if available && !safeForAccountBookUse {
+            return "服务器未公布账套级导入分析契约，为避免跨账套误发请求，已暂停 AI 核验。"
+        }
         switch reason {
         case "provider_not_configured": return "服务器尚未配置 DeepSeek 分析服务，暂时不能进行 AI 核验。"
         case "capabilities_unavailable": return "当前服务器未公布导入分析能力，为避免误发请求，已暂停 AI 核验。"
@@ -470,13 +504,14 @@ struct ServerCapabilities: Equatable, Sendable {
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260715_010"
+    static let apiContractVersion = "20260715_011"
     static let financeDomainV2Schema = "20260714_002_finance_resource_api"
     static let classificationReviewSchema = "20260714_003_classification_review"
     static let classificationPreferenceMemorySchema = "20260715_004_account_book_preference_memory"
     static let immutableRecordEvidenceSchema = "20260715_005_immutable_record_evidence"
     static let semanticPreferenceMemoryV2Schema = "20260715_006_semantic_preference_memory_v2"
     static let multiTenantRegistrationSchema = "20260715_007_multi_tenant_registration"
+    static let accountBookImportAnalysisSchema = "20260715_008_account_book_import_analysis"
 
     static func isFinanceDomainV2Schema(_ value: String?) -> Bool {
         value == financeDomainV2Schema
@@ -485,6 +520,7 @@ struct BackendContract: Equatable, Sendable {
             || value == immutableRecordEvidenceSchema
             || value == semanticPreferenceMemoryV2Schema
             || value == multiTenantRegistrationSchema
+            || value == accountBookImportAnalysisSchema
     }
 
     let serverVersion: String

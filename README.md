@@ -2,7 +2,7 @@
 
 SwiftUI client for the internal Uway finance workflow. This repository contains only the native iOS frontend; the Fastify/PostgreSQL backend is deployed separately on Alibaba Cloud and is accessed over HTTPS.
 
-Current marketing version: `0.14.0` (build `10`), targeting backend app `0.14.0`, API contract `20260715_010` and finance schema `20260715_007_multi_tenant_registration`. The current root checkout contains the delegated v0.14.0 registration contract but has uncommitted mainline changes, so `backendBaselineCommit` remains null rather than claiming an unfrozen commit. The validator cross-checks the live workspace contract and fails closed on any version, route, capability or isolation mismatch. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
+Current marketing version: `0.14.0` (build `11`), targeting backend app `0.14.0`, API contract `20260715_011` and finance schema `20260715_008_account_book_import_analysis`. The validator cross-checks the live workspace contract and fails closed on any version, route, capability or account-book isolation mismatch. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
 
 ## Implemented stage
 

@@ -14,6 +14,9 @@ final class RecordImportSession: ObservableObject {
 
     private var fileFingerprint = ""
     private var batchId = ""
+    private var scopedAccountBookID: String?
+    private var scopedSessionID: UUID?
+    private var pendingRequests: [String: ImportAnalysisRequest] = [:]
 
     var acceptedCount: Int { analyses.values.filter { $0.status == "accepted" }.count }
     var reviewCount: Int { analyses.values.filter { $0.status == "review" }.count }
@@ -72,24 +75,54 @@ final class RecordImportSession: ObservableObject {
 
     func analyze(using api: any ImportAnalysisAPI, session: AppSession) async {
         let capability = session.importAnalysisCapability
-        guard capability.available else {
+        guard capability.safeForAccountBookUse else {
             message = capability.unavailableMessage
             return
         }
         guard canAnalyze, let candidates = preview?.eligible else { return }
-        clearAnalysis()
+        let expectedSessionID = session.sessionScopeID
+        let expectedUserID = session.user?.id
+        let context: FinanceContextResponse
+        do {
+            context = try await api.accountBookContext()
+        } catch APIError.unauthorized {
+            session.invalidateExternalSession()
+            message = APIError.unauthorized.localizedDescription
+            return
+        } catch {
+            message = error.localizedDescription
+            return
+        }
+        guard expectedSessionID == session.sessionScopeID, expectedUserID == session.user?.id else {
+            message = "账号已切换，本次导入分析已取消"
+            return
+        }
+        let accountBook = context.selectedAccountBook
+        guard accountBook.permissions.writeBusinessRecords else {
+            message = "当前账号无权向该账套导入经营事项"
+            return
+        }
+        if scopedSessionID != expectedSessionID || scopedAccountBookID != accountBook.id {
+            clearAnalysis(clearPendingRequests: true)
+            scopedSessionID = expectedSessionID
+            scopedAccountBookID = accountBook.id
+        } else {
+            clearAnalysis(clearPendingRequests: false)
+        }
         isAnalyzing = true
         defer { isAnalyzing = false }
 
         let existingFingerprints = session.state.records.compactMap(\.sourceFingerprint)
         for candidate in candidates {
-            let request = ImportAnalysisRequestFactory.make(
+            let request = pendingRequests[candidate.id] ?? ImportAnalysisRequestFactory.make(
                 candidate: candidate,
+                accountBookId: accountBook.id,
                 batchId: batchId,
                 fileName: fileName,
                 fileFingerprint: fileFingerprint,
                 existingFingerprints: existingFingerprints
             )
+            pendingRequests[candidate.id] = request
             do {
                 analyses[candidate.id] = try await api.analyze(request)
             } catch APIError.unauthorized {
@@ -121,11 +154,28 @@ final class RecordImportSession: ObservableObject {
         guard let current = analyses[candidateID], current.status == "review" else {
             throw APIError.unavailable("该记录已不在待复核状态")
         }
+        let expectedSessionID = session.sessionScopeID
+        let expectedUserID = session.user?.id
 
         do {
+            let context = try await api.accountBookContext()
+            guard expectedSessionID == session.sessionScopeID, expectedUserID == session.user?.id else {
+                throw APIError.unavailable("账号已切换，复核草稿已保留，请重新确认")
+            }
+            let accountBookID = context.selectedAccountBook.id
+            guard context.selectedAccountBook.permissions.writeBusinessRecords,
+                  scopedSessionID == expectedSessionID,
+                  scopedAccountBookID == accountBookID,
+                  pendingRequests[candidateID]?.accountBookId == accountBookID else {
+                throw APIError.unavailable("账套上下文已变化，复核草稿已保留，请重新打开导入任务")
+            }
             let response = try await api.decide(
                 analysisId: current.analysisId,
-                decision: ImportReviewDecision(decision: decision.rawValue, reason: normalizedReason)
+                decision: ImportReviewDecision(
+                    accountBookId: accountBookID,
+                    decision: decision.rawValue,
+                    reason: normalizedReason
+                )
             )
             analyses[candidateID] = HarnessResult(
                 analysisId: response.analysisId,
@@ -167,15 +217,18 @@ final class RecordImportSession: ObservableObject {
         fileName = ""
         fileFingerprint = ""
         batchId = ""
+        scopedAccountBookID = nil
+        scopedSessionID = nil
         message = nil
-        clearAnalysis()
+        clearAnalysis(clearPendingRequests: true)
     }
 
-    private func clearAnalysis() {
+    private func clearAnalysis(clearPendingRequests: Bool = true) {
         analyses = [:]
         failures = [:]
         analyzedCount = 0
         message = nil
+        if clearPendingRequests { pendingRequests = [:] }
     }
 }
 

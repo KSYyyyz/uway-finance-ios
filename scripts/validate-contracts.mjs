@@ -6,9 +6,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
 const expectedMarketingVersion = '0.14.0'
 const expectedBackendVersion = '0.14.0'
-const expectedAPIContractVersion = '20260715_010'
-const expectedFinanceSchemaVersion = '20260715_007_multi_tenant_registration'
-const expectedBuildVersion = '10'
+const expectedAPIContractVersion = '20260715_011'
+const expectedFinanceSchemaVersion = '20260715_008_account_book_import_analysis'
+const expectedBuildVersion = '11'
 const expectedBackendBaselineCommit = null
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
 const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.14.0.json')
@@ -74,8 +74,11 @@ const requiredFiles = [
   'UwayFinanceTests/RecordDeepLinkTests.swift',
   'UwayFinanceTests/LegacyStateConditionalWriteAPITests.swift',
   'UwayFinanceTests/RecordImportPipelineTests.swift',
+  'UwayFinanceTests/ImportAnalysisAPITests.swift',
   'UwayFinanceTests/Fixtures/harness-result.json',
   'UwayFinanceTests/Fixtures/import-analysis-request.json',
+  'UwayFinanceTests/Fixtures/import-analysis-request-account-book-v0.14.0.json',
+  'UwayFinanceTests/Fixtures/import-decision-request-account-book-v0.14.0.json',
   'UwayFinanceTests/Fixtures/import-decision-response.json',
   'UwayFinanceTests/Fixtures/health-v0.8.1.json',
   'UwayFinanceTests/Fixtures/health-v0.9.0.json',
@@ -142,6 +145,8 @@ const fixtures = [
   'state-envelope.json',
   'harness-result.json',
   'import-analysis-request.json',
+  'import-analysis-request-account-book-v0.14.0.json',
+  'import-decision-request-account-book-v0.14.0.json',
   'import-decision-response.json',
   'health-v0.8.1.json',
   'health-v0.9.0.json',
@@ -241,6 +246,15 @@ const decisionResponse = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinance
 if (decisionResponse.status !== 'accepted') throw new Error('accepted human decision must keep Harness status accepted')
 if (decisionResponse.resolution?.decision !== 'accept' || !decisionResponse.resolution?.reviewer) {
   throw new Error('human decision provenance must remain in resolution.decision/reviewer')
+}
+const currentImportRequest = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'import-analysis-request-account-book-v0.14.0.json'), 'utf8'))
+const currentDecisionRequest = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'import-decision-request-account-book-v0.14.0.json'), 'utf8'))
+if (currentImportRequest.accountBookId !== '11' || currentDecisionRequest.accountBookId !== '11') {
+  throw new Error('current import and decision fixtures must carry an explicit accountBookId')
+}
+const historicalImportRequest = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'import-analysis-request.json'), 'utf8'))
+if ('accountBookId' in historicalImportRequest) {
+  throw new Error('historical pre-account-book import fixture must remain immutable')
 }
 
 const contractSnapshot = JSON.parse(fs.readFileSync(contractSnapshotPath, 'utf8'))
@@ -358,8 +372,14 @@ if (evidenceSnapshot?.available !== true
   throw new Error('immutable evidence snapshot capability boundary mismatch')
 }
 if (contractSnapshot.capabilities?.importAnalysis?.availability !== 'runtime'
-    || contractSnapshot.capabilities?.importAnalysis?.reasonWhenUnavailable !== 'provider_not_configured') {
-  throw new Error('import-analysis capability must remain runtime-negotiated')
+    || contractSnapshot.capabilities?.importAnalysis?.reasonWhenUnavailable !== 'provider_not_configured'
+    || contractSnapshot.capabilities?.importAnalysis?.analysisEndpoint !== '/api/import-analysis'
+    || contractSnapshot.capabilities?.importAnalysis?.decisionEndpoint !== '/api/import-analysis/:analysisId/decision'
+    || contractSnapshot.capabilities?.importAnalysis?.scope !== 'account_book'
+    || contractSnapshot.capabilities?.importAnalysis?.sharedWithinAccountBook !== true
+    || contractSnapshot.capabilities?.importAnalysis?.idempotencyKey !== 'analysisId'
+    || contractSnapshot.capabilities?.importAnalysis?.idempotencyReplayHeader !== 'Idempotency-Replayed') {
+  throw new Error('import-analysis capability must remain runtime-negotiated and account-book scoped')
 }
 if (!['accepted', 'review', 'rejected'].every((status) => contractSnapshot.decisionStatuses.includes(status))) {
   throw new Error('backend contract snapshot must preserve Harness three-state status')
@@ -392,8 +412,14 @@ if (capabilitiesFixture.sync?.legacyState?.readable !== true
   throw new Error('capabilities fixture must advertise optional If-Match state protection')
 }
 if (capabilitiesFixture.features?.importAnalysis?.available !== true
-    || capabilitiesFixture.features?.importAnalysis?.reason !== null) {
-  throw new Error('configured import-analysis fixture must report available=true/reason=null')
+    || capabilitiesFixture.features?.importAnalysis?.reason !== null
+    || capabilitiesFixture.features?.importAnalysis?.analysisEndpoint !== '/api/import-analysis'
+    || capabilitiesFixture.features?.importAnalysis?.decisionEndpoint !== '/api/import-analysis/:analysisId/decision'
+    || capabilitiesFixture.features?.importAnalysis?.scope !== 'account_book'
+    || capabilitiesFixture.features?.importAnalysis?.sharedWithinAccountBook !== true
+    || capabilitiesFixture.features?.importAnalysis?.idempotencyKey !== 'analysisId'
+    || capabilitiesFixture.features?.importAnalysis?.idempotencyReplayHeader !== 'Idempotency-Replayed') {
+  throw new Error('configured import-analysis fixture must report the frozen account-book contract')
 }
 const disabledCapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.9.0-import-disabled.json'), 'utf8'))
 if (disabledCapabilitiesFixture.features?.importAnalysis?.available !== false
@@ -796,11 +822,11 @@ for (const marker of ['maximumBatchRows = 30', 'maximumFileSize = 5 * 1024 * 102
   if (!importPipeline.includes(marker)) throw new Error(`native import safety marker missing: ${marker}`)
 }
 const importView = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'RecordImportView.swift'), 'utf8')
-for (const marker of ['.fileImporter(', 'confirmPendingOwnership()', 'importSession.analyze', 'importSession.commit', 'importAnalysisCapability.available', 'unavailableMessage']) {
+for (const marker of ['.fileImporter(', 'confirmPendingOwnership()', 'importSession.analyze', 'importSession.commit', 'importAnalysisCapability.safeForAccountBookUse', 'unavailableMessage']) {
   if (!importView.includes(marker)) throw new Error(`native import flow marker missing: ${marker}`)
 }
 const importSession = fs.readFileSync(path.join(root, 'UwayFinance', 'State', 'RecordImportSession.swift'), 'utf8')
-for (const marker of ['session.importAnalysisCapability', 'guard capability.available else', 'capability.unavailableMessage']) {
+for (const marker of ['session.importAnalysisCapability', 'guard capability.safeForAccountBookUse else', 'accountBookContext()', 'pendingRequests', 'scopedAccountBookID', 'capability.unavailableMessage']) {
   if (!importSession.includes(marker)) throw new Error(`import request capability gate missing: ${marker}`)
 }
 const quickSheet = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'QuickSheetView.swift'), 'utf8')
@@ -817,7 +843,7 @@ for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amo
 }
 
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
-for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningStates', 'semantic-preference-v2', 'complete_link_semantic', 'RegistrationCapability', 'sms_webhook', 'http_only_secure_same_site_strict', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', '"accepted", "review", "rejected"']) {
+for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningStates', 'semantic-preference-v2', 'complete_link_semantic', 'RegistrationCapability', 'sms_webhook', 'http_only_secure_same_site_strict', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', 'safeForAccountBookUse', 'sharedWithinAccountBook', 'idempotencyReplayHeader', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
 }
 for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
@@ -960,6 +986,7 @@ const classificationAnalysisPath = path.join(workspace, 'server', 'classificatio
 const classificationPreferencesPath = path.join(workspace, 'server', 'classification-preferences.ts')
 const businessRecordEvidencePath = path.join(workspace, 'server', 'business-record-evidence.ts')
 const registrationPath = path.join(workspace, 'server', 'registration.ts')
+const databasePath = path.join(workspace, 'server', 'database.ts')
 const apiContractDocumentPath = path.join(workspace, 'API-V2-CONTRACT.md')
 const mainPackagePath = path.join(workspace, 'package.json')
 const hasMainPackage = fs.existsSync(mainPackagePath)
@@ -986,7 +1013,7 @@ if (validateMainline && hasMainPackage && hasMainContractDocument) {
   }
 }
 const hasLocalBackend = validateMainline && process.env.UWAY_SKIP_LOCAL_BACKEND !== '1'
-  && [serverPath, healthPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, classificationReviewPath, classificationAnalysisPath, classificationPreferencesPath, businessRecordEvidencePath, registrationPath, apiContractDocumentPath].every(fs.existsSync)
+  && [serverPath, healthPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, classificationReviewPath, classificationAnalysisPath, classificationPreferencesPath, businessRecordEvidencePath, registrationPath, databasePath, apiContractDocumentPath].every(fs.existsSync)
 if (hasLocalBackend) {
   const server = fs.readFileSync(serverPath, 'utf8')
   for (const { method, path: endpoint } of currentContracts) {
@@ -995,6 +1022,12 @@ if (hasLocalBackend) {
   const importSchema = fs.readFileSync(importSchemaPath, 'utf8')
   for (const field of contractSnapshot.importRequestFields) {
     if (!importSchema.includes(field)) throw new Error(`local import schema mismatch: ${field}`)
+  }
+  for (const marker of [
+    'accountBookId: z.string().regex',
+    'export const importAnalysisDecisionSchema',
+  ]) {
+    if (!importSchema.includes(marker)) throw new Error(`local import account-book schema marker missing: ${marker}`)
   }
   const stateSchema = fs.readFileSync(stateSchemaPath, 'utf8')
   for (const field of contractSnapshot.ledgerProvenanceFields) {
@@ -1059,6 +1092,12 @@ if (hasLocalBackend) {
     'aiMayWriteBusinessRecords: false',
     'aiMayPostJournalVouchers: false',
     "reason: options.importAnalysisAvailable ? null : 'provider_not_configured'",
+    "analysisEndpoint: '/api/import-analysis'",
+    "decisionEndpoint: '/api/import-analysis/:analysisId/decision'",
+    "scope: 'account_book'",
+    'sharedWithinAccountBook: true',
+    "idempotencyKey: 'analysisId'",
+    "idempotencyReplayHeader: 'Idempotency-Replayed'",
     "codeEndpoint: '/api/auth/registration-code'",
     "registerEndpoint: '/api/auth/register'",
     "phoneVerification: 'sms_webhook'",
@@ -1066,6 +1105,31 @@ if (hasLocalBackend) {
     "sessionCookie: 'http_only_secure_same_site_strict'",
   ]) {
     if (!capabilities.includes(marker)) throw new Error(`local capabilities marker missing: ${marker}`)
+  }
+  const importRouteStart = server.indexOf("app.post('/api/import-analysis'")
+  const importDecisionRouteStart = server.indexOf("app.post('/api/import-analysis/:analysisId/decision'")
+  const importRoute = importRouteStart >= 0 && importDecisionRouteStart > importRouteStart
+    ? server.slice(importRouteStart, importDecisionRouteStart)
+    : ''
+  for (const marker of [
+    'const user = (request as AuthenticatedRequest).authUser',
+    'getFinanceContext(pool, user.id, parsed.data.accountBookId)',
+    'assertFinanceWritable(context.selectedAccountBook)',
+    'findImportAnalysisReplay(pool, context.selectedAccountBook.id',
+    'listKnownImportFingerprints(pool, context.selectedAccountBook.id)',
+  ]) {
+    if (!importRoute.includes(marker)) throw new Error(`local import route account-book authorization marker missing: ${marker}`)
+  }
+  const database = fs.readFileSync(databasePath, 'utf8')
+  for (const marker of [
+    'importAnalysisRequestHash',
+    'canonicalJson',
+    "'IMPORT_ANALYSIS_ID_REUSED'",
+    "'IMPORT_ANALYSIS_DECISION_CONFLICT'",
+    'WHERE account_book_id = $1 AND analysis_id = $2',
+    'ON CONFLICT (account_book_id, analysis_id) DO NOTHING',
+  ]) {
+    if (!database.includes(marker)) throw new Error(`local import persistence isolation marker missing: ${marker}`)
   }
   for (const marker of [
     "app.get('/api/live'",

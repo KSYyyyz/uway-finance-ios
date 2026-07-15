@@ -1,6 +1,7 @@
 import SwiftUI
 
 protocol ImportAnalysisAPI: Sendable {
+    func accountBookContext() async throws -> FinanceContextResponse
     func analyze(_ request: ImportAnalysisRequest) async throws -> HarnessResult
     func decide(analysisId: String, decision: ImportReviewDecision) async throws -> ImportReviewDecisionResponse
 }
@@ -9,6 +10,10 @@ actor LiveImportAnalysisAPI: ImportAnalysisAPI {
     private let transport: HTTPTransport
 
     init(transport: HTTPTransport) { self.transport = transport }
+
+    func accountBookContext() async throws -> FinanceContextResponse {
+        try await transport.send(.financeContext())
+    }
 
     func analyze(_ request: ImportAnalysisRequest) async throws -> HarnessResult {
         try await transport.send(.importAnalysis, body: request)
@@ -31,6 +36,10 @@ extension EnvironmentValues {
 }
 
 actor UnavailableImportAnalysisAPI: ImportAnalysisAPI {
+    func accountBookContext() async throws -> FinanceContextResponse {
+        throw APIError.unavailable("导入分析账套上下文接口尚未配置")
+    }
+
     func analyze(_ request: ImportAnalysisRequest) async throws -> HarnessResult {
         throw APIError.unavailable("导入分析接口尚未配置")
     }
@@ -39,4 +48,3 @@ actor UnavailableImportAnalysisAPI: ImportAnalysisAPI {
         throw APIError.unavailable("人工复核接口尚未配置")
     }
 }
-

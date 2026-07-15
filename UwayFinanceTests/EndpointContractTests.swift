@@ -30,9 +30,9 @@ final class EndpointContractTests: XCTestCase {
     }
 
     func testReviewDecisionDoesNotTrustAClientReviewer() throws {
-        let body = ImportReviewDecision(decision: "accept", reason: "已核对银行回单")
+        let body = ImportReviewDecision(accountBookId: "11", decision: "accept", reason: "已核对银行回单")
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any])
-        XCTAssertEqual(Set(object.keys), Set(["decision", "reason"]))
+        XCTAssertEqual(Set(object.keys), Set(["accountBookId", "decision", "reason"]))
     }
 
     func testClassificationPreferenceEndpointsKeepAccountBookScopeAndRevokePath() {

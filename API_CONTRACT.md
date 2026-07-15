@@ -1,10 +1,10 @@
 # UwayFinance iOS API contract
 
-The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.14.0.json` is the checked-in iOS 0.14.0 baseline used by Windows and macOS CI; it targets backend app 0.14.0, API contract `20260715_010` and schema `20260715_007_multi_tenant_registration`. The root checkout contains the delegated registration contract but its mainline changes are not yet committed, so `backendBaselineCommit` remains null; full-workspace validation cross-checks the actual root files instead of claiming a frozen commit.
+The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.14.0.json` is the checked-in iOS 0.14.0 baseline used by Windows and macOS CI; it targets backend app 0.14.0, API contract `20260715_011` and schema `20260715_008_account_book_import_analysis`. Full-workspace validation cross-checks the actual root code and contract document rather than inferring newer endpoints.
 
 ## Classification-review capability handshake
 
-`GET /api/health` returns the database/migration-ready response including `status`, `version` and `financeSchemaVersion: "20260715_007_multi_tenant_registration"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260715_010`. The server also exposes `GET /api/live` for process liveness and `GET /api/ready` for database/migration readiness; iOS intentionally continues using compatibility `/api/health`.
+`GET /api/health` returns the database/migration-ready response including `status`, `version` and `financeSchemaVersion: "20260715_008_account_book_import_analysis"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260715_011`. The server also exposes `GET /api/live` for process liveness and `GET /api/ready` for database/migration readiness; iOS intentionally continues using compatibility `/api/health`.
 
 The capabilities response is the machine-readable source of truth. `financeResources.available=true` with `cutoverState=shadow` means the context and business-record slice can be compiled and contract-tested, not that the active app should cut over. Because `preferredMode` and `availableModes` still contain only `legacy_state_v1`, `AppSession` continues exclusively through `/api/state`. If capabilities are missing or invalid, old 0.8/0.9 fallback remains available.
 
@@ -108,13 +108,17 @@ Evidence remains separate from `AppSession` and `/api/state`. Neither a file, it
 | POST | `/api/import-analysis` | `ImportAnalysisAPI.analyze(...)` |
 | POST | `/api/import-analysis/:analysisId/decision` | `ImportAnalysisAPI.decide(...)` |
 
-The request sends only a normalized record, source coordinates/fingerprints and explicit company-ownership evidence. The server owns candidate retrieval, locked-fact creation and threshold policy. The response preserves evidence references, `accepted/review/rejected`, issue codes and Harness confidence. The iOS client never receives model-provider credentials and never writes a Harness result directly into the ledger.
+Before either call, iOS resolves the authenticated `/api/v2/context`. Both the analysis body and decision body carry the selected `accountBookId`; the server must authorize that account book. Analysis IDs, fingerprint lookup, replay and decisions are shared only within the same account book, and the client never caches a pending request across a user/session or account-book generation.
 
-The review decision body is exactly `{ decision, reason }`; reviewer identity is derived from the authenticated server session and is never trusted from the phone.
+The analysis request sends `accountBookId`, a normalized record, source coordinates/fingerprints and explicit company-ownership evidence. The server owns candidate retrieval, locked-fact creation and threshold policy. The response preserves evidence references, `accepted/review/rejected`, issue codes and Harness confidence. The iOS client never receives model-provider credentials and never writes a Harness result directly into the ledger.
+
+The review decision body is exactly `{ accountBookId, decision, reason }`; reviewer identity is derived from the authenticated server session and is never trusted from the phone.
 
 The decision response keeps the Harness status vocabulary: an accepted human decision returns `status: "accepted"`, and a rejection returns `status: "rejected"`. Human provenance is represented separately by `resolution.decision` and `resolution.reviewer`; it is not encoded into `status`.
 
-`features.importAnalysis` includes `{ available, reason, contract, decisions }`. With a configured provider it reports `available=true, reason=null`; otherwise it reports `available=false, reason="provider_not_configured"`. The native screen disables verification and checks the same capability again immediately before sending, so it does not call `/api/import-analysis` when unavailable. A server-side `503 IMPORT_AI_NOT_CONFIGURED` remains a defensive race-condition fallback; the client never falls back to an on-device or direct-provider call.
+`features.importAnalysis` includes `{ available, reason, contract, decisions, analysisEndpoint, decisionEndpoint, scope, sharedWithinAccountBook, idempotencyKey, idempotencyReplayHeader }`. The client enables the flow only for the exact `scope="account_book"`, `sharedWithinAccountBook=true`, `idempotencyKey="analysisId"` contract. With a configured provider it reports `available=true, reason=null`; otherwise it reports `available=false, reason="provider_not_configured"`. Missing fields on an older server decode safely but fail closed for new analysis calls. A server-side `503 IMPORT_AI_NOT_CONFIGURED` remains a defensive race-condition fallback; the client never falls back to an on-device or direct-provider call.
+
+The request factory retains one canonical request per candidate. Transport retry and a 409 inspection retry reuse the same `analysisId` and byte-equivalent Codable payload. `409 IMPORT_ANALYSIS_ID_REUSED` and `409 IMPORT_ANALYSIS_DECISION_CONFLICT` remain recognizable errors; neither clears the selected CSV, parsed preview, current Harness result nor the review sheet's unsubmitted reason. Changing authenticated user, session generation, file, ownership selection or account book clears the pending replay identity before another request can be sent.
 
 ### Native import safety boundary
 
