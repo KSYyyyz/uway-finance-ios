@@ -25,7 +25,7 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.semanticV2SafeForClientUse, true)
         XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
         XCTAssertTrue(contract.capabilities.documentUploadCapability.safeForClientUse)
-        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.accountBookImportAnalysisSchema)
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.immutableEvidenceLinksSchema)
         XCTAssertEqual(session.state.records.count, 1)
         XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-14T00:00:00.000Z"))
         let fetchStateCallCount = await api.fetchStateCallCount()
@@ -572,7 +572,7 @@ private actor FinanceAPISpy: FinanceAPI {
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
         version: "0.14.0",
-        financeSchemaVersion: BackendContract.accountBookImportAnalysisSchema
+        financeSchemaVersion: BackendContract.immutableEvidenceLinksSchema
     ), capabilitiesFixtureName: String = "capabilities-semantic-preference-memory-v0.14.0",
        fetchEnvelopes: [StateEnvelope] = [StateEnvelope(
         data: makeSessionState(description: "待重试事项"),

@@ -1,10 +1,10 @@
 # UwayFinance iOS API contract
 
-The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.14.0.json` is the checked-in iOS 0.14.0 baseline used by Windows and macOS CI; it targets backend app 0.14.0, API contract `20260715_011` and schema `20260715_008_account_book_import_analysis`. Full-workspace validation cross-checks the actual root code and contract document rather than inferring newer endpoints.
+The backend is deployed independently on Alibaba Cloud and is not part of this frontend repository. `ContractSnapshots/backend-api-v0.14.0.json` is the checked-in iOS 0.14.0 baseline used by Windows and macOS CI; it targets backend app 0.14.0, API contract `20260715_011` and schema `20260716_009_immutable_evidence_links`. Full-workspace validation cross-checks the actual root code and contract document rather than inferring newer endpoints.
 
 ## Classification-review capability handshake
 
-`GET /api/health` returns the database/migration-ready response including `status`, `version` and `financeSchemaVersion: "20260715_008_account_book_import_analysis"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260715_011`. The server also exposes `GET /api/live` for process liveness and `GET /api/ready` for database/migration readiness; iOS intentionally continues using compatibility `/api/health`.
+`GET /api/health` returns the database/migration-ready response including `status`, `version` and `financeSchemaVersion: "20260716_009_immutable_evidence_links"`. The schema field remains optional in Swift so an installed client can still connect to a 0.8.x backend that omits it. iOS then requests `GET /api/capabilities`, whose current `apiContractVersion` is `20260715_011`. The server also exposes `GET /api/live` for process liveness and `GET /api/ready` for database/migration readiness; iOS intentionally continues using compatibility `/api/health`.
 
 The capabilities response is the machine-readable source of truth. `financeResources.available=true` with `cutoverState=shadow` means the context and business-record slice can be compiled and contract-tested, not that the active app should cut over. Because `preferredMode` and `availableModes` still contain only `legacy_state_v1`, `AppSession` continues exclusively through `/api/state`. If capabilities are missing or invalid, old 0.8/0.9 fallback remains available.
 
@@ -100,6 +100,8 @@ Content viewing uses the authenticated byte endpoint and verifies returned lengt
 Revocation sends `accountBookId`, `expectedVersion`, a 3–1000 character reason and a stable idempotency key. Network retry preserves the same command. `409 EVIDENCE_VERSION_CONFLICT` reloads server state without clearing the reason or current `includeRevoked` filter; the user must inspect the new version and explicitly retry. Success is accepted only with `contentDeleted=false` and `contentImmutable=true`.
 
 Evidence remains separate from `AppSession` and `/api/state`. Neither a file, its metadata nor future OCR may accept an import, mutate a raw `BusinessRecord`, post a voucher or revoke evidence through AI authority.
+
+Schema `20260716_009_immutable_evidence_links` strengthens the database boundary without changing the native evidence endpoint shapes: a linked document and business record must belong to the same organization and account book, evidence associations cannot be deleted, and linked records/documents cannot move to another scope. The client continues to treat revocation as the only supported lifecycle action and never interprets attachment presence as accounting authority.
 
 ## Connected mainline import-analysis boundary
 

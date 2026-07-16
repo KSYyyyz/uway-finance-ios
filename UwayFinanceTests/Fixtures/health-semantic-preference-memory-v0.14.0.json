@@ -1,5 +1,5 @@
 {
   "status": "ok",
   "version": "0.14.0",
-  "financeSchemaVersion": "20260715_008_account_book_import_analysis"
+  "financeSchemaVersion": "20260716_009_immutable_evidence_links"
 }

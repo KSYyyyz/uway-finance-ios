@@ -2,9 +2,9 @@
   "version": "0.14.0",
   "backendAppVersion": "0.14.0",
   "backendBaselineCommit": null,
-  "backendBaselineStatus": "pending-mainline-freeze",
+  "backendBaselineStatus": "frozen-candidate",
   "apiContractVersion": "20260715_011",
-  "financeSchemaVersion": "20260715_008_account_book_import_analysis",
+  "financeSchemaVersion": "20260716_009_immutable_evidence_links",
   "syncMode": "legacy_state_v1",
   "money": {
     "legacyStateEncoding": "json_number",

@@ -1,7 +1,7 @@
 {
   "version": "0.14.0",
   "apiContractVersion": "20260715_011",
-  "financeSchemaVersion": "20260715_008_account_book_import_analysis",
+  "financeSchemaVersion": "20260716_009_immutable_evidence_links",
   "sync": {
     "preferredMode": "legacy_state_v1",
     "availableModes": ["legacy_state_v1"],

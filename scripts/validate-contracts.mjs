@@ -7,9 +7,10 @@ const workspace = path.resolve(root, '..', '..')
 const expectedMarketingVersion = '0.14.0'
 const expectedBackendVersion = '0.14.0'
 const expectedAPIContractVersion = '20260715_011'
-const expectedFinanceSchemaVersion = '20260715_008_account_book_import_analysis'
-const expectedBuildVersion = '11'
+const expectedFinanceSchemaVersion = '20260716_009_immutable_evidence_links'
+const expectedBuildVersion = '12'
 const expectedBackendBaselineCommit = null
+const expectedBackendBaselineStatus = 'frozen-candidate'
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
 const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.14.0.json')
 
@@ -261,6 +262,7 @@ const contractSnapshot = JSON.parse(fs.readFileSync(contractSnapshotPath, 'utf8'
 if (contractSnapshot.version !== expectedMarketingVersion) throw new Error('backend contract snapshot version mismatch')
 if (contractSnapshot.backendAppVersion !== expectedBackendVersion) throw new Error('backend app version snapshot mismatch')
 if (contractSnapshot.backendBaselineCommit !== expectedBackendBaselineCommit) throw new Error('backend baseline commit snapshot mismatch')
+if (contractSnapshot.backendBaselineStatus !== expectedBackendBaselineStatus) throw new Error('backend baseline status snapshot mismatch')
 if (contractSnapshot.apiContractVersion !== expectedAPIContractVersion) {
   throw new Error('backend contract snapshot API contract version mismatch')
 }
@@ -1036,6 +1038,18 @@ if (hasLocalBackend) {
   const financeDomain = fs.readFileSync(financeDomainPath, 'utf8')
   if (!financeDomain.includes(`FINANCE_SCHEMA_VERSION = '${expectedFinanceSchemaVersion}'`)) {
     throw new Error('local finance domain schema version mismatch')
+  }
+  for (const marker of [
+    'BUSINESS_RECORD_DOCUMENT_SCOPE_MISMATCH',
+    'BUSINESS_RECORD_EVIDENCE_ORPHANED',
+    'enforce_business_record_document_scope',
+    'BUSINESS_RECORD_EVIDENCE_LINK_IMMUTABLE',
+    'LINKED_EVIDENCE_SCOPE_IMMUTABLE',
+    'business_record_documents_delete_guard',
+    'documents_linked_scope_guard',
+    'business_records_linked_scope_guard',
+  ]) {
+    if (!financeDomain.includes(marker)) throw new Error(`local immutable evidence-link marker missing: ${marker}`)
   }
   const health = fs.readFileSync(healthPath, 'utf8')
   if (!health.includes('financeSchemaVersion: FINANCE_SCHEMA_VERSION')) {

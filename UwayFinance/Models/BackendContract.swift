@@ -512,6 +512,7 @@ struct BackendContract: Equatable, Sendable {
     static let semanticPreferenceMemoryV2Schema = "20260715_006_semantic_preference_memory_v2"
     static let multiTenantRegistrationSchema = "20260715_007_multi_tenant_registration"
     static let accountBookImportAnalysisSchema = "20260715_008_account_book_import_analysis"
+    static let immutableEvidenceLinksSchema = "20260716_009_immutable_evidence_links"
 
     static func isFinanceDomainV2Schema(_ value: String?) -> Bool {
         value == financeDomainV2Schema
@@ -521,6 +522,7 @@ struct BackendContract: Equatable, Sendable {
             || value == semanticPreferenceMemoryV2Schema
             || value == multiTenantRegistrationSchema
             || value == accountBookImportAnalysisSchema
+            || value == immutableEvidenceLinksSchema
     }
 
     let serverVersion: String

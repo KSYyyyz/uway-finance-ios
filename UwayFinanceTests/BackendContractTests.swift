@@ -226,7 +226,7 @@ final class BackendContractTests: XCTestCase {
 
         XCTAssertEqual(contract.serverVersion, "0.14.0")
         XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260715_011")
-        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.accountBookImportAnalysisSchema)
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.immutableEvidenceLinksSchema)
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         let memory = try XCTUnwrap(contract.capabilities.classificationPreferenceMemory)
         XCTAssertNil(memory.learningState)

@@ -2,6 +2,7 @@
 
 ## 0.14.0 - 2026-07-16
 
+- Finalize build 12 against finance schema `20260716_009_immutable_evidence_links`; verify that native evidence flows remain account-book scoped while the database makes evidence associations and linked scope immutable.
 - Target backend app `0.14.0`, API `20260715_011` and schema `20260715_008_account_book_import_analysis` in build 11 without rewriting any historical fixture.
 - Scope import analysis and decisions to the authenticated account book, reuse identical canonical requests on retry, and preserve local previews/review drafts on 409 conflicts.
 - Add capability-gated SMS registration with login/register switching, server-driven challenge TTL/resend countdown, password confirmation, Chinese server-error mapping and VoiceOver/keyboard semantics. Passwords and codes remain transient JSON-body values and are never logged, persisted or put in URLs; no fake-code fallback exists.
