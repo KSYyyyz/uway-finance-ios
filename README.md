@@ -2,7 +2,7 @@
 
 SwiftUI client for the internal Uway finance workflow. This repository contains only the native iOS frontend; the Fastify/PostgreSQL backend is deployed separately on Alibaba Cloud and is accessed over HTTPS.
 
-Current marketing version: `0.14.0` (build `12`), targeting backend app `0.14.0`, API contract `20260715_011` and finance schema `20260716_009_immutable_evidence_links`. The validator cross-checks the live workspace contract and fails closed on any version, route, capability, account-book isolation or immutable-evidence-link mismatch. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
+Current marketing version: `0.14.1` (build `13`), targeting backend app `0.14.1`, API contract `20260720_012` and finance schema `20260716_009_immutable_evidence_links`. Registration now negotiates the server-published `aliyun_sms` verification mode while retaining historical `sms_webhook` decoding because the endpoints and payloads are unchanged. The validator cross-checks the live workspace contract and fails closed on any version, route, capability, account-book isolation or immutable-evidence-link mismatch. The Profile screen reads `CFBundleShortVersionString` from the built app bundle, so the displayed version follows Xcode build settings rather than a hardcoded UI value.
 
 ## Implemented stage
 
@@ -21,7 +21,7 @@ Current marketing version: `0.14.0` (build `12`), targeting backend app `0.14.0`
 - Preference-memory v2 decodes `learningState=shadow|provisional|active` while preserving the existing account-book list/revoke UI and all v0.12/v0.13 compatibility. It still requires `modelCanAccept=false` and `writesBusinessRecords=false`; no new semantic-learning write UI was added.
 - V2 writes use commands that retain one stable `Idempotency-Key` across retries. Updates always carry `expectedVersion`; `409 VERSION_CONFLICT` remains distinguishable from generic server failures.
 - Current `/api/state` read/write compatibility, debounced sync status and pull-to-refresh. The backend may mirror those writes into Finance Domain V2, but `AppSession` does not use V2 resources, classification review, document or OCR APIs as its synchronization source.
-- Every 0.14.0 state write is conditional: the client stores the last fetched/saved `updatedAt`, sends it as quoted `If-Match`, and uses `"0"` for a first empty-ledger write. A conflict never refreshes over local edits; automatic saves pause behind a visible “其他设备已更新，需要核对” state until the user explicitly confirms “保留本机修改并重试” after a non-merge warning.
+- Every 0.14.1 state write is conditional: the client stores the last fetched/saved `updatedAt`, sends it as quoted `If-Match`, and uses `"0"` for a first empty-ledger write. A conflict never refreshes over local edits; automatic saves pause behind a visible “其他设备已更新，需要核对” state until the user explicitly confirms “保留本机修改并重试” after a non-merge warning.
 - Live `/api/health` status plus service app version, optional finance schema, API contract version and active sync-mode display; 0.8.x responses without `financeSchemaVersion` remain decodable. Failed saves keep their local snapshot and expose a one-tap retry instead of overwriting it with a refresh.
 - Exact-cent network/domain boundary: current JSON number amounts remain compatible, while Swift Codable converts them to integer cents before round-tripping state and import payloads.
 - “记一笔” `Form`, workbench cash summary, recent activity and a Swift Charts cash forecast.
@@ -73,7 +73,7 @@ The repository workflow `.github/workflows/ios-ci.yml` runs on GitHub's `macos-2
 6. after XCTest passes, builds a clean unsigned `iphoneos` app and packages it as `UwayFinance-unsigned.ipa` for local signing only;
 7. uploads the simulator build, unsigned device build and `.xcresult`/build logs for 14 days.
 
-It runs for iOS or checked-in contract-snapshot changes and can also be started manually with `workflow_dispatch`. `ContractSnapshots/backend-api-v0.14.0.json` is the standalone frontend contract baseline; when the repository is located inside the full Uway workspace, the validator additionally cross-checks the local backend routes, capability factory, evidence immutability rules and Finance Domain schema constant. No Apple signing secret is required for this simulator job.
+It runs for iOS or checked-in contract-snapshot changes and can also be started manually with `workflow_dispatch`. `ContractSnapshots/backend-api-v0.14.1.json` is the standalone frontend contract baseline; when the repository is located inside the full Uway workspace, the validator additionally cross-checks the local backend routes, capability factory, evidence immutability rules and Finance Domain schema constant. No Apple signing secret is required for this simulator job.
 
 ### Interact from Windows without Apple Developer membership
 

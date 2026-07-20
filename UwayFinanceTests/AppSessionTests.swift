@@ -12,9 +12,9 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
         guard case .available(let contract) = session.serverState else {
-            return XCTFail("0.14.0 server should be available")
+            return XCTFail("0.14.1 server should be available")
         }
-        XCTAssertEqual(contract.serverVersion, "0.14.0")
+        XCTAssertEqual(contract.serverVersion, "0.14.1")
         XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
         XCTAssertEqual(contract.capabilities.source, .server)
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
@@ -571,9 +571,9 @@ private actor FinanceAPISpy: FinanceAPI {
 
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
-        version: "0.14.0",
+        version: "0.14.1",
         financeSchemaVersion: BackendContract.immutableEvidenceLinksSchema
-    ), capabilitiesFixtureName: String = "capabilities-semantic-preference-memory-v0.14.0",
+    ), capabilitiesFixtureName: String = "capabilities-aliyun-sms-v0.14.1",
        fetchEnvelopes: [StateEnvelope] = [StateEnvelope(
         data: makeSessionState(description: "待重试事项"),
         updatedAt: "2026-07-14T00:00:00.000Z"

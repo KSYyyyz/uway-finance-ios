@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.1 - 2026-07-20
+
+- Align build 13 with backend app `0.14.1`, API contract `20260720_012` and unchanged finance schema `20260716_009_immutable_evidence_links`.
+- Negotiate `features.registration.phoneVerification=aliyun_sms` while preserving the frozen registration endpoints, request/response payloads, tenant isolation and HttpOnly/Secure/SameSite=Strict session boundary.
+- Preserve 0.14.0 `sms_webhook` fixtures and decoding as an explicit backward-compatible path; unrecognized verification modes remain fail closed.
+- Keep passwords, one-time codes and provider credentials out of logs, URLs, preferences and repository fixtures. SMS delivery and verification remain server-owned.
+
 ## 0.14.0 - 2026-07-16
 
 - Finalize build 12 against finance schema `20260716_009_immutable_evidence_links`; verify that native evidence flows remain account-book scoped while the database makes evidence associations and linked scope immutable.

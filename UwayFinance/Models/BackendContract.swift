@@ -17,6 +17,8 @@ struct CapabilityAvailability: Codable, Equatable, Sendable {
 }
 
 struct RegistrationCapability: Codable, Equatable, Sendable {
+    private static let supportedPhoneVerification = Set(["sms_webhook", "aliyun_sms"])
+
     let available: Bool
     let reason: String?
     let codeEndpoint: String?
@@ -29,7 +31,7 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
         available
             && codeEndpoint == "/api/auth/registration-code"
             && registerEndpoint == "/api/auth/register"
-            && phoneVerification == "sms_webhook"
+            && phoneVerification.map { Self.supportedPhoneVerification.contains($0) } == true
             && createsIsolatedOrganizationAndAccountBook == true
             && sessionCookie == "http_only_secure_same_site_strict"
     }
@@ -504,7 +506,7 @@ struct ServerCapabilities: Equatable, Sendable {
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260715_011"
+    static let apiContractVersion = "20260720_012"
     static let financeDomainV2Schema = "20260714_002_finance_resource_api"
     static let classificationReviewSchema = "20260714_003_classification_review"
     static let classificationPreferenceMemorySchema = "20260715_004_account_book_preference_memory"

@@ -1,0 +1,168 @@
+{
+  "version": "0.14.1",
+  "backendAppVersion": "0.14.1",
+  "backendBaselineCommit": null,
+  "backendBaselineStatus": "frozen-candidate",
+  "apiContractVersion": "20260720_012",
+  "financeSchemaVersion": "20260716_009_immutable_evidence_links",
+  "syncMode": "legacy_state_v1",
+  "money": {
+    "legacyStateEncoding": "json_number",
+    "financeV2Encoding": "decimal_string",
+    "databasePrecision": 18,
+    "databaseScale": 2
+  },
+  "capabilities": {
+    "financeDomainV2Mirror": true,
+    "legacyState": {
+      "readable": true,
+      "writable": true,
+      "conflictControl": "optional_if_match",
+      "versionSource": "updatedAt",
+      "etagHeader": "ETag",
+      "conditionalWriteHeader": "If-Match"
+    },
+    "financeResources": {
+      "available": true,
+      "cutoverState": "shadow",
+      "contextEndpoint": "/api/v2/context",
+      "cutoverReadiness": {
+        "available": true,
+        "endpoint": "/api/v2/cutover-readiness",
+        "pagination": "cursor",
+        "requiresZeroDifferences": true,
+        "requiresZeroShadowOnlyRecords": true,
+        "clientWritesEnabled": false
+      },
+      "businessRecords": {
+        "list": true,
+        "create": true,
+        "update": true,
+        "delete": false,
+        "pagination": "cursor",
+        "moneyEncoding": "decimal_string",
+        "idempotencyHeader": "Idempotency-Key",
+        "concurrencyControl": "expectedVersion"
+      }
+    },
+    "unifiedDashboardMetrics": {
+      "available": true,
+      "endpoint": "/api/v2/dashboard-metrics",
+      "moneyEncoding": "decimal_string",
+      "source": "finance_v2_shadow_read_model",
+      "rawRecordsMerged": false,
+      "classificationStates": ["accepted", "review", "unclassified"]
+    },
+    "classificationReview": {
+      "available": true,
+      "listEndpoint": "/api/v2/classification-reviews",
+      "analyzeEndpoint": "/api/v2/classification-reviews/:recordId/analyze",
+      "decisionEndpoint": "/api/v2/classification-reviews/:recordId/decision",
+      "pagination": "cursor",
+      "defaultPageSize": 10,
+      "decisions": ["confirm", "correct", "reject"],
+      "idempotencyHeader": "Idempotency-Key",
+      "concurrencyControl": ["expectedRecordVersion", "expectedClassificationVersion"],
+      "modelCanAccept": false,
+      "deterministicRuleMayAccept": true,
+      "rawBusinessRecordsChanged": false
+    },
+    "classificationPreferenceMemory": {
+      "available": true,
+      "normalizationVersion": "semantic-preference-v2",
+      "listEndpoint": "/api/v2/classification-preferences",
+      "revokeEndpoint": "/api/v2/classification-preferences/:observationId/revoke",
+      "pagination": "cursor",
+      "scope": "account_book",
+      "companyScoped": true,
+      "source": "explicit_authenticated_human_decisions",
+      "reasonCodes": ["counterparty_alias", "expense_nature", "employee_compensation", "capital_transaction", "evidence_mismatch", "company_scope", "other"],
+      "learningStates": ["shadow", "provisional", "active"],
+      "similarity": "complete_link_semantic",
+      "provisionalMinimumConsistentObservations": 2,
+      "minimumConsistentObservations": 3,
+      "minimumConsistency": 0.8,
+      "lifecycleStates": ["active", "revoked", "invalidated"],
+      "effect": "closed_candidate_reordering_only",
+      "idempotencyHeader": "Idempotency-Key",
+      "concurrencyControl": "expectedVersion",
+      "modelCanAccept": false,
+      "writesBusinessRecords": false
+    },
+    "registration": {
+      "availability": "runtime",
+      "reasonWhenUnavailable": "sms_provider_not_configured",
+      "codeEndpoint": "/api/auth/registration-code",
+      "registerEndpoint": "/api/auth/register",
+      "phoneVerification": "aliyun_sms",
+      "createsIsolatedOrganizationAndAccountBook": true,
+      "sessionCookie": "http_only_secure_same_site_strict"
+    },
+    "documentUpload": {
+      "available": true,
+      "listEndpoint": "/api/v2/business-record-evidence",
+      "coverageEndpoint": "/api/v2/business-record-evidence-coverage",
+      "uploadEndpoint": "/api/v2/business-record-evidence",
+      "contentEndpoint": "/api/v2/business-record-evidence/:evidenceId/content",
+      "revokeEndpoint": "/api/v2/business-record-evidence/:evidenceId/revoke",
+      "acceptedMediaTypes": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"],
+      "maxBytes": 10000000,
+      "contentImmutability": "database_trigger_and_sha256",
+      "lifecycle": ["active", "revoked"],
+      "deletion": false,
+      "accountBookScoped": true,
+      "idempotencyHeader": "Idempotency-Key"
+    },
+    "aiClassification": {
+      "available": "runtime",
+      "contract": "closed_set_existing_operating_item_v1",
+      "deterministicGroupingAvailable": true,
+      "modelCanAccept": false,
+      "writesBusinessRecords": false
+    },
+    "importAnalysis": {
+      "availability": "runtime",
+      "reasonWhenUnavailable": "provider_not_configured",
+      "analysisEndpoint": "/api/import-analysis",
+      "decisionEndpoint": "/api/import-analysis/:analysisId/decision",
+      "scope": "account_book",
+      "sharedWithinAccountBook": true,
+      "idempotencyKey": "analysisId",
+      "idempotencyReplayHeader": "Idempotency-Replayed"
+    }
+  },
+  "endpoints": [
+    { "method": "get", "path": "/api/health", "swift": "method: .get, path: \"/api/health\"" },
+    { "method": "get", "path": "/api/capabilities", "swift": "method: .get, path: \"/api/capabilities\"" },
+    { "method": "post", "path": "/api/auth/login", "swift": "method: .post, path: \"/api/auth/login\"" },
+    { "method": "post", "path": "/api/auth/registration-code", "swift": "method: .post, path: \"/api/auth/registration-code\"" },
+    { "method": "post", "path": "/api/auth/register", "swift": "method: .post, path: \"/api/auth/register\"" },
+    { "method": "get", "path": "/api/auth/me", "swift": "method: .get, path: \"/api/auth/me\"" },
+    { "method": "post", "path": "/api/auth/logout", "swift": "method: .post, path: \"/api/auth/logout\"" },
+    { "method": "get", "path": "/api/state", "swift": "method: .get, path: \"/api/state\"" },
+    { "method": "put", "path": "/api/state", "swift": "method: .put, path: \"/api/state\"" },
+    { "method": "get", "path": "/api/v2/context", "swift": "\"/api/v2/context\"" },
+    { "method": "get", "path": "/api/v2/business-records", "swift": "path(\"/api/v2/business-records\"" },
+    { "method": "post", "path": "/api/v2/business-records", "swift": "method: .post, path: \"/api/v2/business-records\"" },
+    { "method": "patch", "path": "/api/v2/business-records/:recordId", "swift": "method: .patch, path: \"/api/v2/business-records/\\(encoded)\"" },
+    { "method": "get", "path": "/api/v2/cutover-readiness", "swift": "path(\"/api/v2/cutover-readiness\"" },
+    { "method": "get", "path": "/api/v2/dashboard-metrics", "swift": "path(\"/api/v2/dashboard-metrics\"" },
+    { "method": "get", "path": "/api/v2/classification-reviews", "swift": "path(\"/api/v2/classification-reviews\"" },
+    { "method": "post", "path": "/api/v2/classification-reviews/:recordId/analyze", "swift": "suffix: \"analyze\"" },
+    { "method": "post", "path": "/api/v2/classification-reviews/:recordId/decision", "swift": "suffix: \"decision\"" },
+    { "method": "get", "path": "/api/v2/classification-preferences", "swift": "path(\"/api/v2/classification-preferences\"" },
+    { "method": "post", "path": "/api/v2/classification-preferences/:observationId/revoke", "swift": "path: \"/api/v2/classification-preferences/\\(encoded)/revoke\"" },
+    { "method": "get", "path": "/api/v2/business-record-evidence", "swift": "\"/api/v2/business-record-evidence\"" },
+    { "method": "get", "path": "/api/v2/business-record-evidence-coverage", "swift": "\"/api/v2/business-record-evidence-coverage\"" },
+    { "method": "post", "path": "/api/v2/business-record-evidence", "swift": "path: \"/api/v2/business-record-evidence\"" },
+    { "method": "get", "path": "/api/v2/business-record-evidence/:evidenceId/content", "swift": "businessRecordEvidenceContent" },
+    { "method": "post", "path": "/api/v2/business-record-evidence/:evidenceId/revoke", "swift": "revokeBusinessRecordEvidence" },
+    { "method": "post", "path": "/api/audit-events", "swift": "method: .post, path: \"/api/audit-events\"" },
+    { "method": "post", "path": "/api/import-analysis", "swift": "method: .post, path: \"/api/import-analysis\"" },
+    { "method": "post", "path": "/api/import-analysis/:analysisId/decision", "swift": "method: .post, path: \"/api/import-analysis/\\(encoded)/decision\"" }
+  ],
+  "importRequestFields": ["accountBookId:", "source:", "record:", "companyOwnership:", "evidenceText:", "rowPath:"],
+  "ledgerProvenanceFields": ["importAnalysisId", "sourceFingerprint", "analysisDecision"],
+  "decisionStatuses": ["accepted", "review", "rejected"]
+}
+

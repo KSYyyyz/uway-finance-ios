@@ -213,7 +213,7 @@ final class BackendContractTests: XCTestCase {
         XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
     }
 
-    func testSemanticPreferenceMemoryV2NegotiatesLearningStateWithoutGrantingModelAuthority() throws {
+    func testV0140SMSWebhookCapabilityRemainsBackwardCompatible() throws {
         let health = try JSONDecoder().decode(
             HealthResponse.self,
             from: fixture(named: "health-semantic-preference-memory-v0.14.0")
@@ -245,6 +245,45 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.importAnalysis.idempotencyKey, "analysisId")
         XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
         XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
+    }
+
+    func testV0141AliyunSMSCapabilityNegotiatesWithoutChangingRegistrationPayloadContract() throws {
+        let health = try JSONDecoder().decode(
+            HealthResponse.self,
+            from: fixture(named: "health-aliyun-sms-v0.14.1")
+        )
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-aliyun-sms-v0.14.1")
+        )
+        let contract = BackendContract(health: health, negotiated: response)
+
+        XCTAssertEqual(contract.serverVersion, "0.14.1")
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260720_012")
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.immutableEvidenceLinksSchema)
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
+        XCTAssertEqual(contract.capabilities.registration.codeEndpoint, "/api/auth/registration-code")
+        XCTAssertEqual(contract.capabilities.registration.registerEndpoint, "/api/auth/register")
+        XCTAssertEqual(contract.capabilities.registration.phoneVerification, "aliyun_sms")
+        XCTAssertEqual(contract.capabilities.registration.createsIsolatedOrganizationAndAccountBook, true)
+        XCTAssertEqual(contract.capabilities.registration.sessionCookie, "http_only_secure_same_site_strict")
+        XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
+        XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
+    }
+
+    func testUnknownRegistrationVerificationModeFailsClosed() {
+        let capability = RegistrationCapability(
+            available: true,
+            reason: nil,
+            codeEndpoint: "/api/auth/registration-code",
+            registerEndpoint: "/api/auth/register",
+            phoneVerification: "unrecognized_provider",
+            createsIsolatedOrganizationAndAccountBook: true,
+            sessionCookie: "http_only_secure_same_site_strict"
+        )
+
+        XCTAssertFalse(capability.safeForClientUse)
     }
 
     func testCapabilitiesV090ReportsUnconfiguredImportProvider() throws {

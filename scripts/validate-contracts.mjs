@@ -4,18 +4,19 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
-const expectedMarketingVersion = '0.14.0'
-const expectedBackendVersion = '0.14.0'
-const expectedAPIContractVersion = '20260715_011'
+const expectedMarketingVersion = '0.14.1'
+const expectedBackendVersion = '0.14.1'
+const expectedAPIContractVersion = '20260720_012'
 const expectedFinanceSchemaVersion = '20260716_009_immutable_evidence_links'
-const expectedBuildVersion = '12'
+const expectedBuildVersion = '13'
 const expectedBackendBaselineCommit = null
 const expectedBackendBaselineStatus = 'frozen-candidate'
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
-const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.14.0.json')
+const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.14.1.json')
 
 const requiredFiles = [
   'project.yml',
+  'ContractSnapshots/backend-api-v0.14.1.json',
   'ContractSnapshots/backend-api-v0.14.0.json',
   'UwayFinance/App/UwayFinanceApp.swift',
   'UwayFinance/Networking/APIEndpoint.swift',
@@ -133,6 +134,8 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/registration-code-success-v0.14.0.json',
   'UwayFinanceTests/Fixtures/registration-success-v0.14.0.json',
   'UwayFinanceTests/Fixtures/registration-errors-v0.14.0.json',
+  'UwayFinanceTests/Fixtures/health-aliyun-sms-v0.14.1.json',
+  'UwayFinanceTests/Fixtures/capabilities-aliyun-sms-v0.14.1.json',
   'Docs/PERSONALIZATION_CONTRACT_REQUIREMENTS.md',
   'CHANGELOG.md',
 ]
@@ -214,6 +217,8 @@ const fixtures = [
   'registration-code-success-v0.14.0.json',
   'registration-success-v0.14.0.json',
   'registration-errors-v0.14.0.json',
+  'health-aliyun-sms-v0.14.1.json',
+  'capabilities-aliyun-sms-v0.14.1.json',
 ]
 for (const fixture of fixtures) {
   JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', fixture), 'utf8'))
@@ -352,7 +357,7 @@ if (registrationSnapshot?.availability !== 'runtime'
     || registrationSnapshot?.reasonWhenUnavailable !== 'sms_provider_not_configured'
     || registrationSnapshot?.codeEndpoint !== '/api/auth/registration-code'
     || registrationSnapshot?.registerEndpoint !== '/api/auth/register'
-    || registrationSnapshot?.phoneVerification !== 'sms_webhook'
+    || registrationSnapshot?.phoneVerification !== 'aliyun_sms'
     || registrationSnapshot?.createsIsolatedOrganizationAndAccountBook !== true
     || registrationSnapshot?.sessionCookie !== 'http_only_secure_same_site_strict') {
   throw new Error('registration snapshot must preserve server-gated SMS and tenant isolation boundaries')
@@ -393,8 +398,8 @@ if (contractSnapshot.money?.legacyStateEncoding !== 'json_number'
   throw new Error('backend contract snapshot money boundary mismatch')
 }
 
-const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-semantic-preference-memory-v0.14.0.json'), 'utf8'))
-const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-semantic-preference-memory-v0.14.0.json'), 'utf8'))
+const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-aliyun-sms-v0.14.1.json'), 'utf8'))
+const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-aliyun-sms-v0.14.1.json'), 'utf8'))
 if (healthFixture.version !== expectedBackendVersion
     || healthFixture.financeSchemaVersion !== expectedFinanceSchemaVersion) {
   throw new Error('semantic preference-memory v2 health fixture version/schema mismatch')
@@ -433,7 +438,7 @@ if (registrationCapability?.available !== true
     || registrationCapability?.reason !== null
     || registrationCapability?.codeEndpoint !== '/api/auth/registration-code'
     || registrationCapability?.registerEndpoint !== '/api/auth/register'
-    || registrationCapability?.phoneVerification !== 'sms_webhook'
+    || registrationCapability?.phoneVerification !== 'aliyun_sms'
     || registrationCapability?.createsIsolatedOrganizationAndAccountBook !== true
     || registrationCapability?.sessionCookie !== 'http_only_secure_same_site_strict') {
   throw new Error('current registration capability fixture is unsafe or incomplete')
@@ -442,7 +447,16 @@ if (capabilitiesFixture.sync?.financeResources?.available !== true
     || capabilitiesFixture.sync?.financeResources?.cutoverState !== 'shadow'
     || capabilitiesFixture.sync?.financeResources?.cutoverReadiness?.clientWritesEnabled !== false
     || capabilitiesFixture.sync?.financeResources?.businessRecords?.moneyEncoding !== 'decimal_string') {
-  throw new Error('current 0.14.0 capabilities fixture must preserve read-only readiness and the shadow resource slice')
+  throw new Error('current 0.14.1 capabilities fixture must preserve read-only readiness and the shadow resource slice')
+}
+const historicalV0140CapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-semantic-preference-memory-v0.14.0.json'), 'utf8'))
+const historicalV0140HealthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-semantic-preference-memory-v0.14.0.json'), 'utf8'))
+if (historicalV0140HealthFixture.version !== '0.14.0'
+    || historicalV0140HealthFixture.financeSchemaVersion !== expectedFinanceSchemaVersion
+    || historicalV0140CapabilitiesFixture.version !== '0.14.0'
+    || historicalV0140CapabilitiesFixture.apiContractVersion !== '20260715_011'
+    || historicalV0140CapabilitiesFixture.features?.registration?.phoneVerification !== 'sms_webhook') {
+  throw new Error('historical 0.14.0 SMS webhook compatibility fixtures must remain unchanged')
 }
 const oldCapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-v0.10.0.json'), 'utf8'))
 if ('cutoverReadiness' in (oldCapabilitiesFixture.sync?.financeResources ?? {})) {
@@ -845,7 +859,7 @@ for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amo
 }
 
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
-for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningStates', 'semantic-preference-v2', 'complete_link_semantic', 'RegistrationCapability', 'sms_webhook', 'http_only_secure_same_site_strict', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', 'safeForAccountBookUse', 'sharedWithinAccountBook', 'idempotencyReplayHeader', '"accepted", "review", "rejected"']) {
+for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningStates', 'semantic-preference-v2', 'complete_link_semantic', 'RegistrationCapability', 'sms_webhook', 'aliyun_sms', 'http_only_secure_same_site_strict', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', 'safeForAccountBookUse', 'sharedWithinAccountBook', 'idempotencyReplayHeader', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
 }
 for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
@@ -972,6 +986,14 @@ for (const marker of ['requestRegistrationCode', 'session.register', 'TimelineVi
 }
 for (const forbidden of ['UserDefaults', 'Keychain', 'URLQueryItem(name: "password"', 'URLQueryItem(name: "code"']) {
   if (loginView.includes(forbidden)) throw new Error(`registration secret persistence/URL marker forbidden: ${forbidden}`)
+}
+for (const file of listSwiftFiles(path.join(root, 'UwayFinance'))) {
+  const source = fs.readFileSync(file, 'utf8')
+  for (const forbiddenLogging of [/\bprint\s*\(/, /\bdebugPrint\s*\(/, /\bNSLog\s*\(/, /\bos_log\s*\(/, /\bLogger\s*\(/]) {
+    if (forbiddenLogging.test(source)) {
+      throw new Error(`application source must not log registration codes, passwords or provider secrets: ${path.relative(root, file)}`)
+    }
+  }
 }
 
 const serverPath = path.join(workspace, 'server', 'index.ts')
@@ -1114,7 +1136,7 @@ if (hasLocalBackend) {
     "idempotencyReplayHeader: 'Idempotency-Replayed'",
     "codeEndpoint: '/api/auth/registration-code'",
     "registerEndpoint: '/api/auth/register'",
-    "phoneVerification: 'sms_webhook'",
+    "phoneVerification: 'aliyun_sms'",
     'createsIsolatedOrganizationAndAccountBook: true',
     "sessionCookie: 'http_only_secure_same_site_strict'",
   ]) {
