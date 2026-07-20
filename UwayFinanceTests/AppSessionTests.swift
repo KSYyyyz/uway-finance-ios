@@ -255,6 +255,7 @@ final class AppSessionTests: XCTestCase {
     func testLoginLoadsCurrentLegacyState() async throws {
         let api = FinanceAPISpy()
         let session = AppSession(api: api, saveDelay: .zero)
+        await session.checkServer()
 
         try await session.login(identifier: "finance-admin", password: "secret")
 
