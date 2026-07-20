@@ -12,9 +12,9 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
         guard case .available(let contract) = session.serverState else {
-            return XCTFail("0.14.1 server should be available")
+            return XCTFail("0.15.0 server should be available")
         }
-        XCTAssertEqual(contract.serverVersion, "0.14.1")
+        XCTAssertEqual(contract.serverVersion, "0.15.0")
         XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
         XCTAssertEqual(contract.capabilities.source, .server)
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
@@ -24,8 +24,11 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.safeForClientUse, true)
         XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.semanticV2SafeForClientUse, true)
         XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
+        XCTAssertTrue(contract.capabilities.registration.supportsIdentityContract)
+        XCTAssertTrue(contract.capabilities.authentication.safeForIdentifierLogin)
+        XCTAssertTrue(contract.capabilities.passwordRecovery.safeForClientUse)
         XCTAssertTrue(contract.capabilities.documentUploadCapability.safeForClientUse)
-        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.immutableEvidenceLinksSchema)
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.accountIdentityRecoverySchema)
         XCTAssertEqual(session.state.records.count, 1)
         XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-14T00:00:00.000Z"))
         let fetchStateCallCount = await api.fetchStateCallCount()
@@ -253,11 +256,31 @@ final class AppSessionTests: XCTestCase {
         let api = FinanceAPISpy()
         let session = AppSession(api: api, saveDelay: .zero)
 
-        try await session.login(username: "finance-admin", password: "secret")
+        try await session.login(identifier: "finance-admin", password: "secret")
 
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
         XCTAssertEqual(session.state.records.first?.id, "local-001")
+        let currentLoginFields = await api.attemptedLegacyLoginFields()
+        XCTAssertEqual(currentLoginFields, [false])
+    }
+
+    func testV0141CapabilityUsesLegacyUsernameLoginAlias() async throws {
+        let api = FinanceAPISpy(
+            healthResponse: HealthResponse(
+                status: "ok",
+                version: "0.14.1",
+                financeSchemaVersion: BackendContract.immutableEvidenceLinksSchema
+            ),
+            capabilitiesFixtureName: "capabilities-aliyun-sms-v0.14.1"
+        )
+        let session = AppSession(api: api, saveDelay: .zero)
+        await session.checkServer()
+
+        try await session.login(identifier: "legacy-owner", password: "SafePassword")
+
+        let legacyLoginFields = await api.attemptedLegacyLoginFields()
+        XCTAssertEqual(legacyLoginFields, [true])
     }
 
     func testFailedSaveRetriesLocalSnapshot() async throws {
@@ -441,6 +464,7 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(challenge.resendAfterSeconds, 60)
         try await session.register(RegistrationRequest(
             username: "new_owner",
+            email: "owner@example.com",
             password: "SecurePass2026",
             phone: "+8613800138000",
             challengeId: challenge.challengeId,
@@ -454,6 +478,7 @@ final class AppSessionTests: XCTestCase {
         let request = await api.lastRegistrationRequest()
         XCTAssertEqual(request?.challengeId, challenge.challengeId)
         XCTAssertEqual(request?.code, "246810")
+        XCTAssertEqual(request?.email, "owner@example.com")
     }
 
     func testSlowLoginAResponseCannotOverwriteNewerUserB() async throws {
@@ -467,15 +492,39 @@ final class AppSessionTests: XCTestCase {
         let session = AppSession(api: api, saveDelay: .zero)
         await session.checkServer()
 
-        async let oldAttempt: Void = session.login(username: "user-a", password: "PasswordA1")
+        async let oldAttempt: Void = session.login(identifier: "user-a", password: "PasswordA1")
         try await Task.sleep(for: .milliseconds(15))
-        async let newAttempt: Void = session.login(username: "user-b", password: "PasswordB1")
+        async let newAttempt: Void = session.login(identifier: "user-b", password: "PasswordB1")
         _ = try? await oldAttempt
         try await newAttempt
 
         XCTAssertEqual(session.user, SessionUser(id: "id-user-b", username: "user-b"))
         XCTAssertEqual(session.state.records.first?.description, "B 的独立账套")
         XCTAssertEqual(session.phase, .signedIn)
+    }
+
+    func testPasswordResetConfirmationClearsAuthenticatedStateAndSessionScope() async throws {
+        let api = FinanceAPISpy()
+        let recorder = SessionClearRecorder()
+        let session = AppSession(api: api, saveDelay: .zero) { recorder.record() }
+        await session.start()
+        let oldScope = session.sessionScopeID
+        let clearsBeforeReset = recorder.count
+
+        let response = try await session.confirmPasswordReset(PasswordResetConfirmRequest(
+            email: "owner@example.com",
+            challengeId: "reset_20260720_abcdefghijklmnop",
+            code: "246810",
+            newPassword: "UnrelatedSecurePassword"
+        ))
+
+        XCTAssertTrue(response.ok)
+        XCTAssertEqual(session.phase, .signedOut)
+        XCTAssertNil(session.user)
+        XCTAssertEqual(session.state, .empty)
+        XCTAssertEqual(session.stateRevision, .empty)
+        XCTAssertNotEqual(session.sessionScopeID, oldScope)
+        XCTAssertEqual(recorder.count, clearsBeforeReset + 1)
     }
 
     func testLogoutClearsStateConflictAndAllRegisteredSessionCaches() async {
@@ -567,13 +616,14 @@ private actor FinanceAPISpy: FinanceAPI {
     private var saveUpdatedAts: [String]
     private var saveRevisions: [StateRevision] = []
     private var registrationRequests: [RegistrationRequest] = []
+    private var legacyLoginFields: [Bool] = []
     private let loginDelays: [String: Duration]
 
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
-        version: "0.14.1",
-        financeSchemaVersion: BackendContract.immutableEvidenceLinksSchema
-    ), capabilitiesFixtureName: String = "capabilities-aliyun-sms-v0.14.1",
+        version: "0.15.0",
+        financeSchemaVersion: BackendContract.accountIdentityRecoverySchema
+    ), capabilitiesFixtureName: String = "capabilities-account-identity-recovery-v0.15.0",
        fetchEnvelopes: [StateEnvelope] = [StateEnvelope(
         data: makeSessionState(description: "待重试事项"),
         updatedAt: "2026-07-14T00:00:00.000Z"
@@ -595,6 +645,7 @@ private actor FinanceAPISpy: FinanceAPI {
     func fetchStateCallCount() -> Int { fetchStateCalls }
     func attemptedSaveRevisions() -> [StateRevision] { saveRevisions }
     func lastRegistrationRequest() -> RegistrationRequest? { registrationRequests.last }
+    func attemptedLegacyLoginFields() -> [Bool] { legacyLoginFields }
 
     func health() async throws -> HealthResponse {
         healthResponse
@@ -607,9 +658,14 @@ private actor FinanceAPISpy: FinanceAPI {
         return try JSONDecoder().decode(ServerCapabilitiesResponse.self, from: Data(contentsOf: url))
     }
 
-    func login(username: String, password: String) async throws -> SessionUser {
-        if let delay = loginDelays[username] { try await Task.sleep(for: delay) }
-        return SessionUser(id: loginDelays.isEmpty ? "user-001" : "id-\(username)", username: username)
+    func login(identifier: String, password: String, useLegacyUsernameField: Bool) async throws -> SessionUser {
+        legacyLoginFields.append(useLegacyUsernameField)
+        if let delay = loginDelays[identifier] { try await Task.sleep(for: delay) }
+        return SessionUser(id: loginDelays.isEmpty ? "user-001" : "id-\(identifier)", username: identifier)
+    }
+
+    func usernameAvailability(_ request: UsernameAvailabilityRequest) async throws -> UsernameAvailabilityResponse {
+        UsernameAvailabilityResponse(available: true, reason: nil, message: "用户名可用")
     }
 
     func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse {
@@ -628,6 +684,20 @@ private actor FinanceAPISpy: FinanceAPI {
             organizationId: "301",
             accountBookId: "401"
         )
+    }
+
+    func requestPasswordReset(_ request: PasswordResetRequest) async throws -> PasswordResetChallengeResponse {
+        PasswordResetChallengeResponse(
+            ok: true,
+            challengeId: "reset_20260720_abcdefghijklmnop",
+            expiresInSeconds: 600,
+            resendAfterSeconds: 60,
+            message: "如果该邮箱已注册，重置邮件将在稍后送达"
+        )
+    }
+
+    func confirmPasswordReset(_ request: PasswordResetConfirmRequest) async throws -> PasswordResetConfirmResponse {
+        PasswordResetConfirmResponse(ok: true, message: "密码已重置，请重新登录")
     }
 
     func currentUser() async throws -> SessionUser {

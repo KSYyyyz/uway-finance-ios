@@ -1,0 +1,42 @@
+[
+  {
+    "status": 400,
+    "code": "INVALID_PHONE",
+    "error": "手机号码格式不正确"
+  },
+  {
+    "status": 400,
+    "code": "INVALID_REGISTRATION_INPUT",
+    "error": "注册信息格式不正确"
+  },
+  {
+    "status": 400,
+    "code": "WEAK_PASSWORD",
+    "error": "密码强度不足"
+  },
+  {
+    "status": 400,
+    "code": "INVALID_REGISTRATION_CODE",
+    "error": "验证码无效或已过期"
+  },
+  {
+    "status": 429,
+    "code": "REGISTRATION_CODE_RATE_LIMITED",
+    "error": "验证码请求过于频繁，请稍后再试"
+  },
+  {
+    "status": 409,
+    "code": "REGISTRATION_IDENTITY_CONFLICT",
+    "error": "用户名、手机号或邮箱已被使用"
+  },
+  {
+    "status": 503,
+    "code": "SMS_PROVIDER_UNAVAILABLE",
+    "error": "手机验证码服务暂不可用"
+  },
+  {
+    "status": 503,
+    "code": "SMS_DELIVERY_FAILED",
+    "error": "手机验证码发送失败，请稍后再试"
+  }
+]

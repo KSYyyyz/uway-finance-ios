@@ -23,17 +23,61 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
     let reason: String?
     let codeEndpoint: String?
     let registerEndpoint: String?
+    let usernameAvailabilityEndpoint: String?
     let phoneVerification: String?
+    let emailRequired: Bool?
+    let usernameNormalization: String?
+    let usernameLength: CapabilityLengthRange?
+    let passwordLength: CapabilityLengthRange?
     let createsIsolatedOrganizationAndAccountBook: Bool?
     let sessionCookie: String?
 
+    init(
+        available: Bool,
+        reason: String?,
+        codeEndpoint: String?,
+        registerEndpoint: String?,
+        usernameAvailabilityEndpoint: String? = nil,
+        phoneVerification: String?,
+        emailRequired: Bool? = nil,
+        usernameNormalization: String? = nil,
+        usernameLength: CapabilityLengthRange? = nil,
+        passwordLength: CapabilityLengthRange? = nil,
+        createsIsolatedOrganizationAndAccountBook: Bool?,
+        sessionCookie: String?
+    ) {
+        self.available = available
+        self.reason = reason
+        self.codeEndpoint = codeEndpoint
+        self.registerEndpoint = registerEndpoint
+        self.usernameAvailabilityEndpoint = usernameAvailabilityEndpoint
+        self.phoneVerification = phoneVerification
+        self.emailRequired = emailRequired
+        self.usernameNormalization = usernameNormalization
+        self.usernameLength = usernameLength
+        self.passwordLength = passwordLength
+        self.createsIsolatedOrganizationAndAccountBook = createsIsolatedOrganizationAndAccountBook
+        self.sessionCookie = sessionCookie
+    }
+
     var safeForClientUse: Bool {
-        available
+        let baseContract = available
             && codeEndpoint == "/api/auth/registration-code"
             && registerEndpoint == "/api/auth/register"
             && phoneVerification.map { Self.supportedPhoneVerification.contains($0) } == true
             && createsIsolatedOrganizationAndAccountBook == true
             && sessionCookie == "http_only_secure_same_site_strict"
+        guard baseContract else { return false }
+        guard emailRequired != true else { return supportsIdentityContract }
+        return true
+    }
+
+    var supportsIdentityContract: Bool {
+        usernameAvailabilityEndpoint == "/api/auth/username-availability"
+            && emailRequired == true
+            && usernameNormalization == "nfkc_lowercase"
+            && usernameLength == CapabilityLengthRange(min: 3, max: 32)
+            && passwordLength == CapabilityLengthRange(min: 8, max: 256)
     }
 
     var statusDisplay: String {
@@ -53,9 +97,82 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
         reason: "capabilities_unavailable",
         codeEndpoint: nil,
         registerEndpoint: nil,
+        usernameAvailabilityEndpoint: nil,
         phoneVerification: nil,
+        emailRequired: nil,
+        usernameNormalization: nil,
+        usernameLength: nil,
+        passwordLength: nil,
         createsIsolatedOrganizationAndAccountBook: nil,
         sessionCookie: nil
+    )
+}
+
+struct CapabilityLengthRange: Codable, Equatable, Sendable {
+    let min: Int
+    let max: Int
+}
+
+struct AuthenticationCapability: Codable, Equatable, Sendable {
+    let loginEndpoint: String?
+    let acceptedIdentifiers: [String]?
+    let identifierField: String?
+    let legacyUsernameFieldAccepted: Bool?
+    let invalidCredentialsMessage: String?
+    let sessionRevokedOnPasswordReset: Bool?
+
+    var safeForIdentifierLogin: Bool {
+        loginEndpoint == "/api/auth/login"
+            && Set(acceptedIdentifiers ?? []) == Set(["username", "phone", "email"])
+            && identifierField == "identifier"
+            && legacyUsernameFieldAccepted == true
+            && invalidCredentialsMessage == "账号或密码错误"
+            && sessionRevokedOnPasswordReset == true
+    }
+
+    static let unavailableFallback = AuthenticationCapability(
+        loginEndpoint: nil,
+        acceptedIdentifiers: nil,
+        identifierField: nil,
+        legacyUsernameFieldAccepted: true,
+        invalidCredentialsMessage: "账号或密码错误",
+        sessionRevokedOnPasswordReset: nil
+    )
+}
+
+struct PasswordRecoveryCapability: Codable, Equatable, Sendable {
+    let available: Bool
+    let reason: String?
+    let requestEndpoint: String?
+    let confirmEndpoint: String?
+    let delivery: String?
+    let codeStorage: String?
+    let unknownEmailResponse: String?
+    let sessionRevocation: String?
+
+    var safeForClientUse: Bool {
+        available
+            && requestEndpoint == "/api/auth/password-reset/request"
+            && confirmEndpoint == "/api/auth/password-reset/confirm"
+            && delivery == "email_webhook"
+            && codeStorage == "hmac_sha256_digest_only"
+            && unknownEmailResponse == "indistinguishable"
+            && sessionRevocation == "all_sessions"
+    }
+
+    var unavailableMessage: String {
+        reason == "email_provider_not_configured" ? "邮件找回暂未开通" : "密码找回暂不可用"
+    }
+
+    static let unavailableFallback = PasswordRecoveryCapability(
+        available: false,
+        reason: "capabilities_unavailable",
+        requestEndpoint: nil,
+        confirmEndpoint: nil,
+        delivery: nil,
+        codeStorage: nil,
+        unknownEmailResponse: nil,
+        sessionRevocation: nil
     )
 }
 
@@ -357,6 +474,8 @@ struct ImportAnalysisCapability: Codable, Equatable, Sendable {
 
 struct FeatureCapabilitiesResponse: Codable, Equatable, Sendable {
     let registration: RegistrationCapability?
+    let authentication: AuthenticationCapability?
+    let passwordRecovery: PasswordRecoveryCapability?
     let importAnalysis: ImportAnalysisCapability
     let unifiedDashboardMetrics: UnifiedDashboardMetricsCapability
     let classificationReview: ClassificationReviewCapability?
@@ -396,6 +515,8 @@ struct ServerCapabilities: Equatable, Sendable {
     let importHarnessStatuses: Set<String>
     let importAnalysis: ImportAnalysisCapability
     let registration: RegistrationCapability
+    let authentication: AuthenticationCapability
+    let passwordRecovery: PasswordRecoveryCapability
     let unifiedDashboardMetrics: Bool
     let dashboardMetrics: UnifiedDashboardMetricsCapability
     let classificationReview: ClassificationReviewCapability?
@@ -429,6 +550,8 @@ struct ServerCapabilities: Equatable, Sendable {
             importHarnessStatuses: Set(response.features.importAnalysis.decisions),
             importAnalysis: response.features.importAnalysis,
             registration: response.features.registration ?? .unavailableFallback,
+            authentication: response.features.authentication ?? .unavailableFallback,
+            passwordRecovery: response.features.passwordRecovery ?? .unavailableFallback,
             unifiedDashboardMetrics: response.features.unifiedDashboardMetrics.available,
             dashboardMetrics: response.features.unifiedDashboardMetrics,
             classificationReview: response.features.classificationReview,
@@ -462,6 +585,8 @@ struct ServerCapabilities: Equatable, Sendable {
             importHarnessStatuses: ["accepted", "review", "rejected"],
             importAnalysis: .unavailableFallback,
             registration: .unavailableFallback,
+            authentication: .unavailableFallback,
+            passwordRecovery: .unavailableFallback,
             unifiedDashboardMetrics: false,
             dashboardMetrics: UnifiedDashboardMetricsCapability(
                 available: false,
@@ -506,7 +631,7 @@ struct ServerCapabilities: Equatable, Sendable {
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260720_012"
+    static let apiContractVersion = "20260720_013"
     static let financeDomainV2Schema = "20260714_002_finance_resource_api"
     static let classificationReviewSchema = "20260714_003_classification_review"
     static let classificationPreferenceMemorySchema = "20260715_004_account_book_preference_memory"
@@ -515,6 +640,7 @@ struct BackendContract: Equatable, Sendable {
     static let multiTenantRegistrationSchema = "20260715_007_multi_tenant_registration"
     static let accountBookImportAnalysisSchema = "20260715_008_account_book_import_analysis"
     static let immutableEvidenceLinksSchema = "20260716_009_immutable_evidence_links"
+    static let accountIdentityRecoverySchema = "20260720_010_account_identity_recovery"
 
     static func isFinanceDomainV2Schema(_ value: String?) -> Bool {
         value == financeDomainV2Schema
@@ -525,6 +651,7 @@ struct BackendContract: Equatable, Sendable {
             || value == multiTenantRegistrationSchema
             || value == accountBookImportAnalysisSchema
             || value == immutableEvidenceLinksSchema
+            || value == accountIdentityRecoverySchema
     }
 
     let serverVersion: String

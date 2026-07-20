@@ -13,6 +13,7 @@ struct RegistrationCodeResponse: Codable, Equatable, Sendable {
 
 struct RegistrationRequest: Codable, Equatable, Sendable {
     let username: String
+    let email: String
     let password: String
     let phone: String
     let challengeId: String

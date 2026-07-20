@@ -238,6 +238,9 @@ final class BackendContractTests: XCTestCase {
         XCTAssertFalse(memory.modelCanAccept)
         XCTAssertFalse(memory.writesBusinessRecords)
         XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
+        XCTAssertFalse(contract.capabilities.registration.supportsIdentityContract)
+        XCTAssertFalse(contract.capabilities.authentication.safeForIdentifierLogin)
+        XCTAssertFalse(contract.capabilities.passwordRecovery.safeForClientUse)
         XCTAssertEqual(contract.capabilities.registration.phoneVerification, "sms_webhook")
         XCTAssertEqual(contract.capabilities.registration.createsIsolatedOrganizationAndAccountBook, true)
         XCTAssertTrue(contract.capabilities.importAnalysis.safeForAccountBookUse)
@@ -245,6 +248,51 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.importAnalysis.idempotencyKey, "analysisId")
         XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
         XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
+    }
+
+    func testV0150AccountIdentityRecoveryCapabilitiesDecodeFailClosedBoundaries() throws {
+        let health = try JSONDecoder().decode(
+            HealthResponse.self,
+            from: fixture(named: "health-account-identity-recovery-v0.15.0")
+        )
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-account-identity-recovery-v0.15.0")
+        )
+        let contract = BackendContract(health: health, negotiated: response)
+
+        XCTAssertEqual(contract.serverVersion, "0.15.0")
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260720_013")
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.accountIdentityRecoverySchema)
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
+        XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
+        XCTAssertTrue(contract.capabilities.registration.supportsIdentityContract)
+        XCTAssertEqual(contract.capabilities.registration.usernameAvailabilityEndpoint, "/api/auth/username-availability")
+        XCTAssertEqual(contract.capabilities.registration.usernameLength, CapabilityLengthRange(min: 3, max: 32))
+        XCTAssertEqual(contract.capabilities.registration.passwordLength, CapabilityLengthRange(min: 8, max: 256))
+        XCTAssertTrue(contract.capabilities.authentication.safeForIdentifierLogin)
+        XCTAssertTrue(contract.capabilities.passwordRecovery.safeForClientUse)
+        XCTAssertEqual(contract.capabilities.passwordRecovery.unknownEmailResponse, "indistinguishable")
+        XCTAssertEqual(contract.capabilities.passwordRecovery.sessionRevocation, "all_sessions")
+        XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
+        XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
+    }
+
+    func testUnavailablePasswordRecoveryCapabilityDoesNotExposeResetFlow() {
+        let capability = PasswordRecoveryCapability(
+            available: false,
+            reason: "email_provider_not_configured",
+            requestEndpoint: "/api/auth/password-reset/request",
+            confirmEndpoint: "/api/auth/password-reset/confirm",
+            delivery: "email_webhook",
+            codeStorage: "hmac_sha256_digest_only",
+            unknownEmailResponse: "indistinguishable",
+            sessionRevocation: "all_sessions"
+        )
+
+        XCTAssertFalse(capability.safeForClientUse)
+        XCTAssertEqual(capability.unavailableMessage, "邮件找回暂未开通")
     }
 
     func testV0141AliyunSMSCapabilityNegotiatesWithoutChangingRegistrationPayloadContract() throws {

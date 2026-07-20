@@ -1,0 +1,38 @@
+[
+  {
+    "username": "可用用户_01",
+    "available": true,
+    "reason": null,
+    "message": "用户名可用"
+  },
+  {
+    "username": "ab",
+    "available": false,
+    "reason": "length",
+    "message": "用户名长度必须为 3–32 个字符"
+  },
+  {
+    "username": "bad__name",
+    "available": false,
+    "reason": "format",
+    "message": "用户名只能包含中文、英文字母、数字、下划线或短横线，且必须以文字或数字开头和结尾"
+  },
+  {
+    "username": "123456",
+    "available": false,
+    "reason": "numeric_only",
+    "message": "用户名不能全部由数字组成"
+  },
+  {
+    "username": "admin",
+    "available": false,
+    "reason": "reserved",
+    "message": "该用户名不可使用"
+  },
+  {
+    "username": "existing_owner",
+    "available": false,
+    "reason": "unavailable",
+    "message": "该用户名已被使用"
+  }
+]

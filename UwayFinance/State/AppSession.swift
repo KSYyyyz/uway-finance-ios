@@ -39,6 +39,16 @@ final class AppSession: ObservableObject {
         return contract.capabilities.registration
     }
 
+    var authenticationCapability: AuthenticationCapability {
+        guard case .available(let contract) = serverState else { return .unavailableFallback }
+        return contract.capabilities.authentication
+    }
+
+    var passwordRecoveryCapability: PasswordRecoveryCapability {
+        guard case .available(let contract) = serverState else { return .unavailableFallback }
+        return contract.capabilities.passwordRecovery
+    }
+
     init(
         api: any FinanceAPI,
         saveDelay: Duration = .milliseconds(650),
@@ -79,15 +89,26 @@ final class AppSession: ObservableObject {
         }
     }
 
-    func login(username: String, password: String) async throws {
+    func login(identifier: String, password: String) async throws {
         let generation = beginSessionTransition()
         do {
-            let authenticatedUser = try await api.login(username: username, password: password)
+            let authenticatedUser = try await api.login(
+                identifier: identifier,
+                password: password,
+                useLegacyUsernameField: !authenticationCapability.safeForIdentifierLogin
+            )
             try await establishAuthenticatedSession(user: authenticatedUser, generation: generation)
         } catch {
             if generation == sessionGeneration { phase = .signedOut }
             throw error
         }
+    }
+
+    func checkUsernameAvailability(_ username: String) async throws -> UsernameAvailabilityResponse {
+        guard registrationCapability.supportsIdentityContract else {
+            throw APIError.unavailable("当前服务器未开放用户名实时检查")
+        }
+        return try await api.usernameAvailability(UsernameAvailabilityRequest(username: username))
     }
 
     func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse {
@@ -105,6 +126,32 @@ final class AppSession: ObservableObject {
         do {
             let response = try await api.register(request)
             try await establishAuthenticatedSession(user: response.user, generation: generation)
+        } catch {
+            if generation == sessionGeneration { phase = .signedOut }
+            throw error
+        }
+    }
+
+    func requestPasswordReset(email: String) async throws -> PasswordResetChallengeResponse {
+        guard passwordRecoveryCapability.safeForClientUse else {
+            throw APIError.unavailable(passwordRecoveryCapability.unavailableMessage)
+        }
+        return try await api.requestPasswordReset(PasswordResetRequest(email: email))
+    }
+
+    func confirmPasswordReset(_ request: PasswordResetConfirmRequest) async throws -> PasswordResetConfirmResponse {
+        guard passwordRecoveryCapability.safeForClientUse else {
+            throw APIError.unavailable(passwordRecoveryCapability.unavailableMessage)
+        }
+        let generation = beginSessionTransition()
+        phase = .signedOut
+        do {
+            let response = try await api.confirmPasswordReset(request)
+            guard generation == sessionGeneration else {
+                throw APIError.unavailable("密码重置请求已被新的账号操作替代")
+            }
+            alertMessage = nil
+            return response
         } catch {
             if generation == sessionGeneration { phase = .signedOut }
             throw error

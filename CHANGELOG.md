@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.15.0 - 2026-07-20
+
+- Align build 14 with backend app `0.15.0`, API contract `20260720_013` and finance schema `20260720_010_account_identity_recovery` while retaining every historical fixture unchanged.
+- Send the new `{identifier,password}` login contract for username, phone or email when negotiated; preserve the old `{username,password}` request only for legacy capability responses and keep all failures indistinguishable.
+- Add email-required registration, NFKC/lowercase username policy, reserved-name and identity-fragment password feedback, plus a debounced advisory username-availability check.
+- Add the complete capability-gated email password-reset request/confirm flow with TTL/resend state, provider-unavailable behavior and all-session local cleanup after success.
+- Add accessible show/hide controls to every password and confirmation field. Passwords, codes, tokens, complete identifiers and provider credentials remain out of logs, URLs and persistent storage.
+- Keep `AppSession` exclusively on conditional `/api/state`; Finance V2 remains shadow and all AI, Harness, evidence and tenant-isolation boundaries are unchanged.
+
 ## 0.14.1 - 2026-07-20
 
 - Align build 13 with backend app `0.14.1`, API contract `20260720_012` and unchanged finance schema `20260716_009_immutable_evidence_links`.

@@ -18,9 +18,12 @@ struct AuditEventRequest: Codable {
 protocol FinanceAPI: Sendable {
     func health() async throws -> HealthResponse
     func capabilities() async throws -> ServerCapabilitiesResponse
-    func login(username: String, password: String) async throws -> SessionUser
+    func login(identifier: String, password: String, useLegacyUsernameField: Bool) async throws -> SessionUser
+    func usernameAvailability(_ request: UsernameAvailabilityRequest) async throws -> UsernameAvailabilityResponse
     func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse
     func register(_ request: RegistrationRequest) async throws -> RegistrationResponse
+    func requestPasswordReset(_ request: PasswordResetRequest) async throws -> PasswordResetChallengeResponse
+    func confirmPasswordReset(_ request: PasswordResetConfirmRequest) async throws -> PasswordResetConfirmResponse
     func currentUser() async throws -> SessionUser
     func logout() async throws
     func fetchState() async throws -> StateEnvelope
@@ -42,13 +45,20 @@ actor LiveFinanceAPI: FinanceAPI {
         try await transport.send(.capabilities)
     }
 
-    func login(username: String, password: String) async throws -> SessionUser {
-        struct LoginRequest: Codable { let username: String; let password: String }
-        let request = LoginRequest(username: username, password: password)
+    func login(identifier: String, password: String, useLegacyUsernameField: Bool = false) async throws -> SessionUser {
+        let request = LoginRequest(
+            identifier: identifier,
+            password: password,
+            useLegacyUsernameField: useLegacyUsernameField
+        )
         let envelope: SessionEnvelope = try await serializedAuthenticationRequest {
             try await self.transport.send(.login, body: request)
         }
         return envelope.user
+    }
+
+    func usernameAvailability(_ request: UsernameAvailabilityRequest) async throws -> UsernameAvailabilityResponse {
+        try await transport.send(.usernameAvailability, body: request)
     }
 
     func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse {
@@ -58,6 +68,16 @@ actor LiveFinanceAPI: FinanceAPI {
     func register(_ request: RegistrationRequest) async throws -> RegistrationResponse {
         try await serializedAuthenticationRequest {
             try await self.transport.send(.register, body: request)
+        }
+    }
+
+    func requestPasswordReset(_ request: PasswordResetRequest) async throws -> PasswordResetChallengeResponse {
+        try await transport.send(.passwordResetRequest, body: request)
+    }
+
+    func confirmPasswordReset(_ request: PasswordResetConfirmRequest) async throws -> PasswordResetConfirmResponse {
+        try await serializedAuthenticationRequest {
+            try await self.transport.send(.passwordResetConfirm, body: request)
         }
     }
 
@@ -102,5 +122,23 @@ actor LiveFinanceAPI: FinanceAPI {
         }
         authenticationTail = Task { _ = try? await request.value }
         return try await request.value
+    }
+}
+
+private struct LoginRequest: Encodable, Sendable {
+    let identifier: String
+    let password: String
+    let useLegacyUsernameField: Bool
+
+    enum CodingKeys: String, CodingKey { case identifier, username, password }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(password, forKey: .password)
+        if useLegacyUsernameField {
+            try container.encode(identifier, forKey: .username)
+        } else {
+            try container.encode(identifier, forKey: .identifier)
+        }
     }
 }

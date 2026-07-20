@@ -4,18 +4,19 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
-const expectedMarketingVersion = '0.14.1'
-const expectedBackendVersion = '0.14.1'
-const expectedAPIContractVersion = '20260720_012'
-const expectedFinanceSchemaVersion = '20260716_009_immutable_evidence_links'
-const expectedBuildVersion = '13'
+const expectedMarketingVersion = '0.15.0'
+const expectedBackendVersion = '0.15.0'
+const expectedAPIContractVersion = '20260720_013'
+const expectedFinanceSchemaVersion = '20260720_010_account_identity_recovery'
+const expectedBuildVersion = '14'
 const expectedBackendBaselineCommit = null
 const expectedBackendBaselineStatus = 'frozen-candidate'
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
-const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.14.1.json')
+const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.15.0.json')
 
 const requiredFiles = [
   'project.yml',
+  'ContractSnapshots/backend-api-v0.15.0.json',
   'ContractSnapshots/backend-api-v0.14.1.json',
   'ContractSnapshots/backend-api-v0.14.0.json',
   'UwayFinance/App/UwayFinanceApp.swift',
@@ -30,6 +31,7 @@ const requiredFiles = [
   'UwayFinance/Networking/ClassificationPreferenceAPI.swift',
   'UwayFinance/Networking/BusinessRecordEvidenceAPI.swift',
   'UwayFinance/Models/RegistrationModels.swift',
+  'UwayFinance/Models/AuthenticationModels.swift',
   'UwayFinance/Models/BackendContract.swift',
   'UwayFinance/Models/FinanceResourceModels.swift',
   'UwayFinance/Models/CutoverReadinessModels.swift',
@@ -136,6 +138,14 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/registration-errors-v0.14.0.json',
   'UwayFinanceTests/Fixtures/health-aliyun-sms-v0.14.1.json',
   'UwayFinanceTests/Fixtures/capabilities-aliyun-sms-v0.14.1.json',
+  'UwayFinanceTests/Fixtures/health-account-identity-recovery-v0.15.0.json',
+  'UwayFinanceTests/Fixtures/capabilities-account-identity-recovery-v0.15.0.json',
+  'UwayFinanceTests/Fixtures/username-availability-v0.15.0.json',
+  'UwayFinanceTests/Fixtures/password-reset-request-v0.15.0.json',
+  'UwayFinanceTests/Fixtures/password-reset-confirm-v0.15.0.json',
+  'UwayFinanceTests/Fixtures/password-reset-errors-v0.15.0.json',
+  'UwayFinanceTests/Fixtures/registration-errors-v0.15.0.json',
+  'UwayFinanceTests/IdentityInputPolicyTests.swift',
   'Docs/PERSONALIZATION_CONTRACT_REQUIREMENTS.md',
   'CHANGELOG.md',
 ]
@@ -219,6 +229,13 @@ const fixtures = [
   'registration-errors-v0.14.0.json',
   'health-aliyun-sms-v0.14.1.json',
   'capabilities-aliyun-sms-v0.14.1.json',
+  'health-account-identity-recovery-v0.15.0.json',
+  'capabilities-account-identity-recovery-v0.15.0.json',
+  'username-availability-v0.15.0.json',
+  'password-reset-request-v0.15.0.json',
+  'password-reset-confirm-v0.15.0.json',
+  'password-reset-errors-v0.15.0.json',
+  'registration-errors-v0.15.0.json',
 ]
 for (const fixture of fixtures) {
   JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', fixture), 'utf8'))
@@ -357,10 +374,37 @@ if (registrationSnapshot?.availability !== 'runtime'
     || registrationSnapshot?.reasonWhenUnavailable !== 'sms_provider_not_configured'
     || registrationSnapshot?.codeEndpoint !== '/api/auth/registration-code'
     || registrationSnapshot?.registerEndpoint !== '/api/auth/register'
+    || registrationSnapshot?.usernameAvailabilityEndpoint !== '/api/auth/username-availability'
     || registrationSnapshot?.phoneVerification !== 'aliyun_sms'
+    || registrationSnapshot?.emailRequired !== true
+    || registrationSnapshot?.usernameNormalization !== 'nfkc_lowercase'
+    || registrationSnapshot?.usernameLength?.min !== 3
+    || registrationSnapshot?.usernameLength?.max !== 32
+    || registrationSnapshot?.passwordLength?.min !== 8
+    || registrationSnapshot?.passwordLength?.max !== 256
     || registrationSnapshot?.createsIsolatedOrganizationAndAccountBook !== true
     || registrationSnapshot?.sessionCookie !== 'http_only_secure_same_site_strict') {
   throw new Error('registration snapshot must preserve server-gated SMS and tenant isolation boundaries')
+}
+const authenticationSnapshot = contractSnapshot.capabilities?.authentication
+if (authenticationSnapshot?.loginEndpoint !== '/api/auth/login'
+    || authenticationSnapshot?.acceptedIdentifiers?.join(',') !== 'username,phone,email'
+    || authenticationSnapshot?.identifierField !== 'identifier'
+    || authenticationSnapshot?.legacyUsernameFieldAccepted !== true
+    || authenticationSnapshot?.invalidCredentialsMessage !== '账号或密码错误'
+    || authenticationSnapshot?.sessionRevokedOnPasswordReset !== true) {
+  throw new Error('authentication snapshot must preserve identifier privacy and reset revocation')
+}
+const passwordRecoverySnapshot = contractSnapshot.capabilities?.passwordRecovery
+if (passwordRecoverySnapshot?.availability !== 'runtime'
+    || passwordRecoverySnapshot?.reasonWhenUnavailable !== 'email_provider_not_configured'
+    || passwordRecoverySnapshot?.requestEndpoint !== '/api/auth/password-reset/request'
+    || passwordRecoverySnapshot?.confirmEndpoint !== '/api/auth/password-reset/confirm'
+    || passwordRecoverySnapshot?.delivery !== 'email_webhook'
+    || passwordRecoverySnapshot?.codeStorage !== 'hmac_sha256_digest_only'
+    || passwordRecoverySnapshot?.unknownEmailResponse !== 'indistinguishable'
+    || passwordRecoverySnapshot?.sessionRevocation !== 'all_sessions') {
+  throw new Error('password recovery snapshot must preserve enumeration resistance and session revocation')
 }
 const evidenceSnapshot = contractSnapshot.capabilities?.documentUpload
 if (evidenceSnapshot?.available !== true
@@ -398,8 +442,8 @@ if (contractSnapshot.money?.legacyStateEncoding !== 'json_number'
   throw new Error('backend contract snapshot money boundary mismatch')
 }
 
-const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-aliyun-sms-v0.14.1.json'), 'utf8'))
-const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-aliyun-sms-v0.14.1.json'), 'utf8'))
+const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-account-identity-recovery-v0.15.0.json'), 'utf8'))
+const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-account-identity-recovery-v0.15.0.json'), 'utf8'))
 if (healthFixture.version !== expectedBackendVersion
     || healthFixture.financeSchemaVersion !== expectedFinanceSchemaVersion) {
   throw new Error('semantic preference-memory v2 health fixture version/schema mismatch')
@@ -438,21 +482,58 @@ if (registrationCapability?.available !== true
     || registrationCapability?.reason !== null
     || registrationCapability?.codeEndpoint !== '/api/auth/registration-code'
     || registrationCapability?.registerEndpoint !== '/api/auth/register'
+    || registrationCapability?.usernameAvailabilityEndpoint !== '/api/auth/username-availability'
     || registrationCapability?.phoneVerification !== 'aliyun_sms'
+    || registrationCapability?.emailRequired !== true
+    || registrationCapability?.usernameNormalization !== 'nfkc_lowercase'
+    || registrationCapability?.usernameLength?.min !== 3
+    || registrationCapability?.usernameLength?.max !== 32
+    || registrationCapability?.passwordLength?.min !== 8
+    || registrationCapability?.passwordLength?.max !== 256
     || registrationCapability?.createsIsolatedOrganizationAndAccountBook !== true
     || registrationCapability?.sessionCookie !== 'http_only_secure_same_site_strict') {
   throw new Error('current registration capability fixture is unsafe or incomplete')
+}
+const authenticationCapability = capabilitiesFixture.features?.authentication
+if (authenticationCapability?.loginEndpoint !== '/api/auth/login'
+    || authenticationCapability?.acceptedIdentifiers?.join(',') !== 'username,phone,email'
+    || authenticationCapability?.identifierField !== 'identifier'
+    || authenticationCapability?.legacyUsernameFieldAccepted !== true
+    || authenticationCapability?.invalidCredentialsMessage !== '账号或密码错误'
+    || authenticationCapability?.sessionRevokedOnPasswordReset !== true) {
+  throw new Error('current authentication capability fixture is unsafe or incomplete')
+}
+const passwordRecoveryCapability = capabilitiesFixture.features?.passwordRecovery
+if (passwordRecoveryCapability?.available !== true
+    || passwordRecoveryCapability?.reason !== null
+    || passwordRecoveryCapability?.requestEndpoint !== '/api/auth/password-reset/request'
+    || passwordRecoveryCapability?.confirmEndpoint !== '/api/auth/password-reset/confirm'
+    || passwordRecoveryCapability?.delivery !== 'email_webhook'
+    || passwordRecoveryCapability?.codeStorage !== 'hmac_sha256_digest_only'
+    || passwordRecoveryCapability?.unknownEmailResponse !== 'indistinguishable'
+    || passwordRecoveryCapability?.sessionRevocation !== 'all_sessions') {
+  throw new Error('current password recovery capability fixture is unsafe or incomplete')
 }
 if (capabilitiesFixture.sync?.financeResources?.available !== true
     || capabilitiesFixture.sync?.financeResources?.cutoverState !== 'shadow'
     || capabilitiesFixture.sync?.financeResources?.cutoverReadiness?.clientWritesEnabled !== false
     || capabilitiesFixture.sync?.financeResources?.businessRecords?.moneyEncoding !== 'decimal_string') {
-  throw new Error('current 0.14.1 capabilities fixture must preserve read-only readiness and the shadow resource slice')
+  throw new Error('current 0.15.0 capabilities fixture must preserve read-only readiness and the shadow resource slice')
+}
+const historicalV0141CapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-aliyun-sms-v0.14.1.json'), 'utf8'))
+const historicalV0141HealthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-aliyun-sms-v0.14.1.json'), 'utf8'))
+if (historicalV0141HealthFixture.version !== '0.14.1'
+    || historicalV0141HealthFixture.financeSchemaVersion !== '20260716_009_immutable_evidence_links'
+    || historicalV0141CapabilitiesFixture.version !== '0.14.1'
+    || historicalV0141CapabilitiesFixture.apiContractVersion !== '20260720_012'
+    || 'authentication' in historicalV0141CapabilitiesFixture.features
+    || 'passwordRecovery' in historicalV0141CapabilitiesFixture.features) {
+  throw new Error('historical 0.14.1 authentication fixtures must remain unchanged')
 }
 const historicalV0140CapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-semantic-preference-memory-v0.14.0.json'), 'utf8'))
 const historicalV0140HealthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-semantic-preference-memory-v0.14.0.json'), 'utf8'))
 if (historicalV0140HealthFixture.version !== '0.14.0'
-    || historicalV0140HealthFixture.financeSchemaVersion !== expectedFinanceSchemaVersion
+    || historicalV0140HealthFixture.financeSchemaVersion !== '20260716_009_immutable_evidence_links'
     || historicalV0140CapabilitiesFixture.version !== '0.14.0'
     || historicalV0140CapabilitiesFixture.apiContractVersion !== '20260715_011'
     || historicalV0140CapabilitiesFixture.features?.registration?.phoneVerification !== 'sms_webhook') {
@@ -633,7 +714,7 @@ if (preferenceCapability?.available !== true
 }
 const registrationCodeFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-code-success-v0.14.0.json'), 'utf8'))
 const registrationSuccessFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-success-v0.14.0.json'), 'utf8'))
-const registrationErrorFixtures = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-errors-v0.14.0.json'), 'utf8'))
+const registrationErrorFixtures = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-errors-v0.15.0.json'), 'utf8'))
 const expectedRegistrationErrors = [
   [400, 'INVALID_PHONE'],
   [400, 'INVALID_REGISTRATION_INPUT'],
@@ -653,6 +734,36 @@ if (registrationCodeFixture.ok !== true
     || !registrationSuccessFixture.accountBookId
     || JSON.stringify(registrationErrorFixtures.map(({ status, code }) => [status, code])) !== JSON.stringify(expectedRegistrationErrors)) {
   throw new Error('registration success/error fixtures do not match the frozen contract')
+}
+const historicalRegistrationErrors = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-errors-v0.14.0.json'), 'utf8'))
+if (historicalRegistrationErrors.find(({ code }) => code === 'REGISTRATION_IDENTITY_CONFLICT')?.error !== '用户名或手机号已被使用'
+    || registrationErrorFixtures.find(({ code }) => code === 'REGISTRATION_IDENTITY_CONFLICT')?.error !== '用户名、手机号或邮箱已被使用') {
+  throw new Error('registration identity conflict fixtures must preserve v0.14 history and v0.15 email semantics')
+}
+const usernameAvailabilityFixtures = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'username-availability-v0.15.0.json'), 'utf8'))
+if (usernameAvailabilityFixtures.map(({ reason }) => reason).filter(Boolean).sort().join(',') !== 'format,length,numeric_only,reserved,unavailable'
+    || !usernameAvailabilityFixtures.some(({ available, reason }) => available === true && reason === null)) {
+  throw new Error('username availability fixtures must cover the frozen UX reasons and available result')
+}
+const passwordResetRequestFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'password-reset-request-v0.15.0.json'), 'utf8'))
+const passwordResetConfirmFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'password-reset-confirm-v0.15.0.json'), 'utf8'))
+const passwordResetErrorFixtures = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'password-reset-errors-v0.15.0.json'), 'utf8'))
+const expectedPasswordResetErrors = [
+  [400, 'INVALID_EMAIL'],
+  [400, 'INVALID_PASSWORD_RESET_INPUT'],
+  [400, 'INVALID_PASSWORD_RESET_CODE'],
+  [400, 'WEAK_PASSWORD'],
+  [429, 'PASSWORD_RESET_REQUEST_RATE_LIMITED'],
+  [503, 'EMAIL_RESET_UNAVAILABLE'],
+]
+if (passwordResetRequestFixture.ok !== true
+    || !passwordResetRequestFixture.challengeId
+    || passwordResetRequestFixture.expiresInSeconds !== 600
+    || passwordResetRequestFixture.resendAfterSeconds !== 60
+    || 'email' in passwordResetRequestFixture
+    || passwordResetConfirmFixture.ok !== true
+    || JSON.stringify(passwordResetErrorFixtures.map(({ status, code }) => [status, code])) !== JSON.stringify(expectedPasswordResetErrors)) {
+  throw new Error('password recovery fixtures must preserve indistinguishable request and frozen error behavior')
 }
 const activePreferences = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'classification-preferences-active-v0.12.0.json'), 'utf8'))
 const revokedPreferences = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'classification-preferences-revoked-v0.12.0.json'), 'utf8'))
@@ -859,7 +970,7 @@ for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amo
 }
 
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
-for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningStates', 'semantic-preference-v2', 'complete_link_semantic', 'RegistrationCapability', 'sms_webhook', 'aliyun_sms', 'http_only_secure_same_site_strict', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', 'safeForAccountBookUse', 'sharedWithinAccountBook', 'idempotencyReplayHeader', '"accepted", "review", "rejected"']) {
+for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningStates', 'semantic-preference-v2', 'complete_link_semantic', 'RegistrationCapability', 'AuthenticationCapability', 'PasswordRecoveryCapability', 'supportsIdentityContract', 'safeForIdentifierLogin', 'sms_webhook', 'aliyun_sms', 'nfkc_lowercase', 'indistinguishable', 'all_sessions', 'http_only_secure_same_site_strict', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', 'safeForAccountBookUse', 'sharedWithinAccountBook', 'idempotencyReplayHeader', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
 }
 for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
@@ -964,7 +1075,7 @@ for (const marker of ['case versionConflict', 'case stateVersionConflict', 'STAT
   if (!httpTransport.includes(marker)) throw new Error(`V2 transport marker missing: ${marker}`)
 }
 const financeAPI = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'FinanceAPI.swift'), 'utf8')
-for (const marker of ['requestRegistrationCode', 'register(_ request: RegistrationRequest)', 'serializedAuthenticationRequest', 'ifMatch revision: StateRevision', 'headers: ["If-Match": revision.ifMatchHeaderValue]', 'StateRevision(updatedAt: updatedAt)']) {
+for (const marker of ['login(identifier:', 'useLegacyUsernameField', 'usernameAvailability', 'requestRegistrationCode', 'register(_ request: RegistrationRequest)', 'requestPasswordReset', 'confirmPasswordReset', 'serializedAuthenticationRequest', 'ifMatch revision: StateRevision', 'headers: ["If-Match": revision.ifMatchHeaderValue]', 'StateRevision(updatedAt: updatedAt)']) {
   if (!financeAPI.includes(marker)) throw new Error(`legacy state conditional-write API marker missing: ${marker}`)
 }
 if (financeAPI.includes('ISO8601DateFormatter().string(from: Date())')) {
@@ -977,15 +1088,19 @@ if (appSession.includes('FinanceResourceAPI') || appSession.includes('CutoverRea
 for (const marker of ['stateRevision', 'unsavedSnapshot', 'conflictingServerRevision', 'catch APIError.stateVersionConflict', 'resolveStateConflictAndRetry', '其他设备已更新，需要核对']) {
   if (!appSession.includes(marker)) throw new Error(`AppSession conflict preservation marker missing: ${marker}`)
 }
-for (const marker of ['sessionGeneration', 'sessionScopeID', 'onSessionScopeCleared', 'registrationCapability', 'requestRegistrationCode', 'beginSessionTransition']) {
+for (const marker of ['sessionGeneration', 'sessionScopeID', 'onSessionScopeCleared', 'registrationCapability', 'authenticationCapability', 'passwordRecoveryCapability', 'requestRegistrationCode', 'checkUsernameAvailability', 'requestPasswordReset', 'confirmPasswordReset', 'beginSessionTransition']) {
   if (!appSession.includes(marker)) throw new Error(`AppSession account-isolation marker missing: ${marker}`)
 }
 const loginView = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'LoginView.swift'), 'utf8')
-for (const marker of ['requestRegistrationCode', 'session.register', 'TimelineView', 'expiresInSeconds', 'resendAfterSeconds', 'textContentType(.oneTimeCode)', 'textContentType(.newPassword)', 'RegistrationErrorMessage.localized']) {
+for (const marker of ['用户名、手机号或邮箱', 'requestRegistrationCode', 'session.register', 'debounceUsernameCheck', 'IdentityInputPolicy', 'session.checkUsernameAvailability', 'session.requestPasswordReset', 'session.confirmPasswordReset', 'PasswordEntry', '显示\\(accessibilityName)', 'TimelineView', 'expiresInSeconds', 'resendAfterSeconds', 'textContentType(.oneTimeCode)', 'contentType: .newPassword', 'RegistrationErrorMessage.localized', 'AuthenticationErrorMessage.localized']) {
   if (!loginView.includes(marker)) throw new Error(`registration UI marker missing: ${marker}`)
 }
 for (const forbidden of ['UserDefaults', 'Keychain', 'URLQueryItem(name: "password"', 'URLQueryItem(name: "code"']) {
   if (loginView.includes(forbidden)) throw new Error(`registration secret persistence/URL marker forbidden: ${forbidden}`)
+}
+const authenticationModels = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'AuthenticationModels.swift'), 'utf8')
+for (const marker of ['UsernameAvailabilityRequest', 'PasswordResetChallengeResponse', 'PasswordResetConfirmRequest', 'precomposedStringWithCompatibilityMapping', 'reservedUsernames', 'numeric_only', '8...256', 'INVALID_CREDENTIALS', 'EMAIL_RESET_UNAVAILABLE']) {
+  if (!authenticationModels.includes(marker)) throw new Error(`identity/authentication model marker missing: ${marker}`)
 }
 for (const file of listSwiftFiles(path.join(root, 'UwayFinance'))) {
   const source = fs.readFileSync(file, 'utf8')
@@ -1010,6 +1125,9 @@ const classificationAnalysisPath = path.join(workspace, 'server', 'classificatio
 const classificationPreferencesPath = path.join(workspace, 'server', 'classification-preferences.ts')
 const businessRecordEvidencePath = path.join(workspace, 'server', 'business-record-evidence.ts')
 const registrationPath = path.join(workspace, 'server', 'registration.ts')
+const authenticationPath = path.join(workspace, 'server', 'authentication.ts')
+const identityPath = path.join(workspace, 'server', 'identity.ts')
+const passwordRecoveryPath = path.join(workspace, 'server', 'password-recovery.ts')
 const databasePath = path.join(workspace, 'server', 'database.ts')
 const apiContractDocumentPath = path.join(workspace, 'API-V2-CONTRACT.md')
 const mainPackagePath = path.join(workspace, 'package.json')
@@ -1037,7 +1155,7 @@ if (validateMainline && hasMainPackage && hasMainContractDocument) {
   }
 }
 const hasLocalBackend = validateMainline && process.env.UWAY_SKIP_LOCAL_BACKEND !== '1'
-  && [serverPath, healthPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, classificationReviewPath, classificationAnalysisPath, classificationPreferencesPath, businessRecordEvidencePath, registrationPath, databasePath, apiContractDocumentPath].every(fs.existsSync)
+  && [serverPath, healthPath, importSchemaPath, stateSchemaPath, financeDomainPath, capabilitiesPath, financeResourcesPath, financeCutoverPath, dashboardMetricsPath, classificationReviewPath, classificationAnalysisPath, classificationPreferencesPath, businessRecordEvidencePath, registrationPath, authenticationPath, identityPath, passwordRecoveryPath, databasePath, apiContractDocumentPath].every(fs.existsSync)
 if (hasLocalBackend) {
   const server = fs.readFileSync(serverPath, 'utf8')
   for (const { method, path: endpoint } of currentContracts) {
@@ -1136,9 +1254,25 @@ if (hasLocalBackend) {
     "idempotencyReplayHeader: 'Idempotency-Replayed'",
     "codeEndpoint: '/api/auth/registration-code'",
     "registerEndpoint: '/api/auth/register'",
+    "usernameAvailabilityEndpoint: '/api/auth/username-availability'",
     "phoneVerification: 'aliyun_sms'",
+    'emailRequired: true',
+    "usernameNormalization: 'nfkc_lowercase'",
+    'usernameLength: { min: 3, max: 32 }',
+    'passwordLength: { min: 8, max: 256 }',
     'createsIsolatedOrganizationAndAccountBook: true',
     "sessionCookie: 'http_only_secure_same_site_strict'",
+    "acceptedIdentifiers: ['username', 'phone', 'email']",
+    "identifierField: 'identifier'",
+    'legacyUsernameFieldAccepted: true',
+    "invalidCredentialsMessage: '账号或密码错误'",
+    'sessionRevokedOnPasswordReset: true',
+    "requestEndpoint: '/api/auth/password-reset/request'",
+    "confirmEndpoint: '/api/auth/password-reset/confirm'",
+    "delivery: 'email_webhook'",
+    "codeStorage: 'hmac_sha256_digest_only'",
+    "unknownEmailResponse: 'indistinguishable'",
+    "sessionRevocation: 'all_sessions'",
   ]) {
     if (!capabilities.includes(marker)) throw new Error(`local capabilities marker missing: ${marker}`)
   }
@@ -1235,7 +1369,11 @@ if (hasLocalBackend) {
   const registration = fs.readFileSync(registrationPath, 'utf8')
   for (const marker of [
     'registrationCodeRequestSchema',
+    'usernameAvailabilitySchema',
     'registrationSchema',
+    'email: emailSchema',
+    'validateUsername',
+    'validatePassword',
     'REGISTRATION_CODE_RATE_LIMITED',
     'REGISTRATION_IDENTITY_CONFLICT',
     'SMS_PROVIDER_UNAVAILABLE',
@@ -1245,6 +1383,20 @@ if (hasLocalBackend) {
     'INSERT INTO sessions',
   ]) {
     if (!registration.includes(marker)) throw new Error(`local registration safety marker missing: ${marker}`)
+  }
+  const authentication = fs.readFileSync(authenticationPath, 'utf8')
+  for (const marker of ['identifier:', 'username:', 'loginIdentifierFromRequest', 'classifyLoginIdentifier', 'INVALID_CREDENTIALS_MESSAGE', '账号或密码错误']) {
+    if (!authentication.includes(marker)) throw new Error(`local authentication privacy marker missing: ${marker}`)
+  }
+  const identity = fs.readFileSync(identityPath, 'utf8')
+  for (const marker of ['normalize(\'NFKC\')', 'USERNAME_MIN_LENGTH = 3', 'USERNAME_MAX_LENGTH = 32', 'PASSWORD_MIN_LENGTH = 8', 'PASSWORD_MAX_LENGTH = 256', 'RESERVED_USERNAMES', 'numeric_only', '手机号后六位', '邮箱名称']) {
+    if (!identity.includes(marker)) throw new Error(`local identity policy marker missing: ${marker}`)
+  }
+  const passwordRecovery = fs.readFileSync(passwordRecoveryPath, 'utf8')
+  for (const marker of ['passwordResetRequestSchema', 'passwordResetConfirmSchema', 'EMAIL_RESET_UNAVAILABLE', 'INVALID_PASSWORD_RESET_CODE', 'hmac_sha256_digest_only', 'DELETE FROM sessions', 'requestPasswordReset', 'confirmPasswordReset']) {
+    if (!passwordRecovery.includes(marker) && !(marker === 'hmac_sha256_digest_only' && capabilities.includes(marker))) {
+      throw new Error(`local password recovery marker missing: ${marker}`)
+    }
   }
 }
 
