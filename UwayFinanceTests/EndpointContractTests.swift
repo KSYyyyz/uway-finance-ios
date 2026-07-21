@@ -7,6 +7,8 @@ final class EndpointContractTests: XCTestCase {
         XCTAssertEqual(APIEndpoint.capabilities.path, "/api/capabilities")
         XCTAssertEqual(APIEndpoint.login.path, "/api/auth/login")
         XCTAssertEqual(APIEndpoint.usernameAvailability.path, "/api/auth/username-availability")
+        XCTAssertEqual(APIEndpoint.registrationCode.path, "/api/auth/registration-code")
+        XCTAssertEqual(APIEndpoint.registrationEmailCode.path, "/api/auth/registration-email-code")
         XCTAssertEqual(APIEndpoint.passwordResetRequest.path, "/api/auth/password-reset/request")
         XCTAssertEqual(APIEndpoint.passwordResetConfirm.path, "/api/auth/password-reset/confirm")
         XCTAssertEqual(APIEndpoint.currentUser.path, "/api/auth/me")

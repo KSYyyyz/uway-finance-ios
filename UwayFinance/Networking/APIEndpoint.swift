@@ -17,6 +17,7 @@ struct APIEndpoint: Hashable {
     static let login = APIEndpoint(method: .post, path: "/api/auth/login")
     static let usernameAvailability = APIEndpoint(method: .post, path: "/api/auth/username-availability")
     static let registrationCode = APIEndpoint(method: .post, path: "/api/auth/registration-code")
+    static let registrationEmailCode = APIEndpoint(method: .post, path: "/api/auth/registration-email-code")
     static let register = APIEndpoint(method: .post, path: "/api/auth/register")
     static let passwordResetRequest = APIEndpoint(method: .post, path: "/api/auth/password-reset/request")
     static let passwordResetConfirm = APIEndpoint(method: .post, path: "/api/auth/password-reset/confirm")

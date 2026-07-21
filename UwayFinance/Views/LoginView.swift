@@ -25,7 +25,7 @@ private enum UsernameCheckState: Equatable {
 struct LoginView: View {
     private enum Field: Hashable {
         case loginIdentifier, loginPassword
-        case registerUsername, email, phone, code, password, confirmation
+        case registerUsername, email, emailCode, phone, code, password, confirmation
         case recoveryEmail, recoveryCode, recoveryPassword, recoveryConfirmation
     }
 
@@ -35,11 +35,13 @@ struct LoginView: View {
     @State private var loginPassword = ""
     @State private var registerUsername = ""
     @State private var email = ""
+    @State private var emailCode = ""
     @State private var phone = ""
     @State private var code = ""
     @State private var registerPassword = ""
     @State private var passwordConfirmation = ""
     @State private var registrationChallenge: ActiveAuthenticationChallenge?
+    @State private var registrationEmailChallenge: ActiveAuthenticationChallenge?
     @State private var usernameCheck: UsernameCheckState = .idle
     @State private var recoveryEmail = ""
     @State private var recoveryCode = ""
@@ -47,7 +49,9 @@ struct LoginView: View {
     @State private var recoveryConfirmation = ""
     @State private var recoveryChallenge: ActiveAuthenticationChallenge?
     @State private var isSubmitting = false
-    @State private var isRequestingCode = false
+    @State private var isRequestingPhoneCode = false
+    @State private var isRequestingEmailCode = false
+    @State private var isRequestingRecoveryCode = false
     @State private var errorMessage: String?
     @State private var successMessage: String?
     @State private var showLoginPassword = false
@@ -102,7 +106,11 @@ struct LoginView: View {
             }
             .task(id: registrationChallenge?.id) {
                 guard let challenge = registrationChallenge else { return }
-                await monitorChallenge(challenge, kind: .registration)
+                await monitorChallenge(challenge, kind: .registrationPhone)
+            }
+            .task(id: registrationEmailChallenge?.id) {
+                guard let challenge = registrationEmailChallenge else { return }
+                await monitorChallenge(challenge, kind: .registrationEmail)
             }
             .task(id: recoveryChallenge?.id) {
                 guard let challenge = recoveryChallenge else { return }
@@ -129,7 +137,7 @@ struct LoginView: View {
     private var headerDescription: String {
         switch mode {
         case .login: "使用用户名、手机号或邮箱进入独立账套"
-        case .register: "验证手机并创建独立企业与账套"
+        case .register: "同时验证手机和邮箱，创建独立企业与账套"
         case .recovery: "通过注册邮箱安全重置密码"
         }
     }
@@ -178,7 +186,7 @@ struct LoginView: View {
 
     private var registrationCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if !session.registrationCapability.safeForClientUse {
+            if !session.registrationCapability.safeForVerifiedEmailRegistration {
                 capabilityWarning(session.registrationCapability.unavailableMessage)
             }
 
@@ -203,7 +211,21 @@ struct LoginView: View {
                 .submitLabel(.next)
                 .onSubmit { focusedField = .phone }
                 .accessibilityLabel("注册邮箱")
-                .accessibilityHint("邮箱用于账号登录和密码找回")
+                .accessibilityHint("邮箱用于账号登录、注册验证和密码找回")
+                .onChange(of: email) { oldValue, newValue in
+                    if registrationEmailChallenge != nil, oldValue != newValue {
+                        registrationEmailChallenge = nil
+                        emailCode = ""
+                    }
+                }
+
+            codeRow(
+                title: "邮箱验证",
+                code: $emailCode,
+                challenge: registrationEmailChallenge,
+                focusedField: .emailCode,
+                kind: .registrationEmail
+            )
 
             TextField("手机号，例如 138… 或 +65…", text: $phone)
                 .textContentType(.telephoneNumber)
@@ -220,10 +242,11 @@ struct LoginView: View {
                 }
 
             codeRow(
+                title: "手机验证",
                 code: $code,
                 challenge: registrationChallenge,
                 focusedField: .code,
-                isRecovery: false
+                kind: .registrationPhone
             )
 
             PasswordEntry(
@@ -259,7 +282,7 @@ struct LoginView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(!canSubmitRegistration)
-            .accessibilityHint("验证手机并创建只属于当前新用户的企业和账套")
+            .accessibilityHint("验证手机和邮箱，并创建只属于当前新用户的企业和账套")
         }
         .appCard()
     }
@@ -288,17 +311,18 @@ struct LoginView: View {
                 Button {
                     Task { await requestRecoveryCode() }
                 } label: {
-                    submitLabel(progress: isRequestingCode, idle: "发送重置码", busy: "正在发送")
+                    submitLabel(progress: isRequestingRecoveryCode, idle: "发送重置码", busy: "正在发送")
                 }
                 .buttonStyle(.bordered)
                 .disabled(!canRequestRecoveryCode)
                 .accessibilityHint("向注册邮箱请求一次性重置码")
             } else {
                 codeRow(
+                    title: "邮箱重置验证",
                     code: $recoveryCode,
                     challenge: recoveryChallenge,
                     focusedField: .recoveryCode,
-                    isRecovery: true
+                    kind: .recovery
                 )
 
                 PasswordEntry(
@@ -391,12 +415,16 @@ struct LoginView: View {
     }
 
     private func codeRow(
+        title: String,
         code: Binding<String>,
         challenge: ActiveAuthenticationChallenge?,
         focusedField field: Field,
-        isRecovery: Bool
+        kind: VerificationChallengeKind
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
             HStack(spacing: 10) {
                 TextField("6 位验证码", text: code)
                     .textContentType(.oneTimeCode)
@@ -408,15 +436,20 @@ struct LoginView: View {
                         code.wrappedValue = String(value.filter(\.isNumber).prefix(6))
                     }
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Button(codeButtonTitle(challenge: challenge, at: context.date)) {
-                        Task {
-                            if isRecovery { await requestRecoveryCode() }
-                            else { await requestRegistrationCode() }
-                        }
+                    Button(codeButtonTitle(
+                        challenge: challenge,
+                        at: context.date,
+                        isRequesting: isRequestingCode(for: kind)
+                    )) {
+                        Task { await requestCode(for: kind) }
                     }
                     .buttonStyle(.bordered)
-                    .disabled(!canRequestCode(challenge: challenge, at: context.date, isRecovery: isRecovery))
-                    .accessibilityLabel(codeButtonTitle(challenge: challenge, at: context.date))
+                    .disabled(!canRequestCode(challenge: challenge, at: context.date, kind: kind))
+                    .accessibilityLabel(codeButtonTitle(
+                        challenge: challenge,
+                        at: context.date,
+                        isRequesting: isRequestingCode(for: kind)
+                    ))
                 }
             }
             if let challenge {
@@ -478,11 +511,13 @@ struct LoginView: View {
     }
 
     private var canSubmitRegistration: Bool {
-        session.registrationCapability.safeForClientUse
+        session.registrationCapability.safeForVerifiedEmailRegistration
             && registrationChallenge != nil
+            && registrationEmailChallenge != nil
             && usernameSubmissionAllowed
             && IdentityInputPolicy.isValidEmail(email)
             && code.count == 6
+            && emailCode.count == 6
             && (8...256).contains(registerPassword.count)
             && registrationPasswordIssue == nil
             && registerPassword == passwordConfirmation
@@ -492,7 +527,7 @@ struct LoginView: View {
     private var canRequestRecoveryCode: Bool {
         session.passwordRecoveryCapability.safeForClientUse
             && IdentityInputPolicy.isValidEmail(recoveryEmail)
-            && !isRequestingCode
+            && !isRequestingRecoveryCode
     }
 
     private var recoveryPasswordIssue: String? {
@@ -517,21 +552,50 @@ struct LoginView: View {
     private func canRequestCode(
         challenge: ActiveAuthenticationChallenge?,
         at date: Date,
-        isRecovery: Bool
+        kind: VerificationChallengeKind
     ) -> Bool {
-        let capabilityAvailable = isRecovery
-            ? session.passwordRecoveryCapability.safeForClientUse && IdentityInputPolicy.isValidEmail(recoveryEmail)
-            : session.registrationCapability.safeForClientUse
+        let capabilityAvailable: Bool
+        switch kind {
+        case .registrationPhone:
+            capabilityAvailable = session.registrationCapability.safeForVerifiedEmailRegistration
                 && !phone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        guard capabilityAvailable, !isRequestingCode else { return false }
+        case .registrationEmail:
+            capabilityAvailable = session.registrationCapability.safeForVerifiedEmailRegistration
+                && IdentityInputPolicy.isValidEmail(email)
+        case .recovery:
+            capabilityAvailable = session.passwordRecoveryCapability.safeForClientUse
+                && IdentityInputPolicy.isValidEmail(recoveryEmail)
+        }
+        guard capabilityAvailable, !isRequestingCode(for: kind) else { return false }
         return challenge.map { date >= $0.resendAt } ?? true
     }
 
-    private func codeButtonTitle(challenge: ActiveAuthenticationChallenge?, at date: Date) -> String {
-        if isRequestingCode { return "发送中" }
+    private func codeButtonTitle(
+        challenge: ActiveAuthenticationChallenge?,
+        at date: Date,
+        isRequesting: Bool
+    ) -> String {
+        if isRequesting { return "发送中" }
         guard let challenge else { return "获取验证码" }
         let remaining = remainingSeconds(until: challenge.resendAt, at: date)
         return remaining > 0 ? "\(remaining) 秒后重发" : "重新发送"
+    }
+
+    private func isRequestingCode(for kind: VerificationChallengeKind) -> Bool {
+        switch kind {
+        case .registrationPhone: isRequestingPhoneCode
+        case .registrationEmail: isRequestingEmailCode
+        case .recovery: isRequestingRecoveryCode
+        }
+    }
+
+    @MainActor
+    private func requestCode(for kind: VerificationChallengeKind) async {
+        switch kind {
+        case .registrationPhone: await requestRegistrationCode()
+        case .registrationEmail: await requestRegistrationEmailCode()
+        case .recovery: await requestRecoveryCode()
+        }
     }
 
     private func remainingSeconds(until target: Date, at date: Date) -> Int {
@@ -578,10 +642,10 @@ struct LoginView: View {
 
     @MainActor
     private func requestRegistrationCode() async {
-        isRequestingCode = true
+        isRequestingPhoneCode = true
         errorMessage = nil
         successMessage = nil
-        defer { isRequestingCode = false }
+        defer { isRequestingPhoneCode = false }
         do {
             let response = try await session.requestRegistrationCode(phone: phone)
             registrationChallenge = challenge(from: response)
@@ -593,8 +657,28 @@ struct LoginView: View {
     }
 
     @MainActor
+    private func requestRegistrationEmailCode() async {
+        isRequestingEmailCode = true
+        errorMessage = nil
+        successMessage = nil
+        defer { isRequestingEmailCode = false }
+        do {
+            let response = try await session.requestRegistrationEmailCode(
+                email: IdentityInputPolicy.normalizedEmail(email)
+            )
+            registrationEmailChallenge = challenge(from: response)
+            emailCode = ""
+            successMessage = response.message
+            focusedField = .emailCode
+        } catch {
+            errorMessage = RegistrationErrorMessage.localized(error)
+        }
+    }
+
+    @MainActor
     private func submitRegistration() async {
-        guard let challenge = registrationChallenge else { return }
+        guard let challenge = registrationChallenge,
+              let emailChallenge = registrationEmailChallenge else { return }
         guard registerPassword == passwordConfirmation else {
             errorMessage = "两次输入的密码不一致"
             return
@@ -611,25 +695,31 @@ struct LoginView: View {
                 password: registerPassword,
                 phone: phone.trimmingCharacters(in: .whitespacesAndNewlines),
                 challengeId: challenge.id,
-                code: code
+                code: code,
+                emailChallengeId: emailChallenge.id,
+                emailCode: emailCode
             ))
             clearRegistrationSecrets()
         } catch {
             errorMessage = RegistrationErrorMessage.localized(error)
-            if case APIError.server(_, let serverCode, _) = error,
-               serverCode == "INVALID_REGISTRATION_CODE" {
-                registrationChallenge = nil
-                code = ""
+            if case APIError.server(_, let serverCode, _) = error {
+                if serverCode == "INVALID_REGISTRATION_CODE" {
+                    registrationChallenge = nil
+                    code = ""
+                } else if serverCode == "INVALID_REGISTRATION_EMAIL_CODE" {
+                    registrationEmailChallenge = nil
+                    emailCode = ""
+                }
             }
         }
     }
 
     @MainActor
     private func requestRecoveryCode() async {
-        isRequestingCode = true
+        isRequestingRecoveryCode = true
         errorMessage = nil
         successMessage = nil
-        defer { isRequestingCode = false }
+        defer { isRequestingRecoveryCode = false }
         do {
             let response = try await session.requestPasswordReset(
                 email: IdentityInputPolicy.normalizedEmail(recoveryEmail)
@@ -687,21 +777,45 @@ struct LoginView: View {
         )
     }
 
-    private enum ChallengeKind: Equatable { case registration, recovery }
+    private func challenge(from response: RegistrationEmailCodeResponse) -> ActiveAuthenticationChallenge {
+        let now = Date()
+        return ActiveAuthenticationChallenge(
+            id: response.challengeId,
+            expiresAt: now.addingTimeInterval(TimeInterval(response.expiresInSeconds)),
+            resendAt: now.addingTimeInterval(TimeInterval(response.resendAfterSeconds))
+        )
+    }
+
+    private enum VerificationChallengeKind: Equatable {
+        case registrationPhone
+        case registrationEmail
+        case recovery
+    }
 
     @MainActor
-    private func monitorChallenge(_ monitored: ActiveAuthenticationChallenge, kind: ChallengeKind) async {
+    private func monitorChallenge(_ monitored: ActiveAuthenticationChallenge, kind: VerificationChallengeKind) async {
         while !Task.isCancelled {
-            let current = kind == .registration ? registrationChallenge : recoveryChallenge
+            let current: ActiveAuthenticationChallenge?
+            switch kind {
+            case .registrationPhone: current = registrationChallenge
+            case .registrationEmail: current = registrationEmailChallenge
+            case .recovery: current = recoveryChallenge
+            }
             guard current?.id == monitored.id else { return }
             if Date() >= monitored.expiresAt {
-                if kind == .registration {
+                switch kind {
+                case .registrationPhone:
                     registrationChallenge = nil
                     code = ""
-                } else {
+                case .registrationEmail:
+                    registrationEmailChallenge = nil
+                    emailCode = ""
+                case .recovery:
                     clearRecoveryChallenge()
                 }
-                errorMessage = "验证码已过期，请重新获取"
+                errorMessage = kind == .registrationEmail
+                    ? "邮箱验证码已过期，请重新获取"
+                    : "验证码已过期，请重新获取"
                 return
             }
             try? await Task.sleep(for: .seconds(1))
@@ -713,6 +827,8 @@ struct LoginView: View {
         passwordConfirmation = ""
         code = ""
         registrationChallenge = nil
+        emailCode = ""
+        registrationEmailChallenge = nil
         showRegisterPassword = false
         showRegisterConfirmation = false
     }

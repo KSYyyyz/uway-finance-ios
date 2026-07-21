@@ -21,6 +21,7 @@ protocol FinanceAPI: Sendable {
     func login(identifier: String, password: String, useLegacyUsernameField: Bool) async throws -> SessionUser
     func usernameAvailability(_ request: UsernameAvailabilityRequest) async throws -> UsernameAvailabilityResponse
     func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse
+    func requestRegistrationEmailCode(email: String) async throws -> RegistrationEmailCodeResponse
     func register(_ request: RegistrationRequest) async throws -> RegistrationResponse
     func requestPasswordReset(_ request: PasswordResetRequest) async throws -> PasswordResetChallengeResponse
     func confirmPasswordReset(_ request: PasswordResetConfirmRequest) async throws -> PasswordResetConfirmResponse
@@ -63,6 +64,10 @@ actor LiveFinanceAPI: FinanceAPI {
 
     func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse {
         try await transport.send(.registrationCode, body: RegistrationCodeRequest(phone: phone))
+    }
+
+    func requestRegistrationEmailCode(email: String) async throws -> RegistrationEmailCodeResponse {
+        try await transport.send(.registrationEmailCode, body: RegistrationEmailCodeRequest(email: email))
     }
 
     func register(_ request: RegistrationRequest) async throws -> RegistrationResponse {

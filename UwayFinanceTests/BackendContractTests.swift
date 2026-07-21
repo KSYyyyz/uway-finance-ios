@@ -268,6 +268,7 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
         XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
         XCTAssertTrue(contract.capabilities.registration.supportsIdentityContract)
+        XCTAssertFalse(contract.capabilities.registration.safeForVerifiedEmailRegistration)
         XCTAssertEqual(contract.capabilities.registration.usernameAvailabilityEndpoint, "/api/auth/username-availability")
         XCTAssertEqual(contract.capabilities.registration.usernameLength, CapabilityLengthRange(min: 3, max: 32))
         XCTAssertEqual(contract.capabilities.registration.passwordLength, CapabilityLengthRange(min: 8, max: 256))
@@ -277,6 +278,104 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.passwordRecovery.sessionRevocation, "all_sessions")
         XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
         XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
+    }
+
+    func testV0160VerifiedAccountEmailCapabilitiesRequirePurposeIsolatedDualVerification() throws {
+        let health = try JSONDecoder().decode(
+            HealthResponse.self,
+            from: fixture(named: "health-verified-account-email-v0.16.0")
+        )
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-verified-account-email-v0.16.0")
+        )
+        let contract = BackendContract(health: health, negotiated: response)
+
+        XCTAssertEqual(contract.serverVersion, "0.16.0")
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260721_014")
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.verifiedAccountEmailSchema)
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
+        XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
+        XCTAssertTrue(contract.capabilities.registration.safeForVerifiedEmailRegistration)
+        XCTAssertEqual(
+            contract.capabilities.registration.emailCodeEndpoint,
+            "/api/auth/registration-email-code"
+        )
+        XCTAssertEqual(contract.capabilities.registration.emailVerificationRequired, true)
+        XCTAssertEqual(
+            contract.capabilities.registration.emailVerification?.purpose,
+            "registration_verification"
+        )
+        XCTAssertEqual(
+            contract.capabilities.registration.emailVerification?.delivery,
+            "aliyun_direct_mail"
+        )
+        XCTAssertEqual(
+            contract.capabilities.registration.emailVerification?.codeStorage,
+            "hmac_sha256_digest_only"
+        )
+        XCTAssertEqual(
+            contract.capabilities.registration.emailVerification?.unknownEmailResponse,
+            "indistinguishable"
+        )
+        XCTAssertTrue(contract.capabilities.passwordRecovery.safeForClientUse)
+        XCTAssertEqual(contract.capabilities.passwordRecovery.delivery, "aliyun_direct_mail")
+        XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
+        XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
+    }
+
+    func testVerifiedEmailRegistrationFailsClosedForMissingDeliveryOrWrongPurpose() {
+        let missingDelivery = RegistrationEmailVerificationCapability(
+            purpose: "registration_verification",
+            delivery: nil,
+            codeStorage: "hmac_sha256_digest_only",
+            unknownEmailResponse: "indistinguishable"
+        )
+        let resetPurpose = RegistrationEmailVerificationCapability(
+            purpose: "password_reset",
+            delivery: "aliyun_direct_mail",
+            codeStorage: "hmac_sha256_digest_only",
+            unknownEmailResponse: "indistinguishable"
+        )
+
+        XCTAssertFalse(missingDelivery.safeForClientUse)
+        XCTAssertFalse(resetPurpose.safeForClientUse)
+    }
+
+    func testVerifiedEmailRegistrationUnavailableReasonsRemainActionableAndFailClosed() {
+        let reasons = [
+            "sms_provider_not_configured",
+            "email_provider_not_configured",
+            "verification_pepper_not_configured",
+        ]
+
+        for reason in reasons {
+            let capability = RegistrationCapability(
+                available: false,
+                reason: reason,
+                codeEndpoint: "/api/auth/registration-code",
+                emailCodeEndpoint: "/api/auth/registration-email-code",
+                registerEndpoint: "/api/auth/register",
+                usernameAvailabilityEndpoint: "/api/auth/username-availability",
+                phoneVerification: "aliyun_sms",
+                emailRequired: true,
+                emailVerificationRequired: true,
+                emailVerification: RegistrationEmailVerificationCapability(
+                    purpose: "registration_verification",
+                    delivery: "aliyun_direct_mail",
+                    codeStorage: "hmac_sha256_digest_only",
+                    unknownEmailResponse: "indistinguishable"
+                ),
+                usernameNormalization: "nfkc_lowercase",
+                usernameLength: CapabilityLengthRange(min: 3, max: 32),
+                passwordLength: CapabilityLengthRange(min: 8, max: 256),
+                createsIsolatedOrganizationAndAccountBook: true,
+                sessionCookie: "http_only_secure_same_site_strict"
+            )
+
+            XCTAssertFalse(capability.safeForVerifiedEmailRegistration)
+            XCTAssertFalse(capability.unavailableMessage.isEmpty)
+        }
     }
 
     func testUnavailablePasswordRecoveryCapabilityDoesNotExposeResetFlow() {

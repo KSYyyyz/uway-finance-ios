@@ -112,14 +112,21 @@ final class AppSession: ObservableObject {
     }
 
     func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse {
-        guard registrationCapability.safeForClientUse else {
+        guard registrationCapability.safeForVerifiedEmailRegistration else {
             throw APIError.unavailable(registrationCapability.unavailableMessage)
         }
         return try await api.requestRegistrationCode(phone: phone)
     }
 
+    func requestRegistrationEmailCode(email: String) async throws -> RegistrationEmailCodeResponse {
+        guard registrationCapability.safeForVerifiedEmailRegistration else {
+            throw APIError.unavailable(registrationCapability.unavailableMessage)
+        }
+        return try await api.requestRegistrationEmailCode(email: email)
+    }
+
     func register(_ request: RegistrationRequest) async throws {
-        guard registrationCapability.safeForClientUse else {
+        guard registrationCapability.safeForVerifiedEmailRegistration else {
             throw APIError.unavailable(registrationCapability.unavailableMessage)
         }
         let generation = beginSessionTransition()

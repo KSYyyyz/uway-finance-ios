@@ -22,10 +22,13 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
     let available: Bool
     let reason: String?
     let codeEndpoint: String?
+    let emailCodeEndpoint: String?
     let registerEndpoint: String?
     let usernameAvailabilityEndpoint: String?
     let phoneVerification: String?
     let emailRequired: Bool?
+    let emailVerificationRequired: Bool?
+    let emailVerification: RegistrationEmailVerificationCapability?
     let usernameNormalization: String?
     let usernameLength: CapabilityLengthRange?
     let passwordLength: CapabilityLengthRange?
@@ -36,10 +39,13 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
         available: Bool,
         reason: String?,
         codeEndpoint: String?,
+        emailCodeEndpoint: String? = nil,
         registerEndpoint: String?,
         usernameAvailabilityEndpoint: String? = nil,
         phoneVerification: String?,
         emailRequired: Bool? = nil,
+        emailVerificationRequired: Bool? = nil,
+        emailVerification: RegistrationEmailVerificationCapability? = nil,
         usernameNormalization: String? = nil,
         usernameLength: CapabilityLengthRange? = nil,
         passwordLength: CapabilityLengthRange? = nil,
@@ -49,10 +55,13 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
         self.available = available
         self.reason = reason
         self.codeEndpoint = codeEndpoint
+        self.emailCodeEndpoint = emailCodeEndpoint
         self.registerEndpoint = registerEndpoint
         self.usernameAvailabilityEndpoint = usernameAvailabilityEndpoint
         self.phoneVerification = phoneVerification
         self.emailRequired = emailRequired
+        self.emailVerificationRequired = emailVerificationRequired
+        self.emailVerification = emailVerification
         self.usernameNormalization = usernameNormalization
         self.usernameLength = usernameLength
         self.passwordLength = passwordLength
@@ -80,32 +89,68 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
             && passwordLength == CapabilityLengthRange(min: 8, max: 256)
     }
 
+    var safeForVerifiedEmailRegistration: Bool {
+        safeForClientUse
+            && emailCodeEndpoint == "/api/auth/registration-email-code"
+            && emailVerificationRequired == true
+            && emailVerification?.safeForClientUse == true
+    }
+
     var statusDisplay: String {
-        if safeForClientUse { return "手机验证注册可用" }
+        if safeForVerifiedEmailRegistration { return "手机和邮箱双验证可用" }
+        if safeForClientUse { return "仅兼容旧版手机验证" }
         if reason == "sms_provider_not_configured" { return "短信服务未配置" }
+        if reason == "email_provider_not_configured" { return "邮件服务未配置" }
+        if reason == "verification_pepper_not_configured" { return "验证码安全配置未完成" }
         return "注册暂不可用"
     }
 
     var unavailableMessage: String {
-        reason == "sms_provider_not_configured"
-            ? "服务器尚未配置短信验证码服务，当前不能注册新账号。"
-            : "服务器暂未开放安全注册能力。"
+        switch reason {
+        case "sms_provider_not_configured":
+            "服务器尚未配置短信验证码服务，当前不能注册新账号。"
+        case "email_provider_not_configured":
+            "服务器尚未配置注册邮件服务，当前不能注册新账号。"
+        case "verification_pepper_not_configured":
+            "服务器验证码安全配置尚未完成，当前不能注册新账号。"
+        default:
+            "服务器暂未开放手机与邮箱双重验证注册能力。"
+        }
     }
 
     static let unavailableFallback = RegistrationCapability(
         available: false,
         reason: "capabilities_unavailable",
         codeEndpoint: nil,
+        emailCodeEndpoint: nil,
         registerEndpoint: nil,
         usernameAvailabilityEndpoint: nil,
         phoneVerification: nil,
         emailRequired: nil,
+        emailVerificationRequired: nil,
+        emailVerification: nil,
         usernameNormalization: nil,
         usernameLength: nil,
         passwordLength: nil,
         createsIsolatedOrganizationAndAccountBook: nil,
         sessionCookie: nil
     )
+}
+
+struct RegistrationEmailVerificationCapability: Codable, Equatable, Sendable {
+    private static let supportedDeliveries = Set(["email_webhook", "aliyun_direct_mail"])
+
+    let purpose: String?
+    let delivery: String?
+    let codeStorage: String?
+    let unknownEmailResponse: String?
+
+    var safeForClientUse: Bool {
+        purpose == "registration_verification"
+            && delivery.map { Self.supportedDeliveries.contains($0) } == true
+            && codeStorage == "hmac_sha256_digest_only"
+            && unknownEmailResponse == "indistinguishable"
+    }
 }
 
 struct CapabilityLengthRange: Codable, Equatable, Sendable {
@@ -141,6 +186,7 @@ struct AuthenticationCapability: Codable, Equatable, Sendable {
 }
 
 struct PasswordRecoveryCapability: Codable, Equatable, Sendable {
+    private static let supportedDeliveries = Set(["email_webhook", "aliyun_direct_mail"])
     let available: Bool
     let reason: String?
     let requestEndpoint: String?
@@ -154,7 +200,7 @@ struct PasswordRecoveryCapability: Codable, Equatable, Sendable {
         available
             && requestEndpoint == "/api/auth/password-reset/request"
             && confirmEndpoint == "/api/auth/password-reset/confirm"
-            && delivery == "email_webhook"
+            && delivery.map { Self.supportedDeliveries.contains($0) } == true
             && codeStorage == "hmac_sha256_digest_only"
             && unknownEmailResponse == "indistinguishable"
             && sessionRevocation == "all_sessions"
@@ -631,7 +677,7 @@ struct ServerCapabilities: Equatable, Sendable {
 }
 
 struct BackendContract: Equatable, Sendable {
-    static let apiContractVersion = "20260720_013"
+    static let apiContractVersion = "20260721_014"
     static let financeDomainV2Schema = "20260714_002_finance_resource_api"
     static let classificationReviewSchema = "20260714_003_classification_review"
     static let classificationPreferenceMemorySchema = "20260715_004_account_book_preference_memory"
@@ -641,6 +687,7 @@ struct BackendContract: Equatable, Sendable {
     static let accountBookImportAnalysisSchema = "20260715_008_account_book_import_analysis"
     static let immutableEvidenceLinksSchema = "20260716_009_immutable_evidence_links"
     static let accountIdentityRecoverySchema = "20260720_010_account_identity_recovery"
+    static let verifiedAccountEmailSchema = "20260721_011_verified_account_email"
 
     static func isFinanceDomainV2Schema(_ value: String?) -> Bool {
         value == financeDomainV2Schema
@@ -652,6 +699,7 @@ struct BackendContract: Equatable, Sendable {
             || value == accountBookImportAnalysisSchema
             || value == immutableEvidenceLinksSchema
             || value == accountIdentityRecoverySchema
+            || value == verifiedAccountEmailSchema
     }
 
     let serverVersion: String

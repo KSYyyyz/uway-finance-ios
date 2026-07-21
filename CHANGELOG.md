@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.0 - 2026-07-21
+
+- Align build 15 with backend app `0.16.0`, API contract `20260721_014` and finance schema `20260721_011_verified_account_email` while retaining all v0.15.0 and earlier snapshots and fixtures unchanged.
+- Add capability-gated `POST /api/auth/registration-email-code` with an indistinguishable 202 response, independent TTL/resend state and fail-closed provider handling for `email_webhook` and `aliyun_direct_mail`.
+- Require separate phone `challengeId/code` and email `emailChallengeId/emailCode` in native registration. Editing either identity clears only its own challenge; both must be current before registration can be submitted.
+- Keep email registration purpose `registration_verification` separate from password-reset challenges, with no code/challenge persistence, logging, URL leakage or client-side fallback.
+- Preserve unified identifier login, username checks, accessible password visibility, all-session reset cleanup, legacy `/api/state` synchronization, shadow Finance V2 and every existing AI/evidence/multi-tenant safety boundary.
+
 ## 0.15.0 - 2026-07-20
 
 - Align build 14 with backend app `0.15.0`, API contract `20260720_013` and finance schema `20260720_010_account_identity_recovery` while retaining every historical fixture unchanged.

@@ -23,6 +23,28 @@ final class RegistrationAPITests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(RegistrationCodeRequest.self, from: body), RegistrationCodeRequest(phone: "+8613800138000"))
     }
 
+    func testRequestsRegistrationEmailCodeWithEmailOnlyAndIndistinguishableResponse() async throws {
+        RegistrationURLProtocol.handler = fixtureResponse(
+            named: "registration-email-code-success-v0.16.0",
+            statusCode: 202
+        )
+
+        let response = try await makeAPI().requestRegistrationEmailCode(email: "owner@example.com")
+
+        XCTAssertTrue(response.ok)
+        XCTAssertEqual(response.expiresInSeconds, 600)
+        XCTAssertEqual(response.resendAfterSeconds, 60)
+        XCTAssertFalse(response.message.isEmpty)
+        let request = try XCTUnwrap(capturedRequests().first)
+        XCTAssertEqual(request.url?.path, "/api/auth/registration-email-code")
+        XCTAssertNil(request.url?.query)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(
+            try JSONDecoder().decode(RegistrationEmailCodeRequest.self, from: requestBody(request)),
+            RegistrationEmailCodeRequest(email: "owner@example.com")
+        )
+    }
+
     func testRegisterKeepsPasswordAndCodeOutOfURLAndDecodesIsolatedScope() async throws {
         RegistrationURLProtocol.handler = fixtureResponse(named: "registration-success-v0.14.0", statusCode: 201)
         let command = RegistrationRequest(
@@ -31,7 +53,9 @@ final class RegistrationAPITests: XCTestCase {
             password: "SecurePass2026",
             phone: "+8613800138000",
             challengeId: "reg_20260716_abcdefghijklmnop",
-            code: "246810"
+            code: "246810",
+            emailChallengeId: "email_20260721_abcdefghijklmnop",
+            emailCode: "135790"
         )
 
         let response = try await makeAPI().register(command)
@@ -44,6 +68,7 @@ final class RegistrationAPITests: XCTestCase {
         XCTAssertNil(request.url?.query)
         XCTAssertFalse(request.url?.absoluteString.contains(command.password) ?? true)
         XCTAssertFalse(request.url?.absoluteString.contains(command.code) ?? true)
+        XCTAssertFalse(request.url?.absoluteString.contains(command.emailCode) ?? true)
         XCTAssertEqual(try JSONDecoder().decode(RegistrationRequest.self, from: requestBody(request)), command)
     }
 
@@ -186,7 +211,7 @@ final class RegistrationAPITests: XCTestCase {
         }
     }
 
-    func testEveryFrozenRegistrationErrorKeepsServerIdentityAndHasChineseMessage() async throws {
+    func testHistoricalV015RegistrationErrorsRemainDecodableAndLocalized() async throws {
         let fixtures = try JSONDecoder().decode([RegistrationErrorFixture].self, from: fixture(named: "registration-errors-v0.15.0"))
         XCTAssertEqual(fixtures.count, 8)
 
@@ -212,6 +237,30 @@ final class RegistrationAPITests: XCTestCase {
             } catch {
                 XCTFail("unexpected error for \(item.code): \(error)")
             }
+        }
+    }
+
+    func testV016RegistrationErrorsIncludeEmailChallengeFailuresWithoutLeakingIdentity() throws {
+        let fixtures = try JSONDecoder().decode(
+            [RegistrationErrorFixture].self,
+            from: fixture(named: "registration-errors-v0.16.0")
+        )
+
+        XCTAssertEqual(fixtures.count, 12)
+        XCTAssertEqual(
+            Set(fixtures.map(\.code)),
+            Set([
+                "INVALID_PHONE", "INVALID_EMAIL", "INVALID_REGISTRATION_INPUT", "WEAK_PASSWORD",
+                "INVALID_REGISTRATION_CODE", "INVALID_REGISTRATION_EMAIL_CODE",
+                "REGISTRATION_CODE_RATE_LIMITED", "REGISTRATION_EMAIL_CODE_RATE_LIMITED",
+                "REGISTRATION_IDENTITY_CONFLICT", "SMS_PROVIDER_UNAVAILABLE", "SMS_DELIVERY_FAILED",
+                "EMAIL_VERIFICATION_UNAVAILABLE",
+            ])
+        )
+        for item in fixtures {
+            XCTAssertFalse(RegistrationErrorMessage.localized(
+                APIError.server(status: item.status, code: item.code, message: item.error)
+            ).isEmpty)
         }
     }
 

@@ -12,9 +12,9 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(session.phase, .signedIn)
         XCTAssertEqual(session.user?.username, "finance-admin")
         guard case .available(let contract) = session.serverState else {
-            return XCTFail("0.15.0 server should be available")
+            return XCTFail("0.16.0 server should be available")
         }
-        XCTAssertEqual(contract.serverVersion, "0.15.0")
+        XCTAssertEqual(contract.serverVersion, "0.16.0")
         XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
         XCTAssertEqual(contract.capabilities.source, .server)
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
@@ -25,10 +25,11 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.semanticV2SafeForClientUse, true)
         XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
         XCTAssertTrue(contract.capabilities.registration.supportsIdentityContract)
+        XCTAssertTrue(contract.capabilities.registration.safeForVerifiedEmailRegistration)
         XCTAssertTrue(contract.capabilities.authentication.safeForIdentifierLogin)
         XCTAssertTrue(contract.capabilities.passwordRecovery.safeForClientUse)
         XCTAssertTrue(contract.capabilities.documentUploadCapability.safeForClientUse)
-        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.accountIdentityRecoverySchema)
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.verifiedAccountEmailSchema)
         XCTAssertEqual(session.state.records.count, 1)
         XCTAssertEqual(session.stateRevision, StateRevision(updatedAt: "2026-07-14T00:00:00.000Z"))
         let fetchStateCallCount = await api.fetchStateCallCount()
@@ -461,15 +462,20 @@ final class AppSessionTests: XCTestCase {
         await session.checkServer()
 
         let challenge = try await session.requestRegistrationCode(phone: "+8613800138000")
+        let emailChallenge = try await session.requestRegistrationEmailCode(email: "owner@example.com")
         XCTAssertEqual(challenge.expiresInSeconds, 300)
         XCTAssertEqual(challenge.resendAfterSeconds, 60)
+        XCTAssertEqual(emailChallenge.expiresInSeconds, 600)
+        XCTAssertEqual(emailChallenge.resendAfterSeconds, 60)
         try await session.register(RegistrationRequest(
             username: "new_owner",
             email: "owner@example.com",
             password: "SecurePass2026",
             phone: "+8613800138000",
             challengeId: challenge.challengeId,
-            code: "246810"
+            code: "246810",
+            emailChallengeId: emailChallenge.challengeId,
+            emailCode: "135790"
         ))
 
         XCTAssertEqual(session.phase, .signedIn)
@@ -479,6 +485,8 @@ final class AppSessionTests: XCTestCase {
         let request = await api.lastRegistrationRequest()
         XCTAssertEqual(request?.challengeId, challenge.challengeId)
         XCTAssertEqual(request?.code, "246810")
+        XCTAssertEqual(request?.emailChallengeId, emailChallenge.challengeId)
+        XCTAssertEqual(request?.emailCode, "135790")
         XCTAssertEqual(request?.email, "owner@example.com")
     }
 
@@ -622,9 +630,9 @@ private actor FinanceAPISpy: FinanceAPI {
 
     init(healthResponse: HealthResponse = HealthResponse(
         status: "ok",
-        version: "0.15.0",
-        financeSchemaVersion: BackendContract.accountIdentityRecoverySchema
-    ), capabilitiesFixtureName: String = "capabilities-account-identity-recovery-v0.15.0",
+        version: "0.16.0",
+        financeSchemaVersion: BackendContract.verifiedAccountEmailSchema
+    ), capabilitiesFixtureName: String = "capabilities-verified-account-email-v0.16.0",
        fetchEnvelopes: [StateEnvelope] = [StateEnvelope(
         data: makeSessionState(description: "待重试事项"),
         updatedAt: "2026-07-14T00:00:00.000Z"
@@ -675,6 +683,16 @@ private actor FinanceAPISpy: FinanceAPI {
             challengeId: "challenge-20260716-abcdefghijklmnop",
             expiresInSeconds: 300,
             resendAfterSeconds: 60
+        )
+    }
+
+    func requestRegistrationEmailCode(email: String) async throws -> RegistrationEmailCodeResponse {
+        RegistrationEmailCodeResponse(
+            ok: true,
+            challengeId: "email_20260721_abcdefghijklmnop",
+            expiresInSeconds: 600,
+            resendAfterSeconds: 60,
+            message: "如果该邮箱可用于注册，验证码将发送到邮箱。"
         )
     }
 

@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "challengeId": "email_20260721_abcdefghijklmnop",
+  "expiresInSeconds": 600,
+  "resendAfterSeconds": 60,
+  "message": "如果该邮箱可用于注册，验证码将发送到邮箱。"
+}
