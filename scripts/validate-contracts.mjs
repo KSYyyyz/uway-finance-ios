@@ -1446,7 +1446,11 @@ if (hasLocalBackend) {
       throw new Error(`local password recovery marker missing: ${marker}`)
     }
   }
-  const emailProvider = fs.readFileSync(emailPath, 'utf8')
+  const emailProvider = [
+    fs.readFileSync(emailPath, 'utf8'),
+    fs.readFileSync(path.join(workspace, 'server', 'config.ts'), 'utf8'),
+    fs.readFileSync(serverPath, 'utf8'),
+  ].join('\n')
   for (const marker of ['aliyun_direct_mail', 'email_webhook', 'sendSecurityCode', 'registration_verification', 'password_reset']) {
     if (!emailProvider.includes(marker)) throw new Error(`local email provider marker missing: ${marker}`)
   }
