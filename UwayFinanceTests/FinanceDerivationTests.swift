@@ -9,6 +9,35 @@ final class FinanceDerivationTests: XCTestCase {
         XCTAssertEqual(groups[0].days[0].date, "2026-07-13")
     }
 
+    func testBusinessDateDescendingPreservesSourceOrderWithinSameDay() {
+        let records = [
+            fixture(id: "same-day-second", date: "2026-07-20"),
+            fixture(id: "older", date: "2026-07-19"),
+            fixture(id: "newest", date: "2026-07-21"),
+            fixture(id: "same-day-first-by-id", date: "2026-07-20"),
+        ]
+
+        XCTAssertEqual(
+            records.businessDateDescendingStable.map(\.id),
+            ["newest", "same-day-second", "same-day-first-by-id", "older"]
+        )
+    }
+
+    func testLedgerGroupsUseTheSameStableBusinessDateOrder() {
+        let records = [
+            fixture(id: "z", date: "2026-07-20"),
+            fixture(id: "older", date: "2026-06-30"),
+            fixture(id: "a", date: "2026-07-20"),
+            fixture(id: "newest", date: "2026-07-21"),
+        ]
+
+        let groups = records.ledgerGroups
+
+        XCTAssertEqual(groups.map(\.month), ["2026-07", "2026-06"])
+        XCTAssertEqual(groups[0].days.map(\.date), ["2026-07-21", "2026-07-20"])
+        XCTAssertEqual(groups[0].days[1].records.map(\.id), ["z", "a"])
+    }
+
     func testPendingItemsFollowRecordState() {
         var record = fixture(id: "1", date: "2026-07-13")
         record.settlementStatus = .unsettled
@@ -26,4 +55,3 @@ final class FinanceDerivationTests: XCTestCase {
         )
     }
 }
-

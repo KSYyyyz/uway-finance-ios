@@ -280,18 +280,18 @@ final class BackendContractTests: XCTestCase {
         XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
     }
 
-    func testV0160VerifiedAccountEmailCapabilitiesRequirePurposeIsolatedDualVerification() throws {
+    func testV0161VerifiedAccountEmailCapabilitiesPreserveFrozenAuthenticationContract() throws {
         let health = try JSONDecoder().decode(
             HealthResponse.self,
-            from: fixture(named: "health-verified-account-email-v0.16.0")
+            from: fixture(named: "health-verified-account-email-v0.16.1")
         )
         let response = try JSONDecoder().decode(
             ServerCapabilitiesResponse.self,
-            from: fixture(named: "capabilities-verified-account-email-v0.16.0")
+            from: fixture(named: "capabilities-verified-account-email-v0.16.1")
         )
         let contract = BackendContract(health: health, negotiated: response)
 
-        XCTAssertEqual(contract.serverVersion, "0.16.0")
+        XCTAssertEqual(contract.serverVersion, "0.16.1")
         XCTAssertEqual(contract.negotiatedAPIContractVersion, "20260721_014")
         XCTAssertEqual(contract.financeSchemaVersion, BackendContract.verifiedAccountEmailSchema)
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
@@ -328,6 +328,25 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.passwordRecovery.delivery, "aliyun_direct_mail")
         XCTAssertFalse(contract.capabilities.safety.aiMayWriteBusinessRecords)
         XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
+    }
+
+    func testV0160VerifiedAccountEmailFixturesRemainBackwardCompatible() throws {
+        let health = try JSONDecoder().decode(
+            HealthResponse.self,
+            from: fixture(named: "health-verified-account-email-v0.16.0")
+        )
+        let response = try JSONDecoder().decode(
+            ServerCapabilitiesResponse.self,
+            from: fixture(named: "capabilities-verified-account-email-v0.16.0")
+        )
+
+        let contract = BackendContract(health: health, negotiated: response)
+
+        XCTAssertEqual(contract.serverVersion, "0.16.0")
+        XCTAssertEqual(contract.negotiatedAPIContractVersion, BackendContract.apiContractVersion)
+        XCTAssertEqual(contract.financeSchemaVersion, BackendContract.verifiedAccountEmailSchema)
+        XCTAssertTrue(contract.capabilities.registration.safeForEmailLinkRegistration)
+        XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
     }
 
     func testEmailLinkRegistrationFailsClosedForMissingDeliveryOrWrongPurpose() {

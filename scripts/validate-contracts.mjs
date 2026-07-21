@@ -4,18 +4,19 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const workspace = path.resolve(root, '..', '..')
-const expectedMarketingVersion = '0.16.0'
-const expectedBackendVersion = '0.16.0'
+const expectedMarketingVersion = '0.16.1'
+const expectedBackendVersion = '0.16.1'
 const expectedAPIContractVersion = '20260721_014'
 const expectedFinanceSchemaVersion = '20260721_011_verified_account_email'
-const expectedBuildVersion = '15'
+const expectedBuildVersion = '16'
 const expectedBackendBaselineCommit = null
 const expectedBackendBaselineStatus = 'frozen-candidate'
 const workflowPath = path.join(root, '.github', 'workflows', 'ios-ci.yml')
-const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.16.0.json')
+const contractSnapshotPath = path.join(root, 'ContractSnapshots', 'backend-api-v0.16.1.json')
 
 const requiredFiles = [
   'project.yml',
+  'ContractSnapshots/backend-api-v0.16.1.json',
   'ContractSnapshots/backend-api-v0.16.0.json',
   'ContractSnapshots/backend-api-v0.15.0.json',
   'ContractSnapshots/backend-api-v0.14.1.json',
@@ -35,6 +36,7 @@ const requiredFiles = [
   'UwayFinance/Models/AuthenticationModels.swift',
   'UwayFinance/Models/BackendContract.swift',
   'UwayFinance/Models/FinanceResourceModels.swift',
+  'UwayFinance/Models/FinanceDerivations.swift',
   'UwayFinance/Models/CutoverReadinessModels.swift',
   'UwayFinance/Models/DashboardMetricsModels.swift',
   'UwayFinance/Models/ClassificationReviewModels.swift',
@@ -51,6 +53,7 @@ const requiredFiles = [
   'UwayFinance/State/EvidencePreviewFileManager.swift',
   'UwayFinance/Views/RecordImportView.swift',
   'UwayFinance/Views/LedgerView.swift',
+  'UwayFinance/Views/WorkbenchView.swift',
   'UwayFinance/Views/ClassificationReviewView.swift',
   'UwayFinance/Views/ClassificationPreferenceView.swift',
   'UwayFinance/Views/BusinessRecordEvidenceView.swift',
@@ -64,6 +67,7 @@ const requiredFiles = [
   'UwayFinanceTests/AppSessionTests.swift',
   'UwayFinanceTests/BackendContractTests.swift',
   'UwayFinanceTests/MoneyAmountTests.swift',
+  'UwayFinanceTests/FinanceDerivationTests.swift',
   'UwayFinanceTests/FinanceResourceAPITests.swift',
   'UwayFinanceTests/CutoverReadinessAPITests.swift',
   'UwayFinanceTests/DashboardMetricsAPITests.swift',
@@ -146,6 +150,8 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/password-reset-confirm-v0.15.0.json',
   'UwayFinanceTests/Fixtures/password-reset-errors-v0.15.0.json',
   'UwayFinanceTests/Fixtures/registration-errors-v0.15.0.json',
+  'UwayFinanceTests/Fixtures/health-verified-account-email-v0.16.1.json',
+  'UwayFinanceTests/Fixtures/capabilities-verified-account-email-v0.16.1.json',
   'UwayFinanceTests/Fixtures/health-verified-account-email-v0.16.0.json',
   'UwayFinanceTests/Fixtures/capabilities-verified-account-email-v0.16.0.json',
   'UwayFinanceTests/Fixtures/registration-pending-v0.16.0.json',
@@ -243,6 +249,8 @@ const fixtures = [
   'password-reset-confirm-v0.15.0.json',
   'password-reset-errors-v0.15.0.json',
   'registration-errors-v0.15.0.json',
+  'health-verified-account-email-v0.16.1.json',
+  'capabilities-verified-account-email-v0.16.1.json',
   'health-verified-account-email-v0.16.0.json',
   'capabilities-verified-account-email-v0.16.0.json',
   'registration-pending-v0.16.0.json',
@@ -466,8 +474,8 @@ if (contractSnapshot.money?.legacyStateEncoding !== 'json_number'
   throw new Error('backend contract snapshot money boundary mismatch')
 }
 
-const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-verified-account-email-v0.16.0.json'), 'utf8'))
-const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-verified-account-email-v0.16.0.json'), 'utf8'))
+const capabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-verified-account-email-v0.16.1.json'), 'utf8'))
+const healthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-verified-account-email-v0.16.1.json'), 'utf8'))
 if (healthFixture.version !== expectedBackendVersion
     || healthFixture.financeSchemaVersion !== expectedFinanceSchemaVersion) {
   throw new Error('semantic preference-memory v2 health fixture version/schema mismatch')
@@ -553,7 +561,21 @@ if (capabilitiesFixture.sync?.financeResources?.available !== true
     || capabilitiesFixture.sync?.financeResources?.cutoverState !== 'shadow'
     || capabilitiesFixture.sync?.financeResources?.cutoverReadiness?.clientWritesEnabled !== false
     || capabilitiesFixture.sync?.financeResources?.businessRecords?.moneyEncoding !== 'decimal_string') {
-  throw new Error('current 0.16.0 capabilities fixture must preserve read-only readiness and the shadow resource slice')
+  throw new Error('current 0.16.1 capabilities fixture must preserve read-only readiness and the shadow resource slice')
+}
+const historicalV0160Snapshot = JSON.parse(fs.readFileSync(path.join(root, 'ContractSnapshots', 'backend-api-v0.16.0.json'), 'utf8'))
+const historicalV0160CapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-verified-account-email-v0.16.0.json'), 'utf8'))
+const historicalV0160HealthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-verified-account-email-v0.16.0.json'), 'utf8'))
+if (historicalV0160Snapshot.version !== '0.16.0'
+    || historicalV0160Snapshot.backendAppVersion !== '0.16.0'
+    || historicalV0160Snapshot.apiContractVersion !== expectedAPIContractVersion
+    || historicalV0160Snapshot.financeSchemaVersion !== expectedFinanceSchemaVersion
+    || historicalV0160HealthFixture.version !== '0.16.0'
+    || historicalV0160HealthFixture.financeSchemaVersion !== expectedFinanceSchemaVersion
+    || historicalV0160CapabilitiesFixture.version !== '0.16.0'
+    || historicalV0160CapabilitiesFixture.apiContractVersion !== expectedAPIContractVersion
+    || historicalV0160CapabilitiesFixture.financeSchemaVersion !== expectedFinanceSchemaVersion) {
+  throw new Error('historical 0.16.0 snapshot and fixtures must remain immutable compatibility evidence')
 }
 const historicalV0141CapabilitiesFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'capabilities-aliyun-sms-v0.14.1.json'), 'utf8'))
 const historicalV0141HealthFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'health-aliyun-sms-v0.14.1.json'), 'utf8'))
@@ -1029,6 +1051,15 @@ for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amo
   if (!financeModels.includes(marker)) throw new Error(`legacy compatibility model marker missing: ${marker}`)
 }
 
+const financeDerivations = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'FinanceDerivations.swift'), 'utf8')
+for (const marker of ['businessDateDescendingStable', 'lhs.offset < rhs.offset', 'Dictionary(grouping: businessDateDescendingStable)']) {
+  if (!financeDerivations.includes(marker)) throw new Error(`stable business-date ordering marker missing: ${marker}`)
+}
+const workbench = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'WorkbenchView.swift'), 'utf8')
+if (!workbench.includes('session.state.records.businessDateDescendingStable.prefix(4)')) {
+  throw new Error('workbench recent activity must share stable business-date ordering')
+}
+
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
 for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningStates', 'semantic-preference-v2', 'complete_link_semantic', 'RegistrationCapability', 'RegistrationEmailVerificationCapability', 'safeForEmailLinkRegistration', 'AuthenticationCapability', 'PasswordRecoveryCapability', 'supportsIdentityContract', 'safeForIdentifierLogin', 'sms_webhook', 'aliyun_sms', 'aliyun_direct_mail', 'registration_verification', 'email_link', 'url_fragment_then_post_body', 'after_email_confirmation', 'pendingTenantCreated', 'nfkc_lowercase', 'indistinguishable', 'all_sessions', 'http_only_secure_same_site_strict', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', 'safeForAccountBookUse', 'sharedWithinAccountBook', 'idempotencyReplayHeader', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
@@ -1499,6 +1530,7 @@ if (hasLocalBackend) {
 
 const ledger = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'LedgerView.swift'), 'utf8')
 if (!ledger.includes('fixedControls') || !ledger.includes('ledgerScroll')) throw new Error('ledger fixed/scroll boundary missing')
+if (!ledger.includes('.businessDateDescendingStable')) throw new Error('ledger must use stable business-date ordering')
 if (ledger.includes('pinnedViews:')) throw new Error('month headings must not be sticky')
 for (const marker of ['查看附件（', 'evidenceCoverageStore.coverage(for:', 'autoPreviewFirstSupported: true', '当前不显示“材料齐全”结论']) {
   if (!ledger.includes(marker)) throw new Error(`ledger evidence integration marker missing: ${marker}`)

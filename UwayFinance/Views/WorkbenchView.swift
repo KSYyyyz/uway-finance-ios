@@ -17,6 +17,10 @@ struct WorkbenchView: View {
         return session.state.records.filter { $0.date.hasPrefix(month) }
     }
 
+    private var recentRecords: [BusinessRecord] {
+        Array(session.state.records.businessDateDescendingStable.prefix(4))
+    }
+
     private var canEditRecords: Bool {
         guard case .available(let contract) = session.serverState else { return false }
         return contract.capabilities.legacyState.writable
@@ -147,7 +151,7 @@ struct WorkbenchView: View {
                 ContentUnavailableView("还没有账目", systemImage: "tray", description: Text("点击右上角加号记一笔"))
                     .frame(minHeight: 170)
             } else {
-                ForEach(session.state.records.sorted { $0.date > $1.date }.prefix(4)) { record in
+                ForEach(recentRecords) { record in
                     NavigationLink {
                         RecordDetailView(route: RecordDeepLinkRoute(
                             recordID: record.id,
@@ -159,7 +163,7 @@ struct WorkbenchView: View {
                             .padding(.vertical, 10)
                     }
                     .buttonStyle(.plain)
-                    if record.id != session.state.records.sorted(by: { $0.date > $1.date }).prefix(4).last?.id {
+                    if record.id != recentRecords.last?.id {
                         Divider()
                     }
                 }

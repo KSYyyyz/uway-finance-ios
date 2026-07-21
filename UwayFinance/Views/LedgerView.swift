@@ -68,7 +68,7 @@ struct LedgerView: View {
             let haystack = "\(record.counterparty) \(record.project) \(record.description) \(record.amount)".lowercased()
             return matchesPeriod && matchesFilter && (normalized.isEmpty || haystack.contains(normalized))
         }
-        .sorted { $0.date > $1.date }
+        .businessDateDescendingStable
     }
 
     private var income: Double { filteredRecords.filter { $0.direction == .income }.reduce(0) { $0 + $1.amount } }

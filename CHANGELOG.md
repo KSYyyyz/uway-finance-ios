@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.1 - 2026-07-21
+
+- Align build 16 with backend app `0.16.1`; API contract `20260721_014`, finance schema `20260721_011_verified_account_email`, capabilities and all authentication/session/multi-tenant/evidence boundaries remain unchanged.
+- Audit iOS ledger and workbench ordering. Date descending already existed, but same-day ordering was not contractually stable: ledger groups reordered by record ID and ordinary sorting did not guarantee tie order. A shared stable business-date ordering now preserves the source sequence for equal dates in both the ledger and “最近动态”.
+- Add regression coverage for cross-month/day ordering and equal-date stability. Preserve all v0.16.0 and earlier snapshots/fixtures unchanged as backward-compatible evidence.
+
 ## 0.16.0 - 2026-07-21
 
 - Align build 15 with backend app `0.16.0`, API contract `20260721_014` and finance schema `20260721_011_verified_account_email` while retaining all v0.15.0 and earlier snapshots and fixtures unchanged.

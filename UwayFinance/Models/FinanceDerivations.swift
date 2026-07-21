@@ -63,8 +63,21 @@ struct LedgerMonthGroup: Identifiable {
 }
 
 extension Array where Element == BusinessRecord {
+    /// Orders records by their canonical `yyyy-MM-dd` business date while
+    /// preserving the source order for records that occurred on the same day.
+    var businessDateDescendingStable: [BusinessRecord] {
+        enumerated()
+            .sorted { lhs, rhs in
+                if lhs.element.date != rhs.element.date {
+                    return lhs.element.date > rhs.element.date
+                }
+                return lhs.offset < rhs.offset
+            }
+            .map(\.element)
+    }
+
     var ledgerGroups: [LedgerMonthGroup] {
-        let months = Dictionary(grouping: self) { String($0.date.prefix(7)) }
+        let months = Dictionary(grouping: businessDateDescendingStable) { String($0.date.prefix(7)) }
         return months.keys.sorted(by: >).map { month in
             let records = months[month, default: []]
             let recordsByDay = Dictionary(grouping: records, by: \.date)
@@ -73,7 +86,7 @@ extension Array where Element == BusinessRecord {
                 .map { date in
                     LedgerDayGroup(
                         date: date,
-                        records: recordsByDay[date, default: []].sorted { $0.id < $1.id }
+                        records: recordsByDay[date, default: []]
                     )
                 }
             return LedgerMonthGroup(month: month, days: days)
