@@ -268,7 +268,7 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
         XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
         XCTAssertTrue(contract.capabilities.registration.supportsIdentityContract)
-        XCTAssertFalse(contract.capabilities.registration.safeForVerifiedEmailRegistration)
+        XCTAssertFalse(contract.capabilities.registration.safeForEmailLinkRegistration)
         XCTAssertEqual(contract.capabilities.registration.usernameAvailabilityEndpoint, "/api/auth/username-availability")
         XCTAssertEqual(contract.capabilities.registration.usernameLength, CapabilityLengthRange(min: 3, max: 32))
         XCTAssertEqual(contract.capabilities.registration.passwordLength, CapabilityLengthRange(min: 8, max: 256))
@@ -296,27 +296,33 @@ final class BackendContractTests: XCTestCase {
         XCTAssertEqual(contract.financeSchemaVersion, BackendContract.verifiedAccountEmailSchema)
         XCTAssertEqual(contract.capabilities.syncMode, .legacyStateV1)
         XCTAssertEqual(contract.capabilities.financeResources.cutoverState, "shadow")
-        XCTAssertTrue(contract.capabilities.registration.safeForVerifiedEmailRegistration)
-        XCTAssertEqual(
-            contract.capabilities.registration.emailCodeEndpoint,
-            "/api/auth/registration-email-code"
-        )
+        XCTAssertTrue(contract.capabilities.registration.safeForEmailLinkRegistration)
         XCTAssertEqual(contract.capabilities.registration.emailVerificationRequired, true)
         XCTAssertEqual(
             contract.capabilities.registration.emailVerification?.purpose,
             "registration_verification"
         )
         XCTAssertEqual(
-            contract.capabilities.registration.emailVerification?.delivery,
-            "aliyun_direct_mail"
+            contract.capabilities.registration.emailVerification?.strategy,
+            "email_link"
         )
         XCTAssertEqual(
-            contract.capabilities.registration.emailVerification?.codeStorage,
-            "hmac_sha256_digest_only"
+            contract.capabilities.registration.emailVerification?.confirmEndpoint,
+            "/api/auth/registration-email/confirm"
         )
         XCTAssertEqual(
-            contract.capabilities.registration.emailVerification?.unknownEmailResponse,
-            "indistinguishable"
+            contract.capabilities.registration.emailVerification?.resendEndpoint,
+            "/api/auth/registration-email/resend"
+        )
+        XCTAssertEqual(contract.capabilities.registration.emailVerification?.delivery, "aliyun_direct_mail")
+        XCTAssertEqual(contract.capabilities.registration.emailVerification?.tokenStorage, "hmac_sha256_digest_only")
+        XCTAssertEqual(contract.capabilities.registration.emailVerification?.tokenTransport, "url_fragment_then_post_body")
+        XCTAssertEqual(contract.capabilities.registration.emailVerification?.activation, "after_email_confirmation")
+        XCTAssertEqual(contract.capabilities.registration.emailVerification?.pendingTenantCreated, false)
+        XCTAssertEqual(contract.capabilities.registration.emailVerification?.unknownPendingResponse, "indistinguishable")
+        XCTAssertEqual(
+            contract.capabilities.registration.createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation,
+            true
         )
         XCTAssertTrue(contract.capabilities.passwordRecovery.safeForClientUse)
         XCTAssertEqual(contract.capabilities.passwordRecovery.delivery, "aliyun_direct_mail")
@@ -324,18 +330,30 @@ final class BackendContractTests: XCTestCase {
         XCTAssertFalse(contract.capabilities.safety.aiMayPostJournalVouchers)
     }
 
-    func testVerifiedEmailRegistrationFailsClosedForMissingDeliveryOrWrongPurpose() {
+    func testEmailLinkRegistrationFailsClosedForMissingDeliveryOrWrongPurpose() {
         let missingDelivery = RegistrationEmailVerificationCapability(
             purpose: "registration_verification",
+            strategy: "email_link",
+            confirmEndpoint: "/api/auth/registration-email/confirm",
+            resendEndpoint: "/api/auth/registration-email/resend",
             delivery: nil,
-            codeStorage: "hmac_sha256_digest_only",
-            unknownEmailResponse: "indistinguishable"
+            tokenStorage: "hmac_sha256_digest_only",
+            tokenTransport: "url_fragment_then_post_body",
+            activation: "after_email_confirmation",
+            pendingTenantCreated: false,
+            unknownPendingResponse: "indistinguishable"
         )
         let resetPurpose = RegistrationEmailVerificationCapability(
             purpose: "password_reset",
+            strategy: "email_link",
+            confirmEndpoint: "/api/auth/registration-email/confirm",
+            resendEndpoint: "/api/auth/registration-email/resend",
             delivery: "aliyun_direct_mail",
-            codeStorage: "hmac_sha256_digest_only",
-            unknownEmailResponse: "indistinguishable"
+            tokenStorage: "hmac_sha256_digest_only",
+            tokenTransport: "url_fragment_then_post_body",
+            activation: "after_email_confirmation",
+            pendingTenantCreated: false,
+            unknownPendingResponse: "indistinguishable"
         )
 
         XCTAssertFalse(missingDelivery.safeForClientUse)
@@ -354,7 +372,6 @@ final class BackendContractTests: XCTestCase {
                 available: false,
                 reason: reason,
                 codeEndpoint: "/api/auth/registration-code",
-                emailCodeEndpoint: "/api/auth/registration-email-code",
                 registerEndpoint: "/api/auth/register",
                 usernameAvailabilityEndpoint: "/api/auth/username-availability",
                 phoneVerification: "aliyun_sms",
@@ -362,18 +379,25 @@ final class BackendContractTests: XCTestCase {
                 emailVerificationRequired: true,
                 emailVerification: RegistrationEmailVerificationCapability(
                     purpose: "registration_verification",
+                    strategy: "email_link",
+                    confirmEndpoint: "/api/auth/registration-email/confirm",
+                    resendEndpoint: "/api/auth/registration-email/resend",
                     delivery: "aliyun_direct_mail",
-                    codeStorage: "hmac_sha256_digest_only",
-                    unknownEmailResponse: "indistinguishable"
+                    tokenStorage: "hmac_sha256_digest_only",
+                    tokenTransport: "url_fragment_then_post_body",
+                    activation: "after_email_confirmation",
+                    pendingTenantCreated: false,
+                    unknownPendingResponse: "indistinguishable"
                 ),
                 usernameNormalization: "nfkc_lowercase",
                 usernameLength: CapabilityLengthRange(min: 3, max: 32),
                 passwordLength: CapabilityLengthRange(min: 8, max: 256),
-                createsIsolatedOrganizationAndAccountBook: true,
+                createsIsolatedOrganizationAndAccountBook: nil,
+                createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation: true,
                 sessionCookie: "http_only_secure_same_site_strict"
             )
 
-            XCTAssertFalse(capability.safeForVerifiedEmailRegistration)
+            XCTAssertFalse(capability.safeForEmailLinkRegistration)
             XCTAssertFalse(capability.unavailableMessage.isEmpty)
         }
     }

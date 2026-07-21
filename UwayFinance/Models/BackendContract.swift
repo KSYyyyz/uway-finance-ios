@@ -22,7 +22,6 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
     let available: Bool
     let reason: String?
     let codeEndpoint: String?
-    let emailCodeEndpoint: String?
     let registerEndpoint: String?
     let usernameAvailabilityEndpoint: String?
     let phoneVerification: String?
@@ -33,13 +32,13 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
     let usernameLength: CapabilityLengthRange?
     let passwordLength: CapabilityLengthRange?
     let createsIsolatedOrganizationAndAccountBook: Bool?
+    let createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation: Bool?
     let sessionCookie: String?
 
     init(
         available: Bool,
         reason: String?,
         codeEndpoint: String?,
-        emailCodeEndpoint: String? = nil,
         registerEndpoint: String?,
         usernameAvailabilityEndpoint: String? = nil,
         phoneVerification: String?,
@@ -50,12 +49,12 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
         usernameLength: CapabilityLengthRange? = nil,
         passwordLength: CapabilityLengthRange? = nil,
         createsIsolatedOrganizationAndAccountBook: Bool?,
+        createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation: Bool? = nil,
         sessionCookie: String?
     ) {
         self.available = available
         self.reason = reason
         self.codeEndpoint = codeEndpoint
-        self.emailCodeEndpoint = emailCodeEndpoint
         self.registerEndpoint = registerEndpoint
         self.usernameAvailabilityEndpoint = usernameAvailabilityEndpoint
         self.phoneVerification = phoneVerification
@@ -66,6 +65,7 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
         self.usernameLength = usernameLength
         self.passwordLength = passwordLength
         self.createsIsolatedOrganizationAndAccountBook = createsIsolatedOrganizationAndAccountBook
+        self.createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation = createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation
         self.sessionCookie = sessionCookie
     }
 
@@ -74,7 +74,8 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
             && codeEndpoint == "/api/auth/registration-code"
             && registerEndpoint == "/api/auth/register"
             && phoneVerification.map { Self.supportedPhoneVerification.contains($0) } == true
-            && createsIsolatedOrganizationAndAccountBook == true
+            && (createsIsolatedOrganizationAndAccountBook == true
+                || createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation == true)
             && sessionCookie == "http_only_secure_same_site_strict"
         guard baseContract else { return false }
         guard emailRequired != true else { return supportsIdentityContract }
@@ -89,15 +90,15 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
             && passwordLength == CapabilityLengthRange(min: 8, max: 256)
     }
 
-    var safeForVerifiedEmailRegistration: Bool {
+    var safeForEmailLinkRegistration: Bool {
         safeForClientUse
-            && emailCodeEndpoint == "/api/auth/registration-email-code"
             && emailVerificationRequired == true
             && emailVerification?.safeForClientUse == true
+            && createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation == true
     }
 
     var statusDisplay: String {
-        if safeForVerifiedEmailRegistration { return "手机和邮箱双验证可用" }
+        if safeForEmailLinkRegistration { return "手机验证与邮件激活可用" }
         if safeForClientUse { return "仅兼容旧版手机验证" }
         if reason == "sms_provider_not_configured" { return "短信服务未配置" }
         if reason == "email_provider_not_configured" { return "邮件服务未配置" }
@@ -113,8 +114,10 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
             "服务器尚未配置注册邮件服务，当前不能注册新账号。"
         case "verification_pepper_not_configured":
             "服务器验证码安全配置尚未完成，当前不能注册新账号。"
+        case "app_origin_not_configured":
+            "服务器尚未配置注册邮件确认地址，当前不能注册新账号。"
         default:
-            "服务器暂未开放手机与邮箱双重验证注册能力。"
+            "服务器暂未开放手机验证与邮件链接激活注册能力。"
         }
     }
 
@@ -122,7 +125,6 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
         available: false,
         reason: "capabilities_unavailable",
         codeEndpoint: nil,
-        emailCodeEndpoint: nil,
         registerEndpoint: nil,
         usernameAvailabilityEndpoint: nil,
         phoneVerification: nil,
@@ -133,23 +135,34 @@ struct RegistrationCapability: Codable, Equatable, Sendable {
         usernameLength: nil,
         passwordLength: nil,
         createsIsolatedOrganizationAndAccountBook: nil,
+        createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation: nil,
         sessionCookie: nil
     )
 }
 
 struct RegistrationEmailVerificationCapability: Codable, Equatable, Sendable {
-    private static let supportedDeliveries = Set(["email_webhook", "aliyun_direct_mail"])
-
     let purpose: String?
+    let strategy: String?
+    let confirmEndpoint: String?
+    let resendEndpoint: String?
     let delivery: String?
-    let codeStorage: String?
-    let unknownEmailResponse: String?
+    let tokenStorage: String?
+    let tokenTransport: String?
+    let activation: String?
+    let pendingTenantCreated: Bool?
+    let unknownPendingResponse: String?
 
     var safeForClientUse: Bool {
         purpose == "registration_verification"
-            && delivery.map { Self.supportedDeliveries.contains($0) } == true
-            && codeStorage == "hmac_sha256_digest_only"
-            && unknownEmailResponse == "indistinguishable"
+            && strategy == "email_link"
+            && confirmEndpoint == "/api/auth/registration-email/confirm"
+            && resendEndpoint == "/api/auth/registration-email/resend"
+            && delivery == "aliyun_direct_mail"
+            && tokenStorage == "hmac_sha256_digest_only"
+            && tokenTransport == "url_fragment_then_post_body"
+            && activation == "after_email_confirmation"
+            && pendingTenantCreated == false
+            && unknownPendingResponse == "indistinguishable"
     }
 }
 

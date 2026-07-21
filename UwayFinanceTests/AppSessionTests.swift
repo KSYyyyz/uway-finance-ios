@@ -25,7 +25,7 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(contract.capabilities.classificationPreferenceMemory?.semanticV2SafeForClientUse, true)
         XCTAssertTrue(contract.capabilities.registration.safeForClientUse)
         XCTAssertTrue(contract.capabilities.registration.supportsIdentityContract)
-        XCTAssertTrue(contract.capabilities.registration.safeForVerifiedEmailRegistration)
+        XCTAssertTrue(contract.capabilities.registration.safeForEmailLinkRegistration)
         XCTAssertTrue(contract.capabilities.authentication.safeForIdentifierLogin)
         XCTAssertTrue(contract.capabilities.passwordRecovery.safeForClientUse)
         XCTAssertTrue(contract.capabilities.documentUploadCapability.safeForClientUse)
@@ -455,39 +455,55 @@ final class AppSessionTests: XCTestCase {
         XCTAssertEqual(event?.fileName, "records.csv")
     }
 
-    func testRegistrationCreatesAuthenticatedIsolatedSessionWithoutPersistingSecrets() async throws {
+    func testRegistrationRemainsSignedOutUntilEmailLinkConfirmation() async throws {
         let empty = StateEnvelope(data: .empty, updatedAt: nil)
         let api = FinanceAPISpy(fetchEnvelopes: [empty])
         let session = AppSession(api: api, saveDelay: .zero)
         await session.checkServer()
 
         let challenge = try await session.requestRegistrationCode(phone: "+8613800138000")
-        let emailChallenge = try await session.requestRegistrationEmailCode(email: "owner@example.com")
         XCTAssertEqual(challenge.expiresInSeconds, 300)
         XCTAssertEqual(challenge.resendAfterSeconds, 60)
-        XCTAssertEqual(emailChallenge.expiresInSeconds, 600)
-        XCTAssertEqual(emailChallenge.resendAfterSeconds, 60)
-        try await session.register(RegistrationRequest(
+        let pending = try await session.register(RegistrationRequest(
             username: "new_owner",
             email: "owner@example.com",
             password: "SecurePass2026",
             phone: "+8613800138000",
             challengeId: challenge.challengeId,
-            code: "246810",
-            emailChallengeId: emailChallenge.challengeId,
-            emailCode: "135790"
+            code: "246810"
         ))
 
-        XCTAssertEqual(session.phase, .signedIn)
-        XCTAssertEqual(session.user, SessionUser(id: "201", username: "new_owner"))
+        XCTAssertEqual(pending.pendingRegistrationId, "pending_20260721_abcdefghijklmnop")
+        XCTAssertEqual(session.phase, .signedOut)
+        XCTAssertNil(session.user)
         XCTAssertEqual(session.state, .empty)
         XCTAssertEqual(session.stateRevision, .empty)
+        let fetchCountBeforeConfirmation = await api.fetchStateCallCount()
+        XCTAssertEqual(fetchCountBeforeConfirmation, 0)
         let request = await api.lastRegistrationRequest()
         XCTAssertEqual(request?.challengeId, challenge.challengeId)
         XCTAssertEqual(request?.code, "246810")
-        XCTAssertEqual(request?.emailChallengeId, emailChallenge.challengeId)
-        XCTAssertEqual(request?.emailCode, "135790")
         XCTAssertEqual(request?.email, "owner@example.com")
+
+        let resent = try await session.resendRegistrationEmail(pendingRegistrationId: pending.pendingRegistrationId)
+        XCTAssertEqual(resent.pendingRegistrationId, pending.pendingRegistrationId)
+        let resendID = await api.lastRegistrationEmailResendID()
+        XCTAssertEqual(resendID, pending.pendingRegistrationId)
+    }
+
+    func testEmailLinkConfirmationIsTheOnlyRegistrationStepThatEstablishesSession() async throws {
+        let api = FinanceAPISpy(fetchEnvelopes: [StateEnvelope(data: .empty, updatedAt: nil)])
+        let session = AppSession(api: api, saveDelay: .zero)
+        await session.checkServer()
+
+        try await session.confirmRegistrationEmail(token: "opaque-email-link-token")
+
+        XCTAssertEqual(session.phase, .signedIn)
+        XCTAssertEqual(session.user, SessionUser(id: "201", username: "new_owner"))
+        let confirmedToken = await api.lastRegistrationEmailConfirmToken()
+        let fetchCount = await api.fetchStateCallCount()
+        XCTAssertEqual(confirmedToken, "opaque-email-link-token")
+        XCTAssertEqual(fetchCount, 1)
     }
 
     func testSlowLoginAResponseCannotOverwriteNewerUserB() async throws {
@@ -625,6 +641,8 @@ private actor FinanceAPISpy: FinanceAPI {
     private var saveUpdatedAts: [String]
     private var saveRevisions: [StateRevision] = []
     private var registrationRequests: [RegistrationRequest] = []
+    private var registrationEmailResendIDs: [String] = []
+    private var registrationEmailConfirmTokens: [String] = []
     private var legacyLoginFields: [Bool] = []
     private let loginDelays: [String: Duration]
 
@@ -654,6 +672,8 @@ private actor FinanceAPISpy: FinanceAPI {
     func fetchStateCallCount() -> Int { fetchStateCalls }
     func attemptedSaveRevisions() -> [StateRevision] { saveRevisions }
     func lastRegistrationRequest() -> RegistrationRequest? { registrationRequests.last }
+    func lastRegistrationEmailResendID() -> String? { registrationEmailResendIDs.last }
+    func lastRegistrationEmailConfirmToken() -> String? { registrationEmailConfirmTokens.last }
     func attemptedLegacyLoginFields() -> [Bool] { legacyLoginFields }
 
     func health() async throws -> HealthResponse {
@@ -686,20 +706,32 @@ private actor FinanceAPISpy: FinanceAPI {
         )
     }
 
-    func requestRegistrationEmailCode(email: String) async throws -> RegistrationEmailCodeResponse {
-        RegistrationEmailCodeResponse(
+    func register(_ request: RegistrationRequest) async throws -> PendingRegistrationResponse {
+        registrationRequests.append(request)
+        return PendingRegistrationResponse(
             ok: true,
-            challengeId: "email_20260721_abcdefghijklmnop",
-            expiresInSeconds: 600,
+            pendingRegistrationId: "pending_20260721_abcdefghijklmnop",
+            expiresInSeconds: 900,
             resendAfterSeconds: 60,
-            message: "如果该邮箱可用于注册，验证码将发送到邮箱。"
+            message: "请在 15 分钟内点击确认邮件中的链接完成注册。"
         )
     }
 
-    func register(_ request: RegistrationRequest) async throws -> RegistrationResponse {
-        registrationRequests.append(request)
-        return RegistrationResponse(
-            user: SessionUser(id: "201", username: request.username),
+    func resendRegistrationEmail(_ request: RegistrationEmailResendRequest) async throws -> PendingRegistrationResponse {
+        registrationEmailResendIDs.append(request.pendingRegistrationId)
+        return PendingRegistrationResponse(
+            ok: true,
+            pendingRegistrationId: request.pendingRegistrationId,
+            expiresInSeconds: 900,
+            resendAfterSeconds: 60,
+            message: "如果待确认注册仍有效，确认邮件将重新发送。"
+        )
+    }
+
+    func confirmRegistrationEmail(_ request: RegistrationEmailConfirmRequest) async throws -> RegistrationActivationResponse {
+        registrationEmailConfirmTokens.append(request.token)
+        return RegistrationActivationResponse(
+            user: SessionUser(id: "201", username: "new_owner"),
             organizationId: "301",
             accountBookId: "401"
         )

@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "pendingRegistrationId": "pending_20260721_abcdefghijklmnop",
+  "expiresInSeconds": 900,
+  "resendAfterSeconds": 60,
+  "message": "请在 15 分钟内点击确认邮件中的链接完成注册。"
+}

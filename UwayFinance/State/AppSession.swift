@@ -112,26 +112,40 @@ final class AppSession: ObservableObject {
     }
 
     func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse {
-        guard registrationCapability.safeForVerifiedEmailRegistration else {
+        guard registrationCapability.safeForEmailLinkRegistration else {
             throw APIError.unavailable(registrationCapability.unavailableMessage)
         }
         return try await api.requestRegistrationCode(phone: phone)
     }
 
-    func requestRegistrationEmailCode(email: String) async throws -> RegistrationEmailCodeResponse {
-        guard registrationCapability.safeForVerifiedEmailRegistration else {
+    func register(_ request: RegistrationRequest) async throws -> PendingRegistrationResponse {
+        guard registrationCapability.safeForEmailLinkRegistration else {
             throw APIError.unavailable(registrationCapability.unavailableMessage)
         }
-        return try await api.requestRegistrationEmailCode(email: email)
+        guard phase != .signedIn else {
+            throw APIError.unavailable("请先退出当前账号，再注册新账号")
+        }
+        let response = try await api.register(request)
+        phase = .signedOut
+        return response
     }
 
-    func register(_ request: RegistrationRequest) async throws {
-        guard registrationCapability.safeForVerifiedEmailRegistration else {
+    func resendRegistrationEmail(pendingRegistrationId: String) async throws -> PendingRegistrationResponse {
+        guard registrationCapability.safeForEmailLinkRegistration else {
+            throw APIError.unavailable(registrationCapability.unavailableMessage)
+        }
+        return try await api.resendRegistrationEmail(RegistrationEmailResendRequest(
+            pendingRegistrationId: pendingRegistrationId
+        ))
+    }
+
+    func confirmRegistrationEmail(token: String) async throws {
+        guard registrationCapability.safeForEmailLinkRegistration else {
             throw APIError.unavailable(registrationCapability.unavailableMessage)
         }
         let generation = beginSessionTransition()
         do {
-            let response = try await api.register(request)
+            let response = try await api.confirmRegistrationEmail(RegistrationEmailConfirmRequest(token: token))
             try await establishAuthenticatedSession(user: response.user, generation: generation)
         } catch {
             if generation == sessionGeneration { phase = .signedOut }

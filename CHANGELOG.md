@@ -3,9 +3,10 @@
 ## 0.16.0 - 2026-07-21
 
 - Align build 15 with backend app `0.16.0`, API contract `20260721_014` and finance schema `20260721_011_verified_account_email` while retaining all v0.15.0 and earlier snapshots and fixtures unchanged.
-- Add capability-gated `POST /api/auth/registration-email-code` with an indistinguishable 202 response, independent TTL/resend state and fail-closed provider handling for `email_webhook` and `aliyun_direct_mail`.
-- Require separate phone `challengeId/code` and email `emailChallengeId/emailCode` in native registration. Editing either identity clears only its own challenge; both must be current before registration can be submitted.
-- Keep email registration purpose `registration_verification` separate from password-reset challenges, with no code/challenge persistence, logging, URL leakage or client-side fallback.
+- Replace the withdrawn email-code registration proposal with the frozen pending-registration flow: `POST /api/auth/register` consumes only the SMS challenge and returns a 202 pending ID without creating a user, tenant, account book or session.
+- Add capability-gated email-link resend and confirm DTOs. The server keeps only a purpose-isolated HMAC-SHA-256 token digest; resend rotates the token and confirmation is the only step allowed to atomically activate the account and session.
+- Add a native pending-confirmation screen with link expiry, safe resend and a return-to-login path. iOS does not claim to share Safari's HttpOnly cookie or invent an unfrozen polling/universal-link contract.
+- Use one accessible visibility control on the registration password row to control both password fields; the confirmation row has no duplicate eye button.
 - Preserve unified identifier login, username checks, accessible password visibility, all-session reset cleanup, legacy `/api/state` synchronization, shadow Finance V2 and every existing AI/evidence/multi-tenant safety boundary.
 
 ## 0.15.0 - 2026-07-20

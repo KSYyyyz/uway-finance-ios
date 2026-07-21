@@ -118,21 +118,26 @@
     },
     "registration": {
       "availability": "runtime",
-      "reasonWhenUnavailable": "sms_provider_not_configured|email_provider_not_configured|verification_pepper_not_configured",
+      "reasonWhenUnavailable": "sms_provider_not_configured|email_provider_not_configured|app_origin_not_configured|verification_pepper_not_configured",
       "codeEndpoint": "/api/auth/registration-code",
-      "emailCodeEndpoint": "/api/auth/registration-email-code",
       "registerEndpoint": "/api/auth/register",
       "phoneVerification": "aliyun_sms",
-      "createsIsolatedOrganizationAndAccountBook": true,
+      "createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation": true,
       "sessionCookie": "http_only_secure_same_site_strict",
       "usernameAvailabilityEndpoint": "/api/auth/username-availability",
       "emailRequired": true,
       "emailVerificationRequired": true,
       "emailVerification": {
         "purpose": "registration_verification",
+        "strategy": "email_link",
+        "confirmEndpoint": "/api/auth/registration-email/confirm",
+        "resendEndpoint": "/api/auth/registration-email/resend",
         "delivery": "aliyun_direct_mail",
-        "codeStorage": "hmac_sha256_digest_only",
-        "unknownEmailResponse": "indistinguishable"
+        "tokenStorage": "hmac_sha256_digest_only",
+        "tokenTransport": "url_fragment_then_post_body",
+        "activation": "after_email_confirmation",
+        "pendingTenantCreated": false,
+        "unknownPendingResponse": "indistinguishable"
       },
       "usernameNormalization": "nfkc_lowercase",
       "usernameLength": {
@@ -232,8 +237,13 @@
     },
     {
       "method": "post",
-      "path": "/api/auth/registration-email-code",
-      "swift": "method: .post, path: \"/api/auth/registration-email-code\""
+      "path": "/api/auth/registration-email/resend",
+      "swift": "method: .post, path: \"/api/auth/registration-email/resend\""
+    },
+    {
+      "method": "post",
+      "path": "/api/auth/registration-email/confirm",
+      "swift": "method: .post, path: \"/api/auth/registration-email/confirm\""
     },
     {
       "method": "post",

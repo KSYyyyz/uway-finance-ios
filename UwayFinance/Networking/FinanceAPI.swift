@@ -21,8 +21,9 @@ protocol FinanceAPI: Sendable {
     func login(identifier: String, password: String, useLegacyUsernameField: Bool) async throws -> SessionUser
     func usernameAvailability(_ request: UsernameAvailabilityRequest) async throws -> UsernameAvailabilityResponse
     func requestRegistrationCode(phone: String) async throws -> RegistrationCodeResponse
-    func requestRegistrationEmailCode(email: String) async throws -> RegistrationEmailCodeResponse
-    func register(_ request: RegistrationRequest) async throws -> RegistrationResponse
+    func register(_ request: RegistrationRequest) async throws -> PendingRegistrationResponse
+    func resendRegistrationEmail(_ request: RegistrationEmailResendRequest) async throws -> PendingRegistrationResponse
+    func confirmRegistrationEmail(_ request: RegistrationEmailConfirmRequest) async throws -> RegistrationActivationResponse
     func requestPasswordReset(_ request: PasswordResetRequest) async throws -> PasswordResetChallengeResponse
     func confirmPasswordReset(_ request: PasswordResetConfirmRequest) async throws -> PasswordResetConfirmResponse
     func currentUser() async throws -> SessionUser
@@ -66,13 +67,19 @@ actor LiveFinanceAPI: FinanceAPI {
         try await transport.send(.registrationCode, body: RegistrationCodeRequest(phone: phone))
     }
 
-    func requestRegistrationEmailCode(email: String) async throws -> RegistrationEmailCodeResponse {
-        try await transport.send(.registrationEmailCode, body: RegistrationEmailCodeRequest(email: email))
-    }
-
-    func register(_ request: RegistrationRequest) async throws -> RegistrationResponse {
+    func register(_ request: RegistrationRequest) async throws -> PendingRegistrationResponse {
         try await serializedAuthenticationRequest {
             try await self.transport.send(.register, body: request)
+        }
+    }
+
+    func resendRegistrationEmail(_ request: RegistrationEmailResendRequest) async throws -> PendingRegistrationResponse {
+        try await transport.send(.registrationEmailResend, body: request)
+    }
+
+    func confirmRegistrationEmail(_ request: RegistrationEmailConfirmRequest) async throws -> RegistrationActivationResponse {
+        try await serializedAuthenticationRequest {
+            try await self.transport.send(.registrationEmailConfirm, body: request)
         }
     }
 

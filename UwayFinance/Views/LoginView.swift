@@ -14,6 +14,13 @@ private struct ActiveAuthenticationChallenge: Equatable {
     let resendAt: Date
 }
 
+private struct PendingRegistrationState: Equatable {
+    let id: String
+    let expiresAt: Date
+    let resendAt: Date
+    let message: String
+}
+
 private enum UsernameCheckState: Equatable {
     case idle
     case checking
@@ -25,7 +32,7 @@ private enum UsernameCheckState: Equatable {
 struct LoginView: View {
     private enum Field: Hashable {
         case loginIdentifier, loginPassword
-        case registerUsername, email, emailCode, phone, code, password, confirmation
+        case registerUsername, email, phone, code, password, confirmation
         case recoveryEmail, recoveryCode, recoveryPassword, recoveryConfirmation
     }
 
@@ -35,13 +42,12 @@ struct LoginView: View {
     @State private var loginPassword = ""
     @State private var registerUsername = ""
     @State private var email = ""
-    @State private var emailCode = ""
     @State private var phone = ""
     @State private var code = ""
     @State private var registerPassword = ""
     @State private var passwordConfirmation = ""
     @State private var registrationChallenge: ActiveAuthenticationChallenge?
-    @State private var registrationEmailChallenge: ActiveAuthenticationChallenge?
+    @State private var pendingRegistration: PendingRegistrationState?
     @State private var usernameCheck: UsernameCheckState = .idle
     @State private var recoveryEmail = ""
     @State private var recoveryCode = ""
@@ -50,13 +56,13 @@ struct LoginView: View {
     @State private var recoveryChallenge: ActiveAuthenticationChallenge?
     @State private var isSubmitting = false
     @State private var isRequestingPhoneCode = false
-    @State private var isRequestingEmailCode = false
+    @State private var isResendingRegistrationEmail = false
+    @State private var isConfirmingRegistrationEmail = false
     @State private var isRequestingRecoveryCode = false
     @State private var errorMessage: String?
     @State private var successMessage: String?
     @State private var showLoginPassword = false
     @State private var showRegisterPassword = false
-    @State private var showRegisterConfirmation = false
     @State private var showRecoveryPassword = false
     @State private var showRecoveryConfirmation = false
     @FocusState private var focusedField: Field?
@@ -97,7 +103,7 @@ struct LoginView: View {
                 errorMessage = nil
                 if newMode != .login { successMessage = nil }
                 focusedField = nil
-                if newMode != .register { clearRegistrationSecrets() }
+                if newMode != .register { clearRegistrationState() }
                 if newMode != .recovery { clearRecoverySecrets() }
                 if newMode != .login { loginPassword = "" }
             }
@@ -108,13 +114,12 @@ struct LoginView: View {
                 guard let challenge = registrationChallenge else { return }
                 await monitorChallenge(challenge, kind: .registrationPhone)
             }
-            .task(id: registrationEmailChallenge?.id) {
-                guard let challenge = registrationEmailChallenge else { return }
-                await monitorChallenge(challenge, kind: .registrationEmail)
-            }
             .task(id: recoveryChallenge?.id) {
                 guard let challenge = recoveryChallenge else { return }
                 await monitorChallenge(challenge, kind: .recovery)
+            }
+            .onOpenURL { url in
+                Task { await handleRegistrationEmailLink(url) }
             }
         }
     }
@@ -137,7 +142,7 @@ struct LoginView: View {
     private var headerDescription: String {
         switch mode {
         case .login: "使用用户名、手机号或邮箱进入独立账套"
-        case .register: "同时验证手机和邮箱，创建独立企业与账套"
+        case .register: "先验证手机，再通过邮件链接激活独立企业与账套"
         case .recovery: "通过注册邮箱安全重置密码"
         }
     }
@@ -185,8 +190,18 @@ struct LoginView: View {
     }
 
     private var registrationCard: some View {
+        Group {
+            if let pendingRegistration {
+                pendingRegistrationCard(pendingRegistration)
+            } else {
+                registrationForm
+            }
+        }
+    }
+
+    private var registrationForm: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if !session.registrationCapability.safeForVerifiedEmailRegistration {
+            if !session.registrationCapability.safeForEmailLinkRegistration {
                 capabilityWarning(session.registrationCapability.unavailableMessage)
             }
 
@@ -211,21 +226,7 @@ struct LoginView: View {
                 .submitLabel(.next)
                 .onSubmit { focusedField = .phone }
                 .accessibilityLabel("注册邮箱")
-                .accessibilityHint("邮箱用于账号登录、注册验证和密码找回")
-                .onChange(of: email) { oldValue, newValue in
-                    if registrationEmailChallenge != nil, oldValue != newValue {
-                        registrationEmailChallenge = nil
-                        emailCode = ""
-                    }
-                }
-
-            codeRow(
-                title: "邮箱验证",
-                code: $emailCode,
-                challenge: registrationEmailChallenge,
-                focusedField: .emailCode,
-                kind: .registrationEmail
-            )
+                .accessibilityHint("邮箱用于接收一次性激活链接和找回密码；注册提交后还不会创建可用账号")
 
             TextField("手机号，例如 138… 或 +65…", text: $phone)
                 .textContentType(.telephoneNumber)
@@ -254,7 +255,8 @@ struct LoginView: View {
                 text: $registerPassword,
                 isVisible: $showRegisterPassword,
                 contentType: .newPassword,
-                accessibilityName: "注册密码"
+                accessibilityName: "注册密码",
+                controlsConfirmationVisibility: true
             )
             .focused($focusedField, equals: .password)
             .submitLabel(.next)
@@ -262,9 +264,10 @@ struct LoginView: View {
             PasswordEntry(
                 title: "确认密码",
                 text: $passwordConfirmation,
-                isVisible: $showRegisterConfirmation,
+                isVisible: $showRegisterPassword,
                 contentType: .newPassword,
-                accessibilityName: "确认注册密码"
+                accessibilityName: "确认注册密码",
+                showsVisibilityToggle: false
             )
             .focused($focusedField, equals: .confirmation)
             .submitLabel(.go)
@@ -278,11 +281,69 @@ struct LoginView: View {
             Button {
                 Task { await submitRegistration() }
             } label: {
-                submitLabel(progress: isSubmitting, idle: "注册并进入工作台", busy: "正在创建独立账套")
+                submitLabel(progress: isSubmitting, idle: "提交注册并发送确认邮件", busy: "正在验证手机并创建待激活注册")
             }
             .buttonStyle(.borderedProminent)
             .disabled(!canSubmitRegistration)
-            .accessibilityHint("验证手机和邮箱，并创建只属于当前新用户的企业和账套")
+            .accessibilityHint("验证手机验证码并发送一次性邮件链接；点击链接前不会创建用户、企业、账套或登录会话")
+        }
+        .appCard()
+    }
+
+    private func pendingRegistrationCard(_ pending: PendingRegistrationState) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("请确认注册邮箱", systemImage: "envelope.badge")
+                .font(.headline)
+                .foregroundStyle(AppTheme.brand)
+
+            Text(pending.message)
+                .font(.subheadline)
+
+            Text("点击邮件中的一次性确认链接后，服务器才会原子创建用户、企业和账套。链接中的令牌不会保存在本机。")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            statusMessage
+
+            if isConfirmingRegistrationEmail {
+                ProgressView("正在确认邮箱并创建账号")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel("正在确认注册邮箱并创建独立企业和账套")
+            }
+
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let expiry = remainingSeconds(until: pending.expiresAt, at: context.date)
+                let resend = remainingSeconds(until: pending.resendAt, at: context.date)
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(
+                        expiry > 0 ? "确认链接将在 \(expiry) 秒后失效" : "确认链接可能已失效，可重新发送",
+                        systemImage: expiry > 0 ? "clock" : "exclamationmark.circle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(expiry > 0 ? Color.secondary : AppTheme.warning)
+
+                    Button {
+                        Task { await resendRegistrationEmail() }
+                    } label: {
+                        submitLabel(
+                            progress: isResendingRegistrationEmail,
+                            idle: resend > 0 ? "\(resend) 秒后可重新发送" : "重新发送确认邮件",
+                            busy: "正在重新发送"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(resend > 0 || isResendingRegistrationEmail)
+                    .accessibilityHint("重新发送会旋转邮件令牌，旧确认链接立即失效")
+                }
+            }
+
+            Button("我已完成确认，返回登录") {
+                clearRegistrationState()
+                mode = .login
+                successMessage = "邮箱确认后，请使用用户名、手机号或邮箱登录。"
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityHint("iOS 不共享网页会话；完成邮件确认后使用账号密码登录")
         }
         .appCard()
     }
@@ -511,13 +572,11 @@ struct LoginView: View {
     }
 
     private var canSubmitRegistration: Bool {
-        session.registrationCapability.safeForVerifiedEmailRegistration
+        session.registrationCapability.safeForEmailLinkRegistration
             && registrationChallenge != nil
-            && registrationEmailChallenge != nil
             && usernameSubmissionAllowed
             && IdentityInputPolicy.isValidEmail(email)
             && code.count == 6
-            && emailCode.count == 6
             && (8...256).contains(registerPassword.count)
             && registrationPasswordIssue == nil
             && registerPassword == passwordConfirmation
@@ -557,11 +616,8 @@ struct LoginView: View {
         let capabilityAvailable: Bool
         switch kind {
         case .registrationPhone:
-            capabilityAvailable = session.registrationCapability.safeForVerifiedEmailRegistration
+            capabilityAvailable = session.registrationCapability.safeForEmailLinkRegistration
                 && !phone.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .registrationEmail:
-            capabilityAvailable = session.registrationCapability.safeForVerifiedEmailRegistration
-                && IdentityInputPolicy.isValidEmail(email)
         case .recovery:
             capabilityAvailable = session.passwordRecoveryCapability.safeForClientUse
                 && IdentityInputPolicy.isValidEmail(recoveryEmail)
@@ -584,7 +640,6 @@ struct LoginView: View {
     private func isRequestingCode(for kind: VerificationChallengeKind) -> Bool {
         switch kind {
         case .registrationPhone: isRequestingPhoneCode
-        case .registrationEmail: isRequestingEmailCode
         case .recovery: isRequestingRecoveryCode
         }
     }
@@ -593,7 +648,6 @@ struct LoginView: View {
     private func requestCode(for kind: VerificationChallengeKind) async {
         switch kind {
         case .registrationPhone: await requestRegistrationCode()
-        case .registrationEmail: await requestRegistrationEmailCode()
         case .recovery: await requestRecoveryCode()
         }
     }
@@ -657,28 +711,8 @@ struct LoginView: View {
     }
 
     @MainActor
-    private func requestRegistrationEmailCode() async {
-        isRequestingEmailCode = true
-        errorMessage = nil
-        successMessage = nil
-        defer { isRequestingEmailCode = false }
-        do {
-            let response = try await session.requestRegistrationEmailCode(
-                email: IdentityInputPolicy.normalizedEmail(email)
-            )
-            registrationEmailChallenge = challenge(from: response)
-            emailCode = ""
-            successMessage = response.message
-            focusedField = .emailCode
-        } catch {
-            errorMessage = RegistrationErrorMessage.localized(error)
-        }
-    }
-
-    @MainActor
     private func submitRegistration() async {
-        guard let challenge = registrationChallenge,
-              let emailChallenge = registrationEmailChallenge else { return }
+        guard let challenge = registrationChallenge else { return }
         guard registerPassword == passwordConfirmation else {
             errorMessage = "两次输入的密码不一致"
             return
@@ -688,29 +722,63 @@ struct LoginView: View {
         successMessage = nil
         defer { isSubmitting = false }
         do {
-            try await session.register(RegistrationRequest(
+            let response = try await session.register(RegistrationRequest(
                 username: registerUsername.trimmingCharacters(in: .whitespacesAndNewlines)
                     .precomposedStringWithCompatibilityMapping,
                 email: IdentityInputPolicy.normalizedEmail(email),
                 password: registerPassword,
                 phone: phone.trimmingCharacters(in: .whitespacesAndNewlines),
                 challengeId: challenge.id,
-                code: code,
-                emailChallengeId: emailChallenge.id,
-                emailCode: emailCode
+                code: code
             ))
             clearRegistrationSecrets()
+            registerUsername = ""
+            email = ""
+            phone = ""
+            pendingRegistration = pendingState(from: response)
+            successMessage = nil
         } catch {
             errorMessage = RegistrationErrorMessage.localized(error)
             if case APIError.server(_, let serverCode, _) = error {
                 if serverCode == "INVALID_REGISTRATION_CODE" {
                     registrationChallenge = nil
                     code = ""
-                } else if serverCode == "INVALID_REGISTRATION_EMAIL_CODE" {
-                    registrationEmailChallenge = nil
-                    emailCode = ""
                 }
             }
+        }
+    }
+
+    @MainActor
+    private func resendRegistrationEmail() async {
+        guard let pendingRegistration else { return }
+        isResendingRegistrationEmail = true
+        errorMessage = nil
+        successMessage = nil
+        defer { isResendingRegistrationEmail = false }
+        do {
+            let response = try await session.resendRegistrationEmail(
+                pendingRegistrationId: pendingRegistration.id
+            )
+            self.pendingRegistration = pendingState(from: response)
+            successMessage = response.message
+        } catch {
+            errorMessage = RegistrationErrorMessage.localized(error)
+        }
+    }
+
+    @MainActor
+    private func handleRegistrationEmailLink(_ url: URL) async {
+        guard !isConfirmingRegistrationEmail,
+              let token = RegistrationEmailLink.token(from: url) else { return }
+        isConfirmingRegistrationEmail = true
+        errorMessage = nil
+        successMessage = nil
+        defer { isConfirmingRegistrationEmail = false }
+        do {
+            try await session.confirmRegistrationEmail(token: token)
+            clearRegistrationState()
+        } catch {
+            errorMessage = RegistrationErrorMessage.localized(error)
         }
     }
 
@@ -777,18 +845,18 @@ struct LoginView: View {
         )
     }
 
-    private func challenge(from response: RegistrationEmailCodeResponse) -> ActiveAuthenticationChallenge {
+    private func pendingState(from response: PendingRegistrationResponse) -> PendingRegistrationState {
         let now = Date()
-        return ActiveAuthenticationChallenge(
-            id: response.challengeId,
+        return PendingRegistrationState(
+            id: response.pendingRegistrationId,
             expiresAt: now.addingTimeInterval(TimeInterval(response.expiresInSeconds)),
-            resendAt: now.addingTimeInterval(TimeInterval(response.resendAfterSeconds))
+            resendAt: now.addingTimeInterval(TimeInterval(response.resendAfterSeconds)),
+            message: response.message
         )
     }
 
     private enum VerificationChallengeKind: Equatable {
         case registrationPhone
-        case registrationEmail
         case recovery
     }
 
@@ -798,7 +866,6 @@ struct LoginView: View {
             let current: ActiveAuthenticationChallenge?
             switch kind {
             case .registrationPhone: current = registrationChallenge
-            case .registrationEmail: current = registrationEmailChallenge
             case .recovery: current = recoveryChallenge
             }
             guard current?.id == monitored.id else { return }
@@ -807,15 +874,10 @@ struct LoginView: View {
                 case .registrationPhone:
                     registrationChallenge = nil
                     code = ""
-                case .registrationEmail:
-                    registrationEmailChallenge = nil
-                    emailCode = ""
                 case .recovery:
                     clearRecoveryChallenge()
                 }
-                errorMessage = kind == .registrationEmail
-                    ? "邮箱验证码已过期，请重新获取"
-                    : "验证码已过期，请重新获取"
+                errorMessage = "验证码已过期，请重新获取"
                 return
             }
             try? await Task.sleep(for: .seconds(1))
@@ -827,10 +889,16 @@ struct LoginView: View {
         passwordConfirmation = ""
         code = ""
         registrationChallenge = nil
-        emailCode = ""
-        registrationEmailChallenge = nil
         showRegisterPassword = false
-        showRegisterConfirmation = false
+    }
+
+    private func clearRegistrationState() {
+        clearRegistrationSecrets()
+        pendingRegistration = nil
+        registerUsername = ""
+        email = ""
+        phone = ""
+        usernameCheck = .idle
     }
 
     private func clearRecoveryChallenge() {
@@ -854,6 +922,8 @@ private struct PasswordEntry: View {
     @Binding var isVisible: Bool
     let contentType: UITextContentType
     let accessibilityName: String
+    var controlsConfirmationVisibility = false
+    var showsVisibilityToggle = true
 
     var body: some View {
         HStack(spacing: 8) {
@@ -868,14 +938,20 @@ private struct PasswordEntry: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
 
-            Button {
-                isVisible.toggle()
-            } label: {
-                Image(systemName: isVisible ? "eye.slash" : "eye")
-                    .frame(width: 32, height: 32)
+            if showsVisibilityToggle {
+                Button {
+                    isVisible.toggle()
+                } label: {
+                    Image(systemName: isVisible ? "eye.slash" : "eye")
+                        .frame(width: 32, height: 32)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    isVisible
+                        ? "隐藏\(accessibilityName)\(controlsConfirmationVisibility ? "和确认密码" : "")"
+                        : "显示\(accessibilityName)\(controlsConfirmationVisibility ? "和确认密码" : "")"
+                )
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(isVisible ? "隐藏\(accessibilityName)" : "显示\(accessibilityName)")
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 44)

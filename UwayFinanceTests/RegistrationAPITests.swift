@@ -23,53 +23,84 @@ final class RegistrationAPITests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(RegistrationCodeRequest.self, from: body), RegistrationCodeRequest(phone: "+8613800138000"))
     }
 
-    func testRequestsRegistrationEmailCodeWithEmailOnlyAndIndistinguishableResponse() async throws {
-        RegistrationURLProtocol.handler = fixtureResponse(
-            named: "registration-email-code-success-v0.16.0",
-            statusCode: 202
-        )
-
-        let response = try await makeAPI().requestRegistrationEmailCode(email: "owner@example.com")
-
-        XCTAssertTrue(response.ok)
-        XCTAssertEqual(response.expiresInSeconds, 600)
-        XCTAssertEqual(response.resendAfterSeconds, 60)
-        XCTAssertFalse(response.message.isEmpty)
-        let request = try XCTUnwrap(capturedRequests().first)
-        XCTAssertEqual(request.url?.path, "/api/auth/registration-email-code")
-        XCTAssertNil(request.url?.query)
-        XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertEqual(
-            try JSONDecoder().decode(RegistrationEmailCodeRequest.self, from: requestBody(request)),
-            RegistrationEmailCodeRequest(email: "owner@example.com")
-        )
-    }
-
-    func testRegisterKeepsPasswordAndCodeOutOfURLAndDecodesIsolatedScope() async throws {
-        RegistrationURLProtocol.handler = fixtureResponse(named: "registration-success-v0.14.0", statusCode: 201)
+    func testRegisterCreatesPendingRegistrationWithoutSessionOrTenantResponse() async throws {
+        RegistrationURLProtocol.handler = fixtureResponse(named: "registration-pending-v0.16.0", statusCode: 202)
         let command = RegistrationRequest(
             username: "new_owner",
             email: "owner@example.com",
             password: "SecurePass2026",
             phone: "+8613800138000",
             challengeId: "reg_20260716_abcdefghijklmnop",
-            code: "246810",
-            emailChallengeId: "email_20260721_abcdefghijklmnop",
-            emailCode: "135790"
+            code: "246810"
         )
 
         let response = try await makeAPI().register(command)
 
-        XCTAssertEqual(response.user, SessionUser(id: "201", username: "new_owner"))
-        XCTAssertEqual(response.organizationId, "301")
-        XCTAssertEqual(response.accountBookId, "401")
+        XCTAssertTrue(response.ok)
+        XCTAssertEqual(response.pendingRegistrationId, "pending_20260721_abcdefghijklmnop")
+        XCTAssertEqual(response.expiresInSeconds, 900)
         let request = try XCTUnwrap(capturedRequests().first)
         XCTAssertEqual(request.url?.path, "/api/auth/register")
         XCTAssertNil(request.url?.query)
         XCTAssertFalse(request.url?.absoluteString.contains(command.password) ?? true)
         XCTAssertFalse(request.url?.absoluteString.contains(command.code) ?? true)
-        XCTAssertFalse(request.url?.absoluteString.contains(command.emailCode) ?? true)
         XCTAssertEqual(try JSONDecoder().decode(RegistrationRequest.self, from: requestBody(request)), command)
+        let responseObject = try XCTUnwrap(JSONSerialization.jsonObject(
+            with: fixture(named: "registration-pending-v0.16.0")
+        ) as? [String: Any])
+        XCTAssertNil(responseObject["user"])
+        XCTAssertNil(responseObject["organizationId"])
+        XCTAssertNil(responseObject["accountBookId"])
+    }
+
+    func testEmailLinkResendAndConfirmKeepOpaqueValuesInPOSTBodies() async throws {
+        let pendingData = try fixture(named: "registration-email-resend-v0.16.0")
+        let activationData = try fixture(named: "registration-email-confirm-v0.16.0")
+        RegistrationURLProtocol.handler = { request in
+            let confirming = request.url?.path.hasSuffix("/confirm") == true
+            return (HTTPURLResponse(
+                url: request.url!, statusCode: confirming ? 201 : 202, httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!, confirming ? activationData : pendingData)
+        }
+        let api = makeAPI()
+        let pendingID = "pending_20260721_abcdefghijklmnop"
+        let token = "opaque-token-from-cleared-fragment"
+
+        let resent = try await api.resendRegistrationEmail(RegistrationEmailResendRequest(
+            pendingRegistrationId: pendingID
+        ))
+        let activation = try await api.confirmRegistrationEmail(RegistrationEmailConfirmRequest(token: token))
+
+        XCTAssertEqual(resent.pendingRegistrationId, pendingID)
+        XCTAssertEqual(activation.user.username, "new_owner")
+        let requests = capturedRequests()
+        XCTAssertEqual(requests.map { $0.url?.path }, [
+            "/api/auth/registration-email/resend",
+            "/api/auth/registration-email/confirm",
+        ])
+        for request in requests {
+            XCTAssertNil(request.url?.query)
+            XCTAssertNil(request.url?.fragment)
+        }
+        XCTAssertFalse(requests[1].url?.absoluteString.contains(token) ?? true)
+        XCTAssertEqual(
+            try JSONDecoder().decode(RegistrationEmailResendRequest.self, from: requestBody(requests[0])),
+            RegistrationEmailResendRequest(pendingRegistrationId: pendingID)
+        )
+        XCTAssertEqual(
+            try JSONDecoder().decode(RegistrationEmailConfirmRequest.self, from: requestBody(requests[1])),
+            RegistrationEmailConfirmRequest(token: token)
+        )
+    }
+
+    func testEmailLinkTokenComesOnlyFromFragmentAndIsNotAcceptedFromQuery() throws {
+        let link = try XCTUnwrap(URL(string: "https://finance.example.test/register#verify-email=opaque%2Dtoken"))
+        let queryOnly = try XCTUnwrap(URL(string: "https://finance.example.test/register?verify-email=must-not-be-read"))
+
+        XCTAssertEqual(RegistrationEmailLink.token(from: link), "opaque-token")
+        XCTAssertNil(RegistrationEmailLink.token(from: queryOnly))
+        XCTAssertNil(RegistrationEmailLink.token(from: URL(string: "https://finance.example.test/register#verify-email=" )!))
     }
 
     func testLoginUsesIdentifierForUsernamePhoneAndEmailWithUnifiedFailureShape() async throws {
@@ -240,19 +271,20 @@ final class RegistrationAPITests: XCTestCase {
         }
     }
 
-    func testV016RegistrationErrorsIncludeEmailChallengeFailuresWithoutLeakingIdentity() throws {
+    func testV016RegistrationErrorsCoverPendingLinkLifecycleWithoutLeakingIdentity() throws {
         let fixtures = try JSONDecoder().decode(
             [RegistrationErrorFixture].self,
             from: fixture(named: "registration-errors-v0.16.0")
         )
 
-        XCTAssertEqual(fixtures.count, 12)
+        XCTAssertEqual(fixtures.count, 14)
         XCTAssertEqual(
             Set(fixtures.map(\.code)),
             Set([
                 "INVALID_PHONE", "INVALID_EMAIL", "INVALID_REGISTRATION_INPUT", "WEAK_PASSWORD",
-                "INVALID_REGISTRATION_CODE", "INVALID_REGISTRATION_EMAIL_CODE",
-                "REGISTRATION_CODE_RATE_LIMITED", "REGISTRATION_EMAIL_CODE_RATE_LIMITED",
+                "INVALID_REGISTRATION_CODE", "INVALID_REGISTRATION_EMAIL_TOKEN",
+                "REGISTRATION_CODE_RATE_LIMITED", "REGISTRATION_EMAIL_RESEND_RATE_LIMITED",
+                "REGISTRATION_EMAIL_CONFIRM_RATE_LIMITED", "REGISTRATION_EMAIL_LINK_RATE_LIMITED",
                 "REGISTRATION_IDENTITY_CONFLICT", "SMS_PROVIDER_UNAVAILABLE", "SMS_DELIVERY_FAILED",
                 "EMAIL_VERIFICATION_UNAVAILABLE",
             ])

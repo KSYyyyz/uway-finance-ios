@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "pendingRegistrationId": "pending_20260721_abcdefghijklmnop",
+  "expiresInSeconds": 900,
+  "resendAfterSeconds": 60,
+  "message": "如果待确认注册仍有效，确认邮件将重新发送。"
+}

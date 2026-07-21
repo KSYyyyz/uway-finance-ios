@@ -51,19 +51,24 @@
       "available": true,
       "reason": null,
       "codeEndpoint": "/api/auth/registration-code",
-      "emailCodeEndpoint": "/api/auth/registration-email-code",
       "registerEndpoint": "/api/auth/register",
       "phoneVerification": "aliyun_sms",
-      "createsIsolatedOrganizationAndAccountBook": true,
+      "createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation": true,
       "sessionCookie": "http_only_secure_same_site_strict",
       "usernameAvailabilityEndpoint": "/api/auth/username-availability",
       "emailRequired": true,
       "emailVerificationRequired": true,
       "emailVerification": {
         "purpose": "registration_verification",
+        "strategy": "email_link",
+        "confirmEndpoint": "/api/auth/registration-email/confirm",
+        "resendEndpoint": "/api/auth/registration-email/resend",
         "delivery": "aliyun_direct_mail",
-        "codeStorage": "hmac_sha256_digest_only",
-        "unknownEmailResponse": "indistinguishable"
+        "tokenStorage": "hmac_sha256_digest_only",
+        "tokenTransport": "url_fragment_then_post_body",
+        "activation": "after_email_confirmation",
+        "pendingTenantCreated": false,
+        "unknownPendingResponse": "indistinguishable"
       },
       "usernameNormalization": "nfkc_lowercase",
       "usernameLength": {

@@ -148,7 +148,9 @@ const requiredFiles = [
   'UwayFinanceTests/Fixtures/registration-errors-v0.15.0.json',
   'UwayFinanceTests/Fixtures/health-verified-account-email-v0.16.0.json',
   'UwayFinanceTests/Fixtures/capabilities-verified-account-email-v0.16.0.json',
-  'UwayFinanceTests/Fixtures/registration-email-code-success-v0.16.0.json',
+  'UwayFinanceTests/Fixtures/registration-pending-v0.16.0.json',
+  'UwayFinanceTests/Fixtures/registration-email-resend-v0.16.0.json',
+  'UwayFinanceTests/Fixtures/registration-email-confirm-v0.16.0.json',
   'UwayFinanceTests/Fixtures/registration-errors-v0.16.0.json',
   'UwayFinanceTests/IdentityInputPolicyTests.swift',
   'Docs/PERSONALIZATION_CONTRACT_REQUIREMENTS.md',
@@ -243,7 +245,9 @@ const fixtures = [
   'registration-errors-v0.15.0.json',
   'health-verified-account-email-v0.16.0.json',
   'capabilities-verified-account-email-v0.16.0.json',
-  'registration-email-code-success-v0.16.0.json',
+  'registration-pending-v0.16.0.json',
+  'registration-email-resend-v0.16.0.json',
+  'registration-email-confirm-v0.16.0.json',
   'registration-errors-v0.16.0.json',
 ]
 for (const fixture of fixtures) {
@@ -380,26 +384,31 @@ if (preferenceMemorySnapshot?.available !== true
 }
 const registrationSnapshot = contractSnapshot.capabilities?.registration
 if (registrationSnapshot?.availability !== 'runtime'
-    || registrationSnapshot?.reasonWhenUnavailable !== 'sms_provider_not_configured|email_provider_not_configured|verification_pepper_not_configured'
+    || registrationSnapshot?.reasonWhenUnavailable !== 'sms_provider_not_configured|email_provider_not_configured|app_origin_not_configured|verification_pepper_not_configured'
     || registrationSnapshot?.codeEndpoint !== '/api/auth/registration-code'
-    || registrationSnapshot?.emailCodeEndpoint !== '/api/auth/registration-email-code'
     || registrationSnapshot?.registerEndpoint !== '/api/auth/register'
     || registrationSnapshot?.usernameAvailabilityEndpoint !== '/api/auth/username-availability'
     || registrationSnapshot?.phoneVerification !== 'aliyun_sms'
     || registrationSnapshot?.emailRequired !== true
     || registrationSnapshot?.emailVerificationRequired !== true
     || registrationSnapshot?.emailVerification?.purpose !== 'registration_verification'
+    || registrationSnapshot?.emailVerification?.strategy !== 'email_link'
+    || registrationSnapshot?.emailVerification?.confirmEndpoint !== '/api/auth/registration-email/confirm'
+    || registrationSnapshot?.emailVerification?.resendEndpoint !== '/api/auth/registration-email/resend'
     || registrationSnapshot?.emailVerification?.delivery !== 'aliyun_direct_mail'
-    || registrationSnapshot?.emailVerification?.codeStorage !== 'hmac_sha256_digest_only'
-    || registrationSnapshot?.emailVerification?.unknownEmailResponse !== 'indistinguishable'
+    || registrationSnapshot?.emailVerification?.tokenStorage !== 'hmac_sha256_digest_only'
+    || registrationSnapshot?.emailVerification?.tokenTransport !== 'url_fragment_then_post_body'
+    || registrationSnapshot?.emailVerification?.activation !== 'after_email_confirmation'
+    || registrationSnapshot?.emailVerification?.pendingTenantCreated !== false
+    || registrationSnapshot?.emailVerification?.unknownPendingResponse !== 'indistinguishable'
     || registrationSnapshot?.usernameNormalization !== 'nfkc_lowercase'
     || registrationSnapshot?.usernameLength?.min !== 3
     || registrationSnapshot?.usernameLength?.max !== 32
     || registrationSnapshot?.passwordLength?.min !== 8
     || registrationSnapshot?.passwordLength?.max !== 256
-    || registrationSnapshot?.createsIsolatedOrganizationAndAccountBook !== true
+    || registrationSnapshot?.createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation !== true
     || registrationSnapshot?.sessionCookie !== 'http_only_secure_same_site_strict') {
-  throw new Error('registration snapshot must preserve dual-verification and tenant-isolation boundaries')
+  throw new Error('registration snapshot must preserve pending email-link activation and tenant-isolation boundaries')
 }
 const authenticationSnapshot = contractSnapshot.capabilities?.authentication
 if (authenticationSnapshot?.loginEndpoint !== '/api/auth/login'
@@ -496,22 +505,27 @@ const registrationCapability = capabilitiesFixture.features?.registration
 if (registrationCapability?.available !== true
     || registrationCapability?.reason !== null
     || registrationCapability?.codeEndpoint !== '/api/auth/registration-code'
-    || registrationCapability?.emailCodeEndpoint !== '/api/auth/registration-email-code'
     || registrationCapability?.registerEndpoint !== '/api/auth/register'
     || registrationCapability?.usernameAvailabilityEndpoint !== '/api/auth/username-availability'
     || registrationCapability?.phoneVerification !== 'aliyun_sms'
     || registrationCapability?.emailRequired !== true
     || registrationCapability?.emailVerificationRequired !== true
     || registrationCapability?.emailVerification?.purpose !== 'registration_verification'
+    || registrationCapability?.emailVerification?.strategy !== 'email_link'
+    || registrationCapability?.emailVerification?.confirmEndpoint !== '/api/auth/registration-email/confirm'
+    || registrationCapability?.emailVerification?.resendEndpoint !== '/api/auth/registration-email/resend'
     || registrationCapability?.emailVerification?.delivery !== 'aliyun_direct_mail'
-    || registrationCapability?.emailVerification?.codeStorage !== 'hmac_sha256_digest_only'
-    || registrationCapability?.emailVerification?.unknownEmailResponse !== 'indistinguishable'
+    || registrationCapability?.emailVerification?.tokenStorage !== 'hmac_sha256_digest_only'
+    || registrationCapability?.emailVerification?.tokenTransport !== 'url_fragment_then_post_body'
+    || registrationCapability?.emailVerification?.activation !== 'after_email_confirmation'
+    || registrationCapability?.emailVerification?.pendingTenantCreated !== false
+    || registrationCapability?.emailVerification?.unknownPendingResponse !== 'indistinguishable'
     || registrationCapability?.usernameNormalization !== 'nfkc_lowercase'
     || registrationCapability?.usernameLength?.min !== 3
     || registrationCapability?.usernameLength?.max !== 32
     || registrationCapability?.passwordLength?.min !== 8
     || registrationCapability?.passwordLength?.max !== 256
-    || registrationCapability?.createsIsolatedOrganizationAndAccountBook !== true
+    || registrationCapability?.createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation !== true
     || registrationCapability?.sessionCookie !== 'http_only_secure_same_site_strict') {
   throw new Error('current registration capability fixture is unsafe or incomplete')
 }
@@ -735,7 +749,9 @@ if (preferenceCapability?.available !== true
 }
 const registrationCodeFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-code-success-v0.14.0.json'), 'utf8'))
 const registrationSuccessFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-success-v0.14.0.json'), 'utf8'))
-const registrationEmailCodeFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-email-code-success-v0.16.0.json'), 'utf8'))
+const pendingRegistrationFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-pending-v0.16.0.json'), 'utf8'))
+const registrationEmailResendFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-email-resend-v0.16.0.json'), 'utf8'))
+const registrationEmailConfirmFixture = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-email-confirm-v0.16.0.json'), 'utf8'))
 const registrationErrorFixtures = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-errors-v0.16.0.json'), 'utf8'))
 const expectedRegistrationErrors = [
   [400, 'INVALID_PHONE'],
@@ -743,9 +759,11 @@ const expectedRegistrationErrors = [
   [400, 'INVALID_REGISTRATION_INPUT'],
   [400, 'WEAK_PASSWORD'],
   [400, 'INVALID_REGISTRATION_CODE'],
-  [400, 'INVALID_REGISTRATION_EMAIL_CODE'],
+  [400, 'INVALID_REGISTRATION_EMAIL_TOKEN'],
   [429, 'REGISTRATION_CODE_RATE_LIMITED'],
-  [429, 'REGISTRATION_EMAIL_CODE_RATE_LIMITED'],
+  [429, 'REGISTRATION_EMAIL_RESEND_RATE_LIMITED'],
+  [429, 'REGISTRATION_EMAIL_CONFIRM_RATE_LIMITED'],
+  [429, 'REGISTRATION_EMAIL_LINK_RATE_LIMITED'],
   [409, 'REGISTRATION_IDENTITY_CONFLICT'],
   [503, 'SMS_PROVIDER_UNAVAILABLE'],
   [503, 'SMS_DELIVERY_FAILED'],
@@ -755,16 +773,24 @@ if (registrationCodeFixture.ok !== true
     || registrationCodeFixture.expiresInSeconds !== 300
     || registrationCodeFixture.resendAfterSeconds !== 60
     || !registrationCodeFixture.challengeId
-    || registrationEmailCodeFixture.ok !== true
-    || registrationEmailCodeFixture.expiresInSeconds !== 600
-    || registrationEmailCodeFixture.resendAfterSeconds !== 60
-    || !registrationEmailCodeFixture.challengeId
-    || registrationEmailCodeFixture.message !== '如果该邮箱可用于注册，验证码将发送到邮箱。'
+    || pendingRegistrationFixture.ok !== true
+    || !pendingRegistrationFixture.pendingRegistrationId
+    || pendingRegistrationFixture.expiresInSeconds !== 900
+    || pendingRegistrationFixture.resendAfterSeconds !== 60
+    || 'user' in pendingRegistrationFixture
+    || 'organizationId' in pendingRegistrationFixture
+    || 'accountBookId' in pendingRegistrationFixture
+    || registrationEmailResendFixture.pendingRegistrationId !== pendingRegistrationFixture.pendingRegistrationId
+    || registrationEmailResendFixture.expiresInSeconds !== 900
+    || registrationEmailResendFixture.resendAfterSeconds !== 60
+    || !registrationEmailConfirmFixture.user?.id
+    || !registrationEmailConfirmFixture.organizationId
+    || !registrationEmailConfirmFixture.accountBookId
     || !registrationSuccessFixture.user?.id
     || !registrationSuccessFixture.organizationId
     || !registrationSuccessFixture.accountBookId
     || JSON.stringify(registrationErrorFixtures.map(({ status, code }) => [status, code])) !== JSON.stringify(expectedRegistrationErrors)) {
-  throw new Error('registration success/error fixtures do not match the frozen contract')
+  throw new Error('pending registration, email-link activation or error fixtures do not match the frozen contract')
 }
 const historicalRegistrationErrors = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-errors-v0.14.0.json'), 'utf8'))
 const historicalV015RegistrationErrors = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'registration-errors-v0.15.0.json'), 'utf8'))
@@ -772,7 +798,7 @@ if (historicalRegistrationErrors.find(({ code }) => code === 'REGISTRATION_IDENT
     || historicalV015RegistrationErrors.length !== 8
     || historicalV015RegistrationErrors.some(({ code }) => code.includes('EMAIL_CODE') || code === 'EMAIL_VERIFICATION_UNAVAILABLE')
     || registrationErrorFixtures.find(({ code }) => code === 'REGISTRATION_IDENTITY_CONFLICT')?.error !== '用户名、手机号或邮箱已被使用') {
-  throw new Error('registration fixtures must preserve v0.14/v0.15 history and v0.16 dual-verification semantics')
+  throw new Error('registration fixtures must preserve v0.14/v0.15 history and v0.16 pending email-link semantics')
 }
 const usernameAvailabilityFixtures = JSON.parse(fs.readFileSync(path.join(root, 'UwayFinanceTests', 'Fixtures', 'username-availability-v0.15.0.json'), 'utf8'))
 if (usernameAvailabilityFixtures.map(({ reason }) => reason).filter(Boolean).sort().join(',') !== 'format,length,numeric_only,reserved,unavailable'
@@ -1004,7 +1030,7 @@ for (const marker of ['let financeSchemaVersion: String?', '@LegacyMoney var amo
 }
 
 const backendContract = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'BackendContract.swift'), 'utf8')
-for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningStates', 'semantic-preference-v2', 'complete_link_semantic', 'RegistrationCapability', 'RegistrationEmailVerificationCapability', 'safeForVerifiedEmailRegistration', 'AuthenticationCapability', 'PasswordRecoveryCapability', 'supportsIdentityContract', 'safeForIdentifierLogin', 'sms_webhook', 'aliyun_sms', 'aliyun_direct_mail', 'registration_verification', 'nfkc_lowercase', 'indistinguishable', 'all_sessions', 'http_only_secure_same_site_strict', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', 'safeForAccountBookUse', 'sharedWithinAccountBook', 'idempotencyReplayHeader', '"accepted", "review", "rejected"']) {
+for (const marker of [expectedAPIContractVersion, expectedFinanceSchemaVersion, 'legacy_state_v1', 'versionSource', 'etagHeader', 'conditionalWriteHeader', 'cutoverState', 'cutoverReadiness', 'clientWritesEnabled', 'UnifiedDashboardMetricsCapability', 'ClassificationReviewCapability', 'ClassificationPreferenceMemoryCapability', 'ClassificationPreferenceLearningState', 'learningStates', 'semantic-preference-v2', 'complete_link_semantic', 'RegistrationCapability', 'RegistrationEmailVerificationCapability', 'safeForEmailLinkRegistration', 'AuthenticationCapability', 'PasswordRecoveryCapability', 'supportsIdentityContract', 'safeForIdentifierLogin', 'sms_webhook', 'aliyun_sms', 'aliyun_direct_mail', 'registration_verification', 'email_link', 'url_fragment_then_post_body', 'after_email_confirmation', 'pendingTenantCreated', 'nfkc_lowercase', 'indistinguishable', 'all_sessions', 'http_only_secure_same_site_strict', 'DocumentUploadCapability', 'database_trigger_and_sha256', 'accountBookScoped', 'closed_candidate_reordering_only', 'explicit_authenticated_human_decisions', 'deterministicGroupingAvailable', 'modelCanAccept', 'writesBusinessRecords', 'businessRecords', 'safeForAccountBookUse', 'sharedWithinAccountBook', 'idempotencyReplayHeader', '"accepted", "review", "rejected"']) {
   if (!backendContract.includes(marker)) throw new Error(`backend capability marker missing: ${marker}`)
 }
 for (const marker of ['let reason: String?', 'provider_not_configured', 'capabilities_unavailable', 'importAnalysis: response.features.importAnalysis']) {
@@ -1109,7 +1135,7 @@ for (const marker of ['case versionConflict', 'case stateVersionConflict', 'STAT
   if (!httpTransport.includes(marker)) throw new Error(`V2 transport marker missing: ${marker}`)
 }
 const financeAPI = fs.readFileSync(path.join(root, 'UwayFinance', 'Networking', 'FinanceAPI.swift'), 'utf8')
-for (const marker of ['login(identifier:', 'useLegacyUsernameField', 'usernameAvailability', 'requestRegistrationCode', 'requestRegistrationEmailCode', 'register(_ request: RegistrationRequest)', 'requestPasswordReset', 'confirmPasswordReset', 'serializedAuthenticationRequest', 'ifMatch revision: StateRevision', 'headers: ["If-Match": revision.ifMatchHeaderValue]', 'StateRevision(updatedAt: updatedAt)']) {
+for (const marker of ['login(identifier:', 'useLegacyUsernameField', 'usernameAvailability', 'requestRegistrationCode', 'register(_ request: RegistrationRequest)', 'resendRegistrationEmail', 'confirmRegistrationEmail', 'RegistrationEmailConfirmRequest', 'requestPasswordReset', 'confirmPasswordReset', 'serializedAuthenticationRequest', 'ifMatch revision: StateRevision', 'headers: ["If-Match": revision.ifMatchHeaderValue]', 'StateRevision(updatedAt: updatedAt)']) {
   if (!financeAPI.includes(marker)) throw new Error(`legacy state conditional-write API marker missing: ${marker}`)
 }
 if (financeAPI.includes('ISO8601DateFormatter().string(from: Date())')) {
@@ -1122,15 +1148,20 @@ if (appSession.includes('FinanceResourceAPI') || appSession.includes('CutoverRea
 for (const marker of ['stateRevision', 'unsavedSnapshot', 'conflictingServerRevision', 'catch APIError.stateVersionConflict', 'resolveStateConflictAndRetry', '其他设备已更新，需要核对']) {
   if (!appSession.includes(marker)) throw new Error(`AppSession conflict preservation marker missing: ${marker}`)
 }
-for (const marker of ['sessionGeneration', 'sessionScopeID', 'onSessionScopeCleared', 'registrationCapability', 'authenticationCapability', 'passwordRecoveryCapability', 'requestRegistrationCode', 'requestRegistrationEmailCode', 'checkUsernameAvailability', 'requestPasswordReset', 'confirmPasswordReset', 'beginSessionTransition']) {
+for (const marker of ['sessionGeneration', 'sessionScopeID', 'onSessionScopeCleared', 'registrationCapability', 'authenticationCapability', 'passwordRecoveryCapability', 'requestRegistrationCode', 'resendRegistrationEmail', 'confirmRegistrationEmail', 'checkUsernameAvailability', 'requestPasswordReset', 'confirmPasswordReset', 'beginSessionTransition']) {
   if (!appSession.includes(marker)) throw new Error(`AppSession account-isolation marker missing: ${marker}`)
 }
 const loginView = fs.readFileSync(path.join(root, 'UwayFinance', 'Views', 'LoginView.swift'), 'utf8')
-for (const marker of ['用户名、手机号或邮箱', 'requestRegistrationCode', 'requestRegistrationEmailCode', 'registrationEmailChallenge', 'emailChallengeId', 'emailCode', '手机和邮箱', 'session.register', 'debounceUsernameCheck', 'IdentityInputPolicy', 'session.checkUsernameAvailability', 'session.requestPasswordReset', 'session.confirmPasswordReset', 'PasswordEntry', '显示\\(accessibilityName)', 'TimelineView', 'expiresInSeconds', 'resendAfterSeconds', 'textContentType(.oneTimeCode)', 'contentType: .newPassword', 'RegistrationErrorMessage.localized', 'AuthenticationErrorMessage.localized']) {
+for (const marker of ['用户名、手机号或邮箱', 'requestRegistrationCode', 'pendingRegistration', 'resendRegistrationEmail', 'RegistrationEmailLink.token(from:', '.onOpenURL', 'session.confirmRegistrationEmail(token:', '一次性确认链接', '点击链接前不会创建用户、企业、账套或登录会话', 'session.register', 'debounceUsernameCheck', 'IdentityInputPolicy', 'session.checkUsernameAvailability', 'session.requestPasswordReset', 'session.confirmPasswordReset', 'PasswordEntry', 'controlsConfirmationVisibility: true', 'showsVisibilityToggle: false', 'TimelineView', 'expiresInSeconds', 'resendAfterSeconds', 'textContentType(.oneTimeCode)', 'contentType: .newPassword', 'RegistrationErrorMessage.localized', 'AuthenticationErrorMessage.localized']) {
   if (!loginView.includes(marker)) throw new Error(`registration UI marker missing: ${marker}`)
 }
 for (const forbidden of ['UserDefaults', 'Keychain', 'URLQueryItem(name: "password"', 'URLQueryItem(name: "code"']) {
   if (loginView.includes(forbidden)) throw new Error(`registration secret persistence/URL marker forbidden: ${forbidden}`)
+}
+for (const forbidden of ['requestRegistrationEmailCode', 'registrationEmailChallenge', 'emailChallengeId', 'emailCode']) {
+  if (loginView.includes(forbidden) || financeAPI.includes(forbidden) || appSession.includes(forbidden)) {
+    throw new Error('obsolete registration email-code marker forbidden: ' + forbidden)
+  }
 }
 const authenticationModels = fs.readFileSync(path.join(root, 'UwayFinance', 'Models', 'AuthenticationModels.swift'), 'utf8')
 for (const marker of ['UsernameAvailabilityRequest', 'PasswordResetChallengeResponse', 'PasswordResetConfirmRequest', 'precomposedStringWithCompatibilityMapping', 'reservedUsernames', 'numeric_only', '8...256', 'INVALID_CREDENTIALS', 'EMAIL_RESET_UNAVAILABLE']) {
@@ -1291,18 +1322,25 @@ if (hasLocalBackend) {
     "idempotencyKey: 'analysisId'",
     "idempotencyReplayHeader: 'Idempotency-Replayed'",
     "codeEndpoint: '/api/auth/registration-code'",
-    "emailCodeEndpoint: '/api/auth/registration-email-code'",
     "registerEndpoint: '/api/auth/register'",
     "usernameAvailabilityEndpoint: '/api/auth/username-availability'",
     "phoneVerification: 'aliyun_sms'",
     'emailRequired: true',
     'emailVerificationRequired: true',
     "purpose: 'registration_verification'",
+    "strategy: 'email_link'",
+    "confirmEndpoint: '/api/auth/registration-email/confirm'",
+    "resendEndpoint: '/api/auth/registration-email/resend'",
     'delivery: options.emailDelivery ?? null',
+    "tokenStorage: 'hmac_sha256_digest_only'",
+    "tokenTransport: 'url_fragment_then_post_body'",
+    "activation: 'after_email_confirmation'",
+    'pendingTenantCreated: false',
+    "unknownPendingResponse: 'indistinguishable'",
     "usernameNormalization: 'nfkc_lowercase'",
     'usernameLength: { min: 3, max: 32 }',
     'passwordLength: { min: 8, max: 256 }',
-    'createsIsolatedOrganizationAndAccountBook: true',
+    'createsIsolatedOrganizationAndAccountBookAfterEmailConfirmation: true',
     "sessionCookie: 'http_only_secure_same_site_strict'",
     "acceptedIdentifiers: ['username', 'phone', 'email']",
     "identifierField: 'identifier'",
@@ -1410,18 +1448,21 @@ if (hasLocalBackend) {
   const registration = fs.readFileSync(registrationPath, 'utf8')
   for (const marker of [
     'registrationCodeRequestSchema',
-    'registrationEmailCodeRequestSchema',
+    'registrationEmailConfirmSchema',
+    'registrationEmailResendSchema',
     'usernameAvailabilitySchema',
     'registrationSchema',
     'email: emailSchema',
     'validateUsername',
     'validatePassword',
     'REGISTRATION_CODE_RATE_LIMITED',
-    'REGISTRATION_EMAIL_CODE_RATE_LIMITED',
+    'REGISTRATION_EMAIL_RESEND_RATE_LIMITED',
+    'REGISTRATION_EMAIL_LINK_RATE_LIMITED',
     'EMAIL_VERIFICATION_UNAVAILABLE',
-    'INVALID_REGISTRATION_EMAIL_CODE',
-    "purpose IN ('registration_verification')",
-    'emailVerificationDigest',
+    'INVALID_REGISTRATION_EMAIL_TOKEN',
+    'pending_account_registrations',
+    'registrationEmailTokenDigest',
+    "update('registration_email_link')",
     'email_verified_at',
     'REGISTRATION_IDENTITY_CONFLICT',
     'SMS_PROVIDER_UNAVAILABLE',
